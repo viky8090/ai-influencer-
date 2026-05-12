@@ -1016,15 +1016,45 @@ export default function Influencers() {
           </Sec>
         </main>
       ) : (
-        <main style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:14,color:'var(--text-tertiary)'}}>
-          {isMobile&&(
-            <button onClick={()=>setMobileView('list')} style={{position:'absolute',top:14,left:16,display:'flex',alignItems:'center',gap:6,fontSize:14,fontWeight:600,color:'var(--accent)',background:'none',border:'none'}}>← Back</button>
-          )}
-          <div style={{fontSize:40}}>✦</div>
-          <p style={{fontSize:15,fontWeight:500}}>No influencer selected</p>
-          <button onClick={()=>setShowNew(true)} style={{padding:'10px 24px',borderRadius:980,background:'var(--text-primary)',color:'#fff',fontSize:14,fontWeight:600}}>
-            Create your first influencer
-          </button>
+        <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+
+          {/* Photo grid background */}
+          <div style={{position:'absolute',inset:0,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:3,opacity:0.18,pointerEvents:'none',transform:'scale(1.04)'}}>
+            {['/inf/i1.png','/inf/i4.jpg','/inf/i2.png','/inf/i5.png','/inf/i3.jpg','/inf/i6.jpg'].map((src,i)=>(
+              <img key={i} src={src} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+            ))}
+          </div>
+
+          {/* Frosted overlay */}
+          <div style={{position:'absolute',inset:0,backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',background:'rgba(245,245,247,0.82)',pointerEvents:'none'}}/>
+
+          {/* CTA */}
+          <div style={{position:'relative',zIndex:1,textAlign:'center'}}>
+            <div style={{
+              width:72,height:72,borderRadius:20,margin:'0 auto 24px',
+              background:'linear-gradient(135deg,#EC4899,#8B5CF6)',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              boxShadow:'0 8px 32px rgba(139,92,246,0.4)',
+            }}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="11" r="5.5" stroke="white" strokeWidth="2"/>
+                <path d="M4 28c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <h2 style={{fontSize:26,fontWeight:800,letterSpacing:'-0.6px',color:'var(--text-primary)',marginBottom:24}}>
+              Build your first influencer
+            </h2>
+            <button onClick={()=>setShowNew(true)} style={{
+              padding:'13px 36px',borderRadius:980,
+              background:'linear-gradient(135deg,#EC4899,#8B5CF6)',
+              color:'#fff',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',
+              boxShadow:'0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)',
+              transition:'transform 0.18s,box-shadow 0.18s',
+            }}
+              onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-1px)';e.currentTarget.style.boxShadow='0 0 48px rgba(139,92,246,0.5),0 8px 24px rgba(0,0,0,0.14)'}}
+              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)'}}
+            >+ Create Influencer</button>
+          </div>
         </main>
       ))}
     </div>

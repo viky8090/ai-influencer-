@@ -15,55 +15,60 @@ export default function Nav() {
       position: 'fixed',
       top: 0, left: 0, right: 0,
       height: 'var(--nav-h)',
-      background: dark ? 'transparent' : 'rgba(255,255,255,0.72)',
+      background: dark ? 'transparent' : 'rgba(255,255,255,0.80)',
       backdropFilter: dark ? 'none' : 'blur(24px) saturate(1.8)',
       WebkitBackdropFilter: dark ? 'none' : 'blur(24px) saturate(1.8)',
-      borderBottom: dark ? 'none' : '1px solid rgba(0,0,0,0.07)',
-      boxShadow: dark ? 'none' : '0 1px 0 rgba(255,255,255,0.5) inset',
+      borderBottom: dark ? 'none' : '1px solid rgba(0,0,0,0.06)',
       display: 'flex',
       alignItems: 'center',
-      padding: '0 32px',
+      padding: '0 28px',
       zIndex: 100,
-      gap: 8,
-      transition: 'background 0.5s, border-color 0.5s',
+      gap: 2,
+      transition: 'background 0.5s',
     }}>
-      <NavLink to="/" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+
+      {/* Logo */}
+      <NavLink to="/" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
         <span style={{
-          width: 26, height: 26, borderRadius: 7,
-          background: dark ? 'rgba(255,255,255,0.10)' : 'var(--text-primary)',
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: dark ? 'rgba(255,255,255,0.10)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
           border: dark ? '1px solid rgba(255,255,255,0.12)' : 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: dark ? 'none' : '0 2px 8px rgba(139,92,246,0.35)',
           transition: 'background 0.5s',
         }}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <circle cx="7" cy="5" r="3" fill="white" opacity="0.9"/>
-            <path d="M1 13c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.9"/>
+            <circle cx="7" cy="5" r="3" fill="white" opacity="0.95"/>
+            <path d="M1 13c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.95"/>
           </svg>
         </span>
         <span className="nav-brand-label" style={{
-          fontWeight: 600, fontSize: 15, letterSpacing: '-0.3px',
-          color: dark ? 'rgba(255,255,255,0.85)' : 'var(--text-primary)',
+          fontWeight: 700, fontSize: 15, letterSpacing: '-0.4px',
+          color: dark ? 'rgba(255,255,255,0.90)' : 'var(--text-primary)',
           transition: 'color 0.5s',
         }}>Influencer Studio</span>
       </NavLink>
 
-      {links.map(l => (
-        <NavLink key={l.to} to={l.to} className="nav-link" style={({ isActive }) => ({
-          padding: '6px 14px',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 500,
-          color: dark
-            ? (isActive ? '#fff' : 'rgba(255,255,255,0.42)')
-            : (isActive ? 'var(--accent)' : 'var(--text-secondary)'),
-          background: dark
-            ? (isActive ? 'rgba(255,255,255,0.08)' : 'transparent')
-            : (isActive ? 'var(--accent-light)' : 'transparent'),
-          transition: 'all 0.15s',
-        })}>
-          {l.label}
-        </NavLink>
-      ))}
+      {/* Nav links */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        {links.map(l => (
+          <NavLink key={l.to} to={l.to} className="nav-link" style={({ isActive }) => ({
+            padding: '6px 14px',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: isActive ? 600 : 500,
+            color: dark
+              ? (isActive ? '#fff' : 'rgba(255,255,255,0.45)')
+              : (isActive ? '#EC4899' : 'var(--text-secondary)'),
+            background: dark
+              ? (isActive ? 'rgba(255,255,255,0.08)' : 'transparent')
+              : (isActive ? 'rgba(236,72,153,0.08)' : 'transparent'),
+            transition: 'all 0.15s',
+          })}>
+            {l.label}
+          </NavLink>
+        ))}
+      </div>
     </nav>
   )
 }
