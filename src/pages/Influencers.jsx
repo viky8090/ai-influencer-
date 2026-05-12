@@ -1,4 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+
+function useMobile() {
+  const [m, setM] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  return m
+}
 import { useInfluencers, generateId } from '../store'
 import ImageGrid from '../components/ImageGrid'
 import MasonryGrid from '../components/MasonryGrid'
@@ -121,6 +131,7 @@ function HeroBanner({ influencer, onExport, onDelete, pct }) {
   const gc = gColor(influencer.gender)
   const r = 33, c = 2*Math.PI*r, off = c*(1-pct/100)
   const ringColor = pct>=80?'#34C759':pct>=50?'#F97316':'#0071E3'
+  const isMobile = useMobile()
 
   return (
     <div style={{
@@ -134,7 +145,7 @@ function HeroBanner({ influencer, onExport, onDelete, pct }) {
       {/* Accent stripe */}
       <div style={{height:3,background:`linear-gradient(to right, ${ac}, ${ac}55, transparent)`}}/>
 
-      <div style={{padding:'18px 22px',display:'flex',alignItems:'center',gap:18}}>
+      <div style={{padding:isMobile?'14px 16px':'18px 22px',display:'flex',alignItems:'center',gap:isMobile?12:18,flexWrap:isMobile?'wrap':'nowrap'}}>
         {/* Avatar + completion ring */}
         <div style={{position:'relative',width:74,height:74,flexShrink:0}}>
           <svg width={74} height={74} style={{position:'absolute',top:0,left:0,pointerEvents:'none'}}>
@@ -189,7 +200,7 @@ function HeroBanner({ influencer, onExport, onDelete, pct }) {
         </div>
 
         {/* Actions */}
-        <div style={{display:'flex',gap:8,flexShrink:0}}>
+        <div style={{display:'flex',gap:8,flexShrink:0,marginLeft:isMobile?'auto':0}}>
           <button onClick={onExport} style={{
             padding:'8px 16px',borderRadius:8,fontSize:12,fontWeight:600,
             background:'var(--bg-tertiary)',color:'var(--text-primary)',
@@ -723,7 +734,7 @@ function DescriptionForm({ influencer, onUpdate }) {
       </InfoCell>
 
       {/* ── Row 4: Style trifecta ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+      <div className="desc-grid-3">
         <InfoCell label="Clothing Style" icon="👗">
           <BareInput value={influencer.clothingStyle ?? ''} onChange={e => u('clothingStyle', e.target.value)} placeholder="e.g. Minimalist…"/>
         </InfoCell>
@@ -736,7 +747,7 @@ function DescriptionForm({ influencer, onUpdate }) {
       </div>
 
       {/* ── Row 5: Palette + Voice ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div className="desc-grid-2">
         <InfoCell label="Aesthetic Palette" icon="🎨">
           <ColorPalette palette={influencer.palette ?? []} onChange={v => u('palette', v)} gender={influencer.gender}/>
         </InfoCell>
@@ -812,6 +823,8 @@ export default function Influencers() {
   const [ctxMenu,setCtxMenu]=useState(null)
   const [renameId,setRenameId]=useState(null)
   const [renameVal,setRenameVal]=useState('')
+  const [mobileView,setMobileView]=useState('list')
+  const isMobile=useMobile()
 
   const influencer=influencers.find(i=>i.id===selectedId)
   const ac=accent(influencer)
@@ -870,8 +883,8 @@ export default function Influencers() {
         />
       )}
 
-      {/* ── Dark sidebar */}
-      <aside style={{width:216,flexShrink:0,background:SD.bg,borderRight:`1px solid ${SD.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      {/* ── Dark sidebar — hidden on mobile when viewing detail */}
+      {(!isMobile || mobileView==='list') && <aside style={{width:isMobile?'100%':216,flexShrink:0,background:SD.bg,borderRight:`1px solid ${SD.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
         <div style={{padding:'16px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${SD.border}`}}>
           <span style={{fontSize:11,fontWeight:700,color:SD.dim,textTransform:'uppercase',letterSpacing:'0.6px'}}>Influencers</span>
           <button onClick={()=>setShowNew(true)} style={{width:26,height:26,borderRadius:7,background:'rgba(255,255,255,0.12)',color:SD.text,fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.15s'}}
@@ -890,7 +903,7 @@ export default function Influencers() {
             const gc=gColor(inf.gender)
             return (
               <button key={inf.id}
-                onClick={()=>setSelectedId(inf.id)}
+                onClick={()=>{setSelectedId(inf.id);if(isMobile)setMobileView('detail')}}
                 onContextMenu={e=>openCtx(e,inf.id)}
                 style={{
                   width:'100%',padding:'10px',borderRadius:10,textAlign:'left',
@@ -930,17 +943,25 @@ export default function Influencers() {
             )
           })}
         </div>
-      </aside>
+      </aside>}
 
-      {/* ── Main */}
-      {influencer ? (
-        <main style={{flex:1,overflow:'auto',padding:'20px 24px',display:'flex',flexDirection:'column',gap:14,backgroundImage:'radial-gradient(ellipse at 75% 0%, rgba(0,113,227,0.04) 0%, transparent 55%)'}}>
+      {/* ── Main — hidden on mobile when viewing list */}
+      {(!isMobile || mobileView==='detail') && (influencer ? (
+        <main style={{flex:1,overflow:'auto',padding:isMobile?'14px 16px':'20px 24px',display:'flex',flexDirection:'column',gap:14,backgroundImage:'radial-gradient(ellipse at 75% 0%, rgba(0,113,227,0.04) 0%, transparent 55%)'}}>
+          {/* Mobile back button */}
+          {isMobile&&(
+            <button onClick={()=>setMobileView('list')} style={{
+              display:'flex',alignItems:'center',gap:6,padding:'8px 0',
+              fontSize:14,fontWeight:600,color:'var(--accent)',background:'none',border:'none',
+              alignSelf:'flex-start',
+            }}>← All Influencers</button>
+          )}
           {/* Hero banner */}
           <HeroBanner influencer={influencer} pct={pct} onExport={()=>exportInfluencerCard(influencer)} onDelete={()=>del(influencer.id)}/>
 
           {/* Three image sections */}
           <Sec>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16}}>
+            <div className="inf-img-grid">
               <div>
                 <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Image</div>
                 <ImageSlot value={influencer.mainImage} onChange={v=>upd(influencer.id,{mainImage:v})} label="Main image" aspectRatio="3/4"
@@ -996,13 +1017,16 @@ export default function Influencers() {
         </main>
       ) : (
         <main style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:14,color:'var(--text-tertiary)'}}>
+          {isMobile&&(
+            <button onClick={()=>setMobileView('list')} style={{position:'absolute',top:14,left:16,display:'flex',alignItems:'center',gap:6,fontSize:14,fontWeight:600,color:'var(--accent)',background:'none',border:'none'}}>← Back</button>
+          )}
           <div style={{fontSize:40}}>✦</div>
           <p style={{fontSize:15,fontWeight:500}}>No influencer selected</p>
           <button onClick={()=>setShowNew(true)} style={{padding:'10px 24px',borderRadius:980,background:'var(--text-primary)',color:'#fff',fontSize:14,fontWeight:600}}>
             Create your first influencer
           </button>
         </main>
-      )}
+      ))}
     </div>
   )
 }

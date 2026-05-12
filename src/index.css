@@ -91,3 +91,20 @@ a {
 .dark-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── Responsive grids ── */
+.desc-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.desc-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.inf-img-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+@media (max-width: 700px) {
+  .desc-grid-2, .desc-grid-3 { grid-template-columns: 1fr; }
+  .inf-img-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+}
+
+/* ── Nav mobile ── */
+@media (max-width: 640px) {
+  .nav-root { padding: 0 12px !important; gap: 2px !important; }
+  .nav-link  { padding: 5px 8px !important; font-size: 12px !important; }
+  .nav-brand-label { display: none !important; }
+}

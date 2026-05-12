@@ -11,7 +11,7 @@ export default function Nav() {
   const dark = pathname === '/'
 
   return (
-    <nav style={{
+    <nav className="nav-root" style={{
       position: 'fixed',
       top: 0, left: 0, right: 0,
       height: 'var(--nav-h)',
@@ -40,7 +40,7 @@ export default function Nav() {
             <path d="M1 13c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.9"/>
           </svg>
         </span>
-        <span style={{
+        <span className="nav-brand-label" style={{
           fontWeight: 600, fontSize: 15, letterSpacing: '-0.3px',
           color: dark ? 'rgba(255,255,255,0.85)' : 'var(--text-primary)',
           transition: 'color 0.5s',
@@ -48,7 +48,7 @@ export default function Nav() {
       </NavLink>
 
       {links.map(l => (
-        <NavLink key={l.to} to={l.to} style={({ isActive }) => ({
+        <NavLink key={l.to} to={l.to} className="nav-link" style={({ isActive }) => ({
           padding: '6px 14px',
           borderRadius: 8,
           fontSize: 14,
