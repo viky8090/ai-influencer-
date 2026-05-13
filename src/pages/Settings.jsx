@@ -38,6 +38,7 @@ export default function Settings() {
 
   async function connectHiggsfield() {
     setHfLoading(true)
+    window.open('https://higgsfield.ai/?fpr=dankieft&fp_sid=tool', '_blank', 'noopener,noreferrer')
     try {
       await startHiggsfieldOAuth() // redirects away
     } catch (e) {
