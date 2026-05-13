@@ -21,13 +21,27 @@ export default function AuthCallback() {
       return
     }
 
+    const isPopup = !!(window.opener && !window.opener.closed)
+
     handleOAuthCallback(code, state)
       .then(() => {
-        const returnUrl = localStorage.getItem('hf_return_url') || '/settings?connected=1'
-        localStorage.removeItem('hf_return_url')
-        navigate(returnUrl, { replace: true })
+        if (isPopup) {
+          window.opener.postMessage({ type: 'hf_auth_success' }, window.location.origin)
+          window.close()
+        } else {
+          const returnUrl = localStorage.getItem('hf_return_url') || '/settings?connected=1'
+          localStorage.removeItem('hf_return_url')
+          navigate(returnUrl, { replace: true })
+        }
       })
-      .catch(e => setError(e.message))
+      .catch(e => {
+        if (isPopup) {
+          window.opener.postMessage({ type: 'hf_auth_error', error: e.message }, window.location.origin)
+          window.close()
+        } else {
+          setError(e.message)
+        }
+      })
   }, [])
 
   return (

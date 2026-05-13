@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { startHiggsfieldOAuth, disconnectHF, isHFConnected, fireReferralOnce } from '../utils/higgsfieldAuth'
+import { startHiggsfieldOAuthPopup, disconnectHF, isHFConnected, fireReferralOnce } from '../utils/higgsfieldAuth'
 import { useTheme } from '../context/theme'
 
 function Section({ title, children }) {
@@ -39,11 +39,12 @@ export default function Settings() {
   async function connectHiggsfield() {
     setHfLoading(true)
     fireReferralOnce()
-    localStorage.setItem('hf_return_url', '/settings?connected=1')
     try {
-      await startHiggsfieldOAuth() // redirects away
+      await startHiggsfieldOAuthPopup()
+      setHfConnected(true)
     } catch (e) {
-      alert('Failed to start Higgsfield connection: ' + e.message)
+      if (e.message !== 'cancelled') alert('Failed to connect Higgsfield: ' + e.message)
+    } finally {
       setHfLoading(false)
     }
   }

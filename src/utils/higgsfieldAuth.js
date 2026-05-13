@@ -35,15 +35,13 @@ async function ensureClientId() {
   return d.client_id
 }
 
-export async function startHiggsfieldOAuth() {
+async function buildAuthUrl() {
   const verifier = randomString(64)
   const challenge = await sha256Base64Url(verifier)
   const state = randomString(16)
   const clientId = await ensureClientId()
-
   localStorage.setItem('hf_verifier', verifier)
   localStorage.setItem('hf_state', state)
-
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
@@ -53,7 +51,33 @@ export async function startHiggsfieldOAuth() {
     code_challenge: challenge,
     code_challenge_method: 'S256',
   })
-  window.location.href = `${AUTH_DIRECT}/oauth2/authorize?${params}`
+  return `${AUTH_DIRECT}/oauth2/authorize?${params}`
+}
+
+export async function startHiggsfieldOAuth() {
+  window.location.href = await buildAuthUrl()
+}
+
+// Opens OAuth in a small popup so the current tab never navigates away.
+// Resolves when the user successfully connects, rejects if cancelled or failed.
+export async function startHiggsfieldOAuthPopup() {
+  const authUrl = await buildAuthUrl()
+  const w = 520, h = 660
+  const left = Math.round(window.screenX + (window.outerWidth - w) / 2)
+  const top = Math.round(window.screenY + (window.outerHeight - h) / 2)
+  const popup = window.open(authUrl, 'hf_oauth', `width=${w},height=${h},left=${left},top=${top}`)
+  if (!popup) throw new Error('Popup blocked — please allow popups for this site and try again')
+
+  return new Promise((resolve, reject) => {
+    function onMessage(e) {
+      if (e.origin !== window.location.origin) return
+      if (e.data?.type === 'hf_auth_success') { cleanup(); resolve() }
+      else if (e.data?.type === 'hf_auth_error') { cleanup(); reject(new Error(e.data.error)) }
+    }
+    const poll = setInterval(() => { if (popup.closed) { cleanup(); reject(new Error('cancelled')) } }, 600)
+    function cleanup() { clearInterval(poll); window.removeEventListener('message', onMessage) }
+    window.addEventListener('message', onMessage)
+  })
 }
 
 export async function handleOAuthCallback(code, state) {

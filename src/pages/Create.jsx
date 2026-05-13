@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useInfluencers, generateId } from '../store'
 import { buildThreeVariationPrompts } from '../utils/systemPrompt'
 import { generateThreeImages } from '../utils/higgsfieldGenerate'
-import { isHFConnected, startHiggsfieldOAuth, fireReferralOnce } from '../utils/higgsfieldAuth'
+import { isHFConnected, startHiggsfieldOAuthPopup, fireReferralOnce } from '../utils/higgsfieldAuth'
 import { compressImage } from '../utils/imageUtils'
 import { gColor } from '../utils/influencerUtils'
 
@@ -765,14 +765,14 @@ function VariationCard({ url, selected, gc, onSelect, index }) {
 }
 
 // ── Step 5: Generate ──────────────────────────────────────────
-function Step5({ data, onFinish, onReset }) {
+function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
   const [phase, setPhase] = useState('idle')
   const [genProgress, setGenProgress] = useState(0)
   const [genError, setGenError] = useState(null)
   const [variations, setVariations] = useState([])
   const [selected, setSelected] = useState(null)
   const [lightboxUrl, setLightboxUrl] = useState(null)
-  const hfConnected = isHFConnected()
+  const [connectingHF, setConnectingHF] = useState(false)
   const gc = gColor(data.gender)
 
   async function generate() {
@@ -787,17 +787,17 @@ function Step5({ data, onFinish, onReset }) {
     }
   }
 
-  const [connectingHF, setConnectingHF] = useState(false)
   const displayName = data.name?.trim() || 'your influencer'
 
   async function doConnect() {
     setConnectingHF(true)
     fireReferralOnce()
-    localStorage.setItem('hf_return_url', '/create')
     try {
-      await startHiggsfieldOAuth()
+      await startHiggsfieldOAuthPopup()
+      onConnected?.()
     } catch (e) {
-      alert('Failed to start Higgsfield connection: ' + e.message)
+      if (e.message !== 'cancelled') alert('Failed to connect Higgsfield: ' + e.message)
+    } finally {
       setConnectingHF(false)
     }
   }
@@ -945,6 +945,7 @@ export default function Create() {
 
   const [shakeContinue, setShakeContinue] = useState(false)
   const [ageErrorPulse, setAgeErrorPulse] = useState(false)
+  const [hfConnected, setHfConnected] = useState(isHFConnected)
 
   function set(k, v) { setData(prev => ({ ...prev, [k]: v })) }
   function canAdvance() { return step === 1 ? !!data.name.trim() : true }
@@ -962,8 +963,12 @@ export default function Create() {
 
   async function connectFromBanner() {
     fireReferralOnce()
-    localStorage.setItem('hf_return_url', '/create')
-    try { await startHiggsfieldOAuth() } catch (e) { alert('Failed to connect: ' + e.message) }
+    try {
+      await startHiggsfieldOAuthPopup()
+      setHfConnected(true)
+    } catch (e) {
+      if (e.message !== 'cancelled') alert('Failed to connect: ' + e.message)
+    }
   }
 
   function resetAll() {
@@ -1012,7 +1017,7 @@ export default function Create() {
       <div style={{ width: '100%', maxWidth: 548, padding: '40px 24px 100px', position: 'relative', zIndex: 2 }}>
         <StepIndicator current={step} />
 
-        {!isHFConnected() && step < 5 && (
+        {!hfConnected && step < 5 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 15px', borderRadius: 12, background: 'rgba(139,92,246,0.06)', border: '1.5px solid rgba(139,92,246,0.14)', marginBottom: 32 }}>
             <span style={{ fontSize: 13 }}>🔗</span>
             <span style={{ fontSize: 13, color: L.textSub, flex: 1 }}>Connect your Higgsfield account first.</span>
@@ -1024,7 +1029,7 @@ export default function Create() {
         {step === 2 && <Step2 data={data} set={set} />}
         {step === 3 && <Step3 data={data} set={set} />}
         {step === 4 && <Step4 data={data} set={set} />}
-        {step === 5 && <Step5 data={data} onFinish={finish} onReset={resetAll} />}
+        {step === 5 && <Step5 data={data} onFinish={finish} onReset={resetAll} hfConnected={hfConnected} onConnected={() => setHfConnected(true)} />}
 
         {!isLastStep && (
           <div style={{ display: 'flex', gap: 10, marginTop: 36 }}>
