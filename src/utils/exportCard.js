@@ -36,21 +36,7 @@ async function loadImg(src) {
   })
 }
 
-function gColor(gender) {
-  if (gender === 'Female') return '#EC4899'
-  if (gender === 'Male') return '#3B82F6'
-  return '#8B5CF6'
-}
-
-function pLabel(v) {
-  if (v < 15) return 'Strongly Introverted'
-  if (v < 30) return 'Introverted'
-  if (v < 43) return 'Slightly Introverted'
-  if (v < 57) return 'Balanced'
-  if (v < 70) return 'Slightly Extroverted'
-  if (v < 85) return 'Extroverted'
-  return 'Strongly Extroverted'
-}
+import { gColor, pLabel } from './influencerUtils'
 
 export async function exportInfluencerCard(inf) {
   const W = 900, H = 520, IW = 270
@@ -127,21 +113,16 @@ export async function exportInfluencerCard(inf) {
     cy += 8
   }
 
-  // Content Pillars
-  if (inf.contentPillars?.length > 0) {
+  // Hobbies
+  if (inf.hobbies?.trim()) {
     ctx.fillStyle = '#AEAEB2'
     ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, Arial, sans-serif'
-    ctx.fillText('CONTENT PILLARS', RX, cy); cy += 14
-    let px = RX
-    for (const p of inf.contentPillars) {
-      ctx.font = '11px -apple-system, BlinkMacSystemFont, Arial, sans-serif'
-      const tw = ctx.measureText(p).width + 16
-      if (px + tw > RX + RW) break
-      ctx.fillStyle = gc + '22'; rr(ctx, px, cy - 12, tw, 20, 5); ctx.fill()
-      ctx.fillStyle = gc; ctx.fillText(p, px + 8, cy + 2)
-      px += tw + 6
-    }
-    cy += 20
+    ctx.fillText('HOBBIES', RX, cy)
+    const lw = ctx.measureText('HOBBIES').width + 8
+    ctx.fillStyle = '#3A3A3C'
+    ctx.font = '12px -apple-system, BlinkMacSystemFont, Arial, sans-serif'
+    ctx.fillText(inf.hobbies.slice(0, 55), RX + lw, cy)
+    cy += 18
   }
 
   // Voice / Dream brands

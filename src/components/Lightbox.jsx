@@ -90,7 +90,8 @@ export default function Lightbox({ images, startIndex = 0, onClose }) {
       {multi && (
         <div style={{
           position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', gap: 8,
+          display: 'flex', gap: 8, maxWidth: '90vw', overflowX: 'auto',
+          paddingBottom: 4,
         }}>
           {images.map((src, i) => (
             <div

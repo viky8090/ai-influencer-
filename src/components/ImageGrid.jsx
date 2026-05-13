@@ -1,19 +1,22 @@
 import { useRef, useState } from 'react'
 import Lightbox from './Lightbox'
+import { compressImage } from '../utils/imageUtils'
 
 export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add images', columns = 3 }) {
   const fileRef = useRef()
   const [dragIdx, setDragIdx] = useState(null)
   const [overIdx, setOverIdx] = useState(null)
   const [lightbox, setLightbox] = useState(null) // index
+  const imagesRef = useRef(images)
+  imagesRef.current = images
 
   function handleFiles(files) {
     const readers = Array.from(files).map(f => new Promise(res => {
       const r = new FileReader()
-      r.onload = e => res(e.target.result)
+      r.onload = e => compressImage(e.target.result).then(res)
       r.readAsDataURL(f)
     }))
-    Promise.all(readers).then(results => onChange([...images, ...results]))
+    Promise.all(readers).then(results => onChange([...imagesRef.current, ...results])).catch(console.error)
   }
 
   function remove(idx) {

@@ -1,4 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useInfluencers, generateId } from '../store'
+import ImageGrid from '../components/ImageGrid'
+import MasonryGrid from '../components/MasonryGrid'
+import Lightbox from '../components/Lightbox'
+import { exportInfluencerCard } from '../utils/exportCard'
+import { compressImage } from '../utils/imageUtils'
+import { gColor, pLabel } from '../utils/influencerUtils'
 
 function useMobile() {
   const [m, setM] = useState(() => window.innerWidth < 768)
@@ -9,11 +16,6 @@ function useMobile() {
   }, [])
   return m
 }
-import { useInfluencers, generateId } from '../store'
-import ImageGrid from '../components/ImageGrid'
-import MasonryGrid from '../components/MasonryGrid'
-import Lightbox from '../components/Lightbox'
-import { exportInfluencerCard } from '../utils/exportCard'
 
 // ─────────────────────────────────────────────
 // Dark sidebar palette
@@ -42,22 +44,11 @@ function audiencePh(g,n) {
   if (g==='Male')   return `e.g. a man, 20–35, interested in ${nl||'fitness & gaming'}`
   return `e.g. adults, 18–30, interested in ${nl||'lifestyle & entertainment'}`
 }
-function pLabel(v) {
-  if (v<15) return 'Strongly Introverted'
-  if (v<30) return 'Introverted'
-  if (v<43) return 'Slightly Introverted'
-  if (v<57) return 'Balanced'
-  if (v<70) return 'Slightly Extroverted'
-  if (v<85) return 'Extroverted'
-  return 'Strongly Extroverted'
-}
 function pColor(v) {
   const l=(a,b,t)=>Math.round(a+(b-a)*t)
   if(v<=50){const t=v/50;return`rgb(${l(251,249,t)},${l(191,115,t)},${l(36,22,t)})`}
   const t=(v-50)/50;return`rgb(${l(249,239,t)},${l(115,68,t)},${l(22,68,t)})`
 }
-function gColor(g) { return g==='Female'?'#EC4899':g==='Male'?'#3B82F6':'#8B5CF6' }
-
 // Profile accent: use first palette color or fall back to gender color
 function accent(inf) { return inf?.palette?.[0] || gColor(inf?.gender) }
 
@@ -72,8 +63,8 @@ function completeness(inf) {
   const c = [
     inf.name?.trim(), inf.gender, inf.mainImage, inf.characterSheetImage, inf.closeUpImage1,
     inf.prompt?.trim(), inf.backstory?.trim(), inf.niche, inf.audience?.trim(), inf.voice?.trim(),
-    inf.wardrobeImages?.length>0, inf.homeImages?.length>0,
-    inf.contentPillars?.length>0, inf.palette?.length>0,
+    inf.wardrobeSlots?.some(s => s.image), inf.homeImages?.length > 0,
+    inf.hobbies?.trim(), inf.palette?.length > 0,
   ]
   return Math.round(c.filter(Boolean).length / c.length * 100)
 }
@@ -99,8 +90,13 @@ function Ring({ pct, size=42 }) {
 function CtxMenu({ x, y, items, onClose }) {
   useEffect(() => {
     const h = () => onClose()
+    const onKey = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('click', h, { once: true })
-    return () => window.removeEventListener('click', h)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('click', h)
+      window.removeEventListener('keydown', onKey)
+    }
   }, [onClose])
   return (
     <div onClick={e=>e.stopPropagation()} style={{
@@ -207,7 +203,7 @@ function HeroBanner({ influencer, onExport, onDelete, pct }) {
             border:'1.5px solid var(--border)',
             display:'flex',alignItems:'center',gap:5,transition:'background 0.15s',
           }}
-            onMouseEnter={e=>e.currentTarget.style.background='#E8E8ED'}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--border)'}
             onMouseLeave={e=>e.currentTarget.style.background='var(--bg-tertiary)'}
           >↓ Export</button>
           <button onClick={onDelete} style={{
@@ -222,24 +218,6 @@ function HeroBanner({ influencer, onExport, onDelete, pct }) {
       </div>
     </div>
   )
-}
-
-// ─────────────────────────────────────────────
-// Compress image to JPEG before storing (prevents localStorage crash on large photos)
-function compressImage(dataUrl, maxPx = 1400, quality = 0.82) {
-  return new Promise(resolve => {
-    const img = new Image()
-    img.onload = () => {
-      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
-      const w = Math.round(img.width * scale)
-      const h = Math.round(img.height * scale)
-      const canvas = document.createElement('canvas')
-      canvas.width = w; canvas.height = h
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/jpeg', quality))
-    }
-    img.src = dataUrl
-  })
 }
 
 // ─────────────────────────────────────────────
@@ -286,29 +264,9 @@ function ImageSlot({ value, onChange, label, aspectRatio='3/4', onLightbox }) {
         onChange={e=>{
           const f=e.target.files[0]; if(!f) return
           const r=new FileReader()
-          r.onload=ev=>compressImage(ev.target.result).then(onChange)
+          r.onload=ev=>compressImage(ev.target.result).then(onChange).catch(console.error)
           r.readAsDataURL(f); e.target.value=''
         }}/>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────
-// Personality slider
-function PersonalitySlider({ value, onChange }) {
-  return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
-        <span style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>Introvert</span>
-        <span style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>Extrovert</span>
-      </div>
-      <input type="range" min={0} max={100} value={value} onChange={e=>onChange(Number(e.target.value))} style={{
-        width:'100%',height:6,borderRadius:3,
-        background:'linear-gradient(to right,#FBBF24,#F97316,#EF4444)',
-        outline:'none',appearance:'none',WebkitAppearance:'none',cursor:'pointer',
-      }}/>
-      <style>{`input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid #F97316;box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer;}`}</style>
-      <div style={{textAlign:'center',marginTop:7,fontSize:12,fontWeight:500,color:'#F97316'}}>{pLabel(value)}</div>
     </div>
   )
 }
@@ -350,31 +308,6 @@ function GenderButtons({ value, onChange }) {
           </button>
         )
       })}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────
-// Content pillars
-function ContentPillars({ pillars=[], onChange }) {
-  const [input,setInput]=useState('')
-  function add(){ const t=input.trim(); if(t&&pillars.length<7){onChange([...pillars,t]);setInput('')} }
-  return (
-    <div>
-      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:pillars.length?10:0}}>
-        {pillars.map((p,i)=>(
-          <span key={i} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:20,background:'var(--bg-tertiary)',fontSize:12,fontWeight:500,color:'var(--text-primary)',border:'1px solid var(--border)'}}>
-            {p}<button onClick={()=>onChange(pillars.filter((_,j)=>j!==i))} style={{fontSize:13,color:'var(--text-tertiary)',lineHeight:1}}>×</button>
-          </span>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:8}}>
-        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}
-          placeholder={pillars.length>=7?'Max 7':'e.g. Morning routines…'} disabled={pillars.length>=7}
-          style={{flex:1,padding:'8px 12px',borderRadius:8,border:'1.5px solid var(--border)',background:'var(--bg)',fontSize:13,color:'var(--text-primary)'}}/>
-        <button onClick={add} disabled={!input.trim()||pillars.length>=7}
-          style={{padding:'8px 14px',borderRadius:8,background:input.trim()?'var(--text-primary)':'var(--border)',color:input.trim()?'#fff':'var(--text-tertiary)',fontSize:13,fontWeight:600}}>Add</button>
-      </div>
     </div>
   )
 }
@@ -761,6 +694,128 @@ function DescriptionForm({ influencer, onUpdate }) {
 }
 
 // ─────────────────────────────────────────────
+// World Drops
+function WorldDropCard({ drop, editing, editName, onEditName, onStartEdit, onCommitEdit, onCancelEdit, onImageChange, onDelete }) {
+  const fileRef = useRef()
+  const [hovered, setHovered] = useState(false)
+  return (
+    <div
+      style={{ background:'var(--bg)', borderRadius:12, border:`1.5px solid ${hovered?'var(--accent)':'var(--border)'}`, overflow:'hidden', boxShadow:hovered?'var(--shadow-md)':'none', transition:'border-color 0.15s, box-shadow 0.15s' }}
+      onMouseEnter={()=>setHovered(true)}
+      onMouseLeave={()=>setHovered(false)}
+    >
+      {/* Image slot */}
+      <div
+        style={{ aspectRatio:'4/3', background:'var(--bg-tertiary)', overflow:'hidden', cursor:'pointer', position:'relative' }}
+        onClick={()=>fileRef.current.click()}
+      >
+        {drop.image
+          ? <>
+              <img src={drop.image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
+              <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0)', transition:'background 0.15s' }}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(0,0,0,0.2)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(0,0,0,0)'}
+              >
+                <button onClick={e=>{e.stopPropagation();onImageChange(null)}} style={{
+                  position:'absolute', top:6, right:6, width:22, height:22, borderRadius:'50%',
+                  background:'rgba(0,0,0,0.55)', color:'#fff', fontSize:13,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  backdropFilter:'blur(4px)', border:'1px solid rgba(255,255,255,0.15)',
+                }}>×</button>
+              </div>
+            </>
+          : <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <span style={{ fontSize:22, opacity:0.22 }}>+</span>
+              <span style={{ fontSize:11, color:'var(--text-tertiary)', fontWeight:500 }}>Upload image</span>
+            </div>
+        }
+        <input ref={fileRef} type="file" accept="image/*" style={{ display:'none' }}
+          onChange={e=>{
+            const f=e.target.files[0]; if(!f) return
+            const r=new FileReader()
+            r.onload=ev=>compressImage(ev.target.result).then(onImageChange).catch(console.error)
+            r.readAsDataURL(f); e.target.value=''
+          }}/>
+      </div>
+
+      {/* Name + hover-reveal actions */}
+      <div style={{ padding:'10px 12px', display:'flex', alignItems:'center', gap:6, minHeight:42 }}>
+        {editing
+          ? <input autoFocus value={editName} onChange={e=>onEditName(e.target.value)}
+              onBlur={onCommitEdit}
+              onKeyDown={e=>{if(e.key==='Enter')onCommitEdit();if(e.key==='Escape')onCancelEdit()}}
+              style={{ flex:1, fontSize:13, fontWeight:600, border:'none', background:'transparent', color:'var(--text-primary)', outline:'none' }}/>
+          : <span style={{ flex:1, fontSize:13, fontWeight:600, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{drop.name}</span>
+        }
+        <div style={{ display:'flex', gap:3, flexShrink:0, opacity: hovered ? 1 : 0, transition:'opacity 0.15s' }}>
+          <button onClick={e=>{e.stopPropagation();onStartEdit()}} title="Rename" style={{
+            width:26, height:26, borderRadius:7, border:'none', cursor:'pointer',
+            background:'var(--bg-tertiary)', color:'var(--text-secondary)',
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:13,
+          }}>✎</button>
+          <button onClick={e=>{e.stopPropagation();onDelete()}} title="Delete" style={{
+            width:26, height:26, borderRadius:7, border:'none', cursor:'pointer',
+            background:'#FFF5F5', color:'#FF3B30',
+            display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, lineHeight:1,
+          }}>×</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WorldDropSection({ drops=[], onChange }) {
+  const [editId,setEditId]=useState(null)
+  const [editName,setEditName]=useState('')
+
+  function addDrop() {
+    onChange([...drops, { id:generateId(), name:`Wardrobe ${drops.length+1}`, image:null }])
+  }
+  function updateDrop(id,updates){ onChange(drops.map(d=>d.id===id?{...d,...updates}:d)) }
+  function deleteDrop(id){ onChange(drops.filter(d=>d.id!==id)) }
+  function commitRename(){ if(editName.trim()) updateDrop(editId,{name:editName.trim()}); setEditId(null); setEditName('') }
+
+  return (
+    <div>
+      {drops.length===0&&(
+        <div style={{ textAlign:'center', padding:'52px 0', color:'var(--text-tertiary)' }}>
+          <div style={{ fontSize:36, marginBottom:10, opacity:.2 }}>👗</div>
+          <div style={{ fontSize:14, fontWeight:600, color:'var(--text-secondary)', marginBottom:6 }}>No wardrobe slots yet</div>
+          <div style={{ fontSize:13 }}>Add wardrobe slots to organize your influencer's looks.</div>
+        </div>
+      )}
+      {drops.length>0&&(
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:14, marginBottom:16 }}>
+          {drops.map(drop=>(
+            <WorldDropCard
+              key={drop.id} drop={drop}
+              editing={editId===drop.id} editName={editName}
+              onEditName={setEditName}
+              onStartEdit={()=>{setEditId(drop.id);setEditName(drop.name)}}
+              onCommitEdit={commitRename}
+              onCancelEdit={()=>{setEditId(null);setEditName('')}}
+              onImageChange={img=>updateDrop(drop.id,{image:img})}
+              onDelete={()=>deleteDrop(drop.id)}
+            />
+          ))}
+        </div>
+      )}
+      <button onClick={addDrop} style={{
+        display:'flex', alignItems:'center', gap:6,
+        padding:'8px 16px', borderRadius:8,
+        border:'1.5px dashed var(--border)',
+        background:'transparent', color:'var(--text-secondary)',
+        fontSize:13, fontWeight:500, cursor:'pointer',
+        transition:'border-color 0.15s, color 0.15s',
+      }}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)'}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--text-secondary)'}}
+      >+ Add Wardrobe</button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
 // New influencer modal
 function NewModal({ onClose, onSave }) {
   const [name,setName]=useState('')
@@ -825,6 +880,7 @@ export default function Influencers() {
   const [renameVal,setRenameVal]=useState('')
   const [mobileView,setMobileView]=useState('list')
   const isMobile=useMobile()
+  const tabSecRef=useRef()
 
   const influencer=influencers.find(i=>i.id===selectedId)
   const ac=accent(influencer)
@@ -839,7 +895,12 @@ export default function Influencers() {
       prompt:'',age:'',backstory:'',introExtrovert:50,
       niche:'',nicheCustom:'',audience:'',hobbies:'',clothingStyle:'',dreamBrands:'',voice:'',
       contentPillars:[],palette:[],videoUrls:[],scripts:[],
-      homeImages:[],wardrobeImages:[],brandDealImages:[],
+      homeImages:[],brandDealImages:[],
+      wardrobeSlots:[
+        {id:generateId(),name:'Wardrobe 1',image:null},
+        {id:generateId(),name:'Wardrobe 2',image:null},
+        {id:generateId(),name:'Wardrobe 3',image:null},
+      ],
     }
     setInfluencers(prev=>[...prev,n]); setSelectedId(n.id); setShowNew(false)
   }
@@ -853,6 +914,7 @@ export default function Influencers() {
   }
 
   function del(id) {
+    if (!window.confirm('Delete this influencer? This cannot be undone.')) return
     const next=influencers.filter(i=>i.id!==id)
     setInfluencers(next); setSelectedId(next[0]?.id??null)
   }
@@ -993,8 +1055,8 @@ export default function Influencers() {
           </Sec>
 
           {/* Detail tabs */}
-          <Sec style={{marginBottom:20}}>
-            <Tabs active={activeTab} onChange={setActiveTab} ac={ac}/>
+          <div ref={tabSecRef}><Sec style={{marginBottom:20}}>
+            <Tabs active={activeTab} onChange={tab=>{setActiveTab(tab);requestAnimationFrame(()=>tabSecRef.current?.scrollIntoView({behavior:'smooth',block:'start'}))}} ac={ac}/>
 
             {activeTab==='Description' && <DescriptionForm influencer={influencer} onUpdate={upd}/>}
             {activeTab==='Scripts' && (
@@ -1005,7 +1067,7 @@ export default function Influencers() {
               />
             )}
             {activeTab==='Wardrobe' && (
-              <MasonryGrid images={influencer.wardrobeImages??[]} onChange={imgs=>upd(influencer.id,{wardrobeImages:imgs})} emptyLabel="Add wardrobe images" cols={3}/>
+              <WorldDropSection drops={influencer.wardrobeSlots??[]} onChange={slots=>upd(influencer.id,{wardrobeSlots:slots})}/>
             )}
             {activeTab==='Home' && (
               <MasonryGrid images={influencer.homeImages??[]} onChange={imgs=>upd(influencer.id,{homeImages:imgs})} emptyLabel="Add home / room photos" cols={3}/>
@@ -1013,7 +1075,8 @@ export default function Influencers() {
             {activeTab==='Brand Deals' && (
               <ImageGrid images={influencer.brandDealImages??[]} onChange={imgs=>upd(influencer.id,{brandDealImages:imgs})} emptyLabel="Add brand" columns={4}/>
             )}
-          </Sec>
+
+          </Sec></div>
         </main>
       ) : (
         <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>

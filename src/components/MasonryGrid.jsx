@@ -1,25 +1,12 @@
 import { useRef, useState } from 'react'
 import Lightbox from './Lightbox'
-
-function compressImage(dataUrl, maxPx = 1400, quality = 0.82) {
-  return new Promise(resolve => {
-    const img = new Image()
-    img.onload = () => {
-      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
-      const w = Math.round(img.width * scale)
-      const h = Math.round(img.height * scale)
-      const canvas = document.createElement('canvas')
-      canvas.width = w; canvas.height = h
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/jpeg', quality))
-    }
-    img.src = dataUrl
-  })
-}
+import { compressImage } from '../utils/imageUtils'
 
 export default function MasonryGrid({ images = [], onChange, emptyLabel = 'Add images', cols = 3 }) {
   const fileRef = useRef()
   const [lightbox, setLightbox] = useState(null)
+  const imagesRef = useRef(images)
+  imagesRef.current = images
 
   function handleFiles(files) {
     const readers = Array.from(files).map(f => new Promise(res => {
@@ -27,7 +14,7 @@ export default function MasonryGrid({ images = [], onChange, emptyLabel = 'Add i
       r.onload = e => compressImage(e.target.result).then(res)
       r.readAsDataURL(f)
     }))
-    Promise.all(readers).then(results => onChange([...images, ...results]))
+    Promise.all(readers).then(results => onChange([...imagesRef.current, ...results])).catch(console.error)
   }
 
   function remove(idx) { onChange(images.filter((_, i) => i !== idx)) }

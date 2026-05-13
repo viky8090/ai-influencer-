@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useInspirationBoards, generateId } from '../store'
+import { compressImage } from '../utils/imageUtils'
 
 function BoardCard({ board, onSelect, onRename, onDelete }) {
   const [editing, setEditing] = useState(false)
@@ -66,15 +67,18 @@ function BoardCard({ board, onSelect, onRename, onDelete }) {
 function BoardDetail({ board, onBack, onUpdate }) {
   const fileRef = useRef()
 
+  const boardImagesRef = useRef(board.images)
+  boardImagesRef.current = board.images
+
   function addImages(files) {
     const readers = Array.from(files).map(file => new Promise(resolve => {
       const r = new FileReader()
-      r.onload = e => resolve(e.target.result)
+      r.onload = e => compressImage(e.target.result).then(resolve)
       r.readAsDataURL(file)
     }))
     Promise.all(readers).then(results => {
-      onUpdate(board.id, { images: [...(board.images ?? []), ...results] })
-    })
+      onUpdate(board.id, { images: [...(boardImagesRef.current ?? []), ...results] })
+    }).catch(console.error)
   }
 
   function removeImage(idx) {

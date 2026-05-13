@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useBrandDeals, generateId } from '../store'
+import { compressImage } from '../utils/imageUtils'
 
 function NewDealModal({ onClose, onSave }) {
   const [brand, setBrand] = useState('')
@@ -11,7 +12,7 @@ function NewDealModal({ onClose, onSave }) {
     const f = e.target.files[0]
     if (!f) return
     const r = new FileReader()
-    r.onload = ev => setImage(ev.target.result)
+    r.onload = ev => compressImage(ev.target.result).then(setImage)
     r.readAsDataURL(f)
     e.target.value = ''
   }
