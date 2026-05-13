@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useInfluencers, generateId } from '../store'
 import { buildThreeVariationPrompts } from '../utils/systemPrompt'
 import { generateThreeImages } from '../utils/higgsfieldGenerate'
-import { isHFConnected } from '../utils/higgsfieldAuth'
+import { isHFConnected, startHiggsfieldOAuth } from '../utils/higgsfieldAuth'
 import { compressImage } from '../utils/imageUtils'
 import { gColor } from '../utils/influencerUtils'
 
@@ -787,7 +787,19 @@ function Step5({ data, onFinish, onReset }) {
     }
   }
 
+  const [connectingHF, setConnectingHF] = useState(false)
   const displayName = data.name?.trim() || 'your influencer'
+
+  async function doConnect() {
+    setConnectingHF(true)
+    window.open('https://higgsfield.ai/?fpr=dankieft&fp_sid=tool', '_blank', 'noopener,noreferrer')
+    try {
+      await startHiggsfieldOAuth()
+    } catch (e) {
+      alert('Failed to start Higgsfield connection: ' + e.message)
+      setConnectingHF(false)
+    }
+  }
 
   if (!hfConnected) {
     return (
@@ -798,8 +810,20 @@ function Step5({ data, onFinish, onReset }) {
         </div>
         <div style={{ background: 'rgba(139,92,246,0.06)', border: '1.5px solid rgba(139,92,246,0.18)', borderRadius: 18, padding: '24px' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#7C3AED', marginBottom: 8 }}>Connect Higgsfield</div>
-          <div style={{ fontSize: 14, color: L.textSub, marginBottom: 18, lineHeight: 1.5 }}>Go to Settings and connect your Higgsfield account, then come back here.</div>
-          <a href="/settings" style={{ display: 'inline-block', padding: '10px 22px', borderRadius: 10, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Open Settings →</a>
+          <div style={{ fontSize: 14, color: L.textSub, marginBottom: 18, lineHeight: 1.5 }}>Connect your Higgsfield account to start generating images.</div>
+          <button
+            onClick={doConnect}
+            disabled={connectingHF}
+            style={{ padding: '10px 22px', borderRadius: 10, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: connectingHF ? 'default' : 'pointer', opacity: connectingHF ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            {connectingHF ? (
+              <>
+                <div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite' }} />
+                Connecting…
+              </>
+            ) : 'Connect Higgsfield'}
+            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+          </button>
         </div>
       </div>
     )
