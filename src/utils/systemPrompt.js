@@ -29,19 +29,17 @@ const TIME_CONFIGS = [
   },
 ]
 
-function getTimesForNiche(niche) {
-  const n = niche.toLowerCase()
-  if (n.includes('fitness') || n.includes('sport') || n.includes('wellness'))
-    return [TIME_CONFIGS[0], TIME_CONFIGS[0], TIME_CONFIGS[2]]
-  if (n.includes('fashion') || n.includes('beauty'))
-    return [TIME_CONFIGS[0], TIME_CONFIGS[1], TIME_CONFIGS[4]]
-  if (n.includes('food') || n.includes('lifestyle'))
-    return [TIME_CONFIGS[4], TIME_CONFIGS[5], TIME_CONFIGS[1]]
-  if (n.includes('travel'))
-    return [TIME_CONFIGS[0], TIME_CONFIGS[3], TIME_CONFIGS[1]]
-  if (n.includes('tech') || n.includes('gaming') || n.includes('finance'))
-    return [TIME_CONFIGS[4], TIME_CONFIGS[5], TIME_CONFIGS[2]]
+function getTimesForNiche() {
   return TIME_CONFIGS
+}
+
+// ── Soul-safe poses — simple natural descriptions Soul can follow ─
+// Higgsfield Soul struggles with detailed spatial pose instructions,
+// so these strip body-angle / weight / hand geometry down to a natural feel cue.
+const POSES_SOUL = {
+  facing: _prop => 'standing naturally and facing the camera, weight relaxed, arms at ease — a real person comfortable being photographed, not posing',
+  angled: _prop => 'standing at a slight natural angle toward the camera, relaxed posture, not stiff — just present and at ease',
+  candid: _prop => 'caught in a natural candid moment, looking directly toward the camera with open, relaxed energy — genuine, unguarded',
 }
 
 // ── Pose — driven by personality slider ──────────────────────
@@ -79,225 +77,444 @@ const WARDROBE = [
   // Quiet / understated (energy 0–20)
   { gender: 'female', energy: 5,  tags: ['quiet','minimalist','natural'],
     niches: ['fashion','lifestyle','travel','any'],
-    text: 'Oversized natural linen shirt worn as a dress, belted loosely at the waist with a thin natural leather cord, hem falling mid-thigh; bare legs; flat leather mule in warm tan — no jewelry, no logos visible' },
+    text: 'Oversized linen shirt worn as a dress, belted loosely at the waist with a thin leather cord, hem falling mid-thigh; bare legs; flat leather mule — no jewelry, no logos visible' },
   { gender: 'female', energy: 10, tags: ['quiet','minimalist','clean'],
     niches: ['fashion','beauty','lifestyle','any'],
-    text: 'Washed ivory wide-leg linen trousers, slightly cropped at the ankle; fine-knit pale grey long-sleeve top tucked in; no accessories; clean white leather slide — no logos visible' },
+    text: 'Wide-leg linen trousers, slightly cropped at the ankle; fine-knit long-sleeve top tucked in; no accessories; clean leather slide — no logos visible' },
   { gender: 'female', energy: 12, tags: ['quiet','minimalist','structured'],
     niches: ['fashion','tech','finance','lifestyle'],
-    text: 'Soft camel oversized turtleneck, hem just untucked; dark wide-leg tailored trousers, clean break; worn-in dark chocolate leather loafer — no accessories, no logos visible' },
+    text: 'Soft oversized turtleneck, hem just untucked; wide-leg tailored trousers, clean break; worn-in leather loafer — no accessories, no logos visible' },
   { gender: 'female', energy: 18, tags: ['quiet','glam','minimalist'],
     niches: ['fashion','lifestyle','any'],
-    text: 'Slip dress in heavy oyster satin, midi length, thin straps, no jewelry; flat leather thong sandal in bone — no logos visible' },
+    text: 'Slip dress in heavy satin, midi length, thin straps, no jewelry; flat leather thong sandal — no logos visible' },
 
   // Understated with one intentional element (energy 20–40)
   { gender: 'female', energy: 22, tags: ['editorial','minimalist','structured'],
     niches: ['fashion','tech','finance'],
-    text: 'Oversized dark navy blazer worn as a top, one button fastened, no shirt visible underneath; wide-leg pale grey trousers; clean pointed-toe leather flat — one thin gold chain, the only jewelry — no logos visible' },
+    text: 'Oversized blazer worn as a top, one button fastened, no shirt visible underneath; wide-leg trousers; clean pointed-toe leather flat — one thin gold chain, the only jewelry — no logos visible' },
   { gender: 'female', energy: 28, tags: ['clean','minimalist','casual'],
     niches: ['lifestyle','fashion','any'],
-    text: 'Straight-leg dark indigo denim, clean hem; fitted ribbed white tank top tucked in; two thin layered delicate gold chains at the collarbone; clean white low-top leather sneakers — no logos visible' },
+    text: 'Straight-leg denim, clean hem; fitted ribbed tank top tucked in; two thin layered delicate gold chains at the collarbone; clean low-top leather sneakers — no logos visible' },
   { gender: 'female', energy: 30, tags: ['quiet','minimalist','casual'],
     niches: ['lifestyle','travel','fashion'],
-    text: 'Worn soft-grey oversized cashmere crewneck sweater, slightly pilling at the cuffs; slim straight black denim; clean black leather loafer; small natural pebbled leather crossbody — no logos visible' },
+    text: 'Worn oversized cashmere crewneck sweater, slightly pilling at the cuffs; slim straight denim; clean leather loafer; small pebbled leather crossbody — no logos visible' },
   { gender: 'female', energy: 35, tags: ['minimalist','clean','travel'],
     niches: ['travel','lifestyle','fashion'],
-    text: 'White linen shirt, collar open, sleeves slightly rolled once at the forearm; high-waist straight-leg ecru linen trousers, clean hem; tan leather strappy sandal, minimal ankle strap — no logos visible' },
+    text: 'Linen shirt, collar open, sleeves slightly rolled once at the forearm; high-waist straight-leg linen trousers, clean hem; leather strappy sandal, minimal ankle strap — no logos visible' },
   { gender: 'female', energy: 38, tags: ['preppy','classic','polished'],
     niches: ['fashion','lifestyle','tech'],
-    text: 'Fitted dark hunter-green polo shirt, collar up slightly; high-waist straight-leg oat chino; white leather sneaker, clean; a single thin gold band ring — no logos visible' },
+    text: 'Fitted polo shirt, collar up slightly; high-waist straight-leg chino; leather sneaker, clean; a single thin gold band ring — no logos visible' },
 
   // Balanced / versatile (energy 40–60)
   { gender: 'female', energy: 42, tags: ['casual','clean','urban'],
     niches: ['lifestyle','travel','any'],
-    text: 'Oversized vintage-wash olive tee, neckline slightly relaxed, tucked loosely at the front; high-waist straight-leg light-wash denim; white low-top canvas shoe, faintly scuffed — no logos visible' },
+    text: 'Oversized vintage-wash tee, neckline slightly relaxed, tucked loosely at the front; high-waist straight-leg denim; low-top canvas shoe, faintly scuffed — no logos visible' },
   { gender: 'female', energy: 45, tags: ['minimalist','structured','clean'],
     niches: ['fashion','lifestyle','tech'],
-    text: 'Fitted ribbed cream mock-neck top; tailored wide-leg charcoal trousers, clean hem; minimal white leather loafer; a thin gold bracelet — no logos visible' },
+    text: 'Fitted ribbed mock-neck top; tailored wide-leg trousers, clean hem; minimal leather loafer; a thin gold bracelet — no logos visible' },
   { gender: 'female', energy: 48, tags: ['earthy','casual','natural'],
     niches: ['lifestyle','travel','any'],
-    text: 'Well-worn straight-leg medium-wash denim; warm terracotta linen shirt tucked in, collar open; small simple gold hoop earrings; white sneaker, clean — no logos visible' },
+    text: 'Well-worn straight-leg medium-wash denim; linen shirt tucked in, collar open; small simple gold hoop earrings; clean sneaker — no logos visible' },
   { gender: 'female', energy: 52, tags: ['casual','quiet','cottagecore'],
     niches: ['lifestyle','any'],
-    text: 'Long open cardigan in soft oat-colored knit over a simple white fitted tee; straight-leg black jeans; white leather low sneaker; a thin woven cord bracelet — no logos visible' },
+    text: 'Long open cardigan in soft knit over a simple fitted tee; straight-leg jeans; leather low sneaker; a thin woven cord bracelet — no logos visible' },
   { gender: 'female', energy: 55, tags: ['bohemian','earthy','natural'],
     niches: ['travel','lifestyle','wellness'],
-    text: 'Lightweight washed cotton sundress in warm terracotta, thin straps, fabric draping softly at the waist; simple leather slide sandals, worn soft at the footbed; layered thin beaded bracelets — no logos visible' },
+    text: 'Flowy midi dress in lightweight gauze or crinkled cotton, slightly tiered skirt, adjustable thin straps; flat leather sandal worn soft at the footbed; layered cord and thin beaded bracelets on both wrists, a simple thin pendant necklace — no logos visible' },
   { gender: 'female', energy: 58, tags: ['clean','casual','sport'],
     niches: ['fitness','lifestyle','any'],
-    text: 'Oversized oat-colored cotton hoodie, slightly cropped, hood down; black bike shorts; white thick-sole trainer; small silver hoop earrings — no logos visible' },
+    text: 'Oversized cotton hoodie, slightly cropped, hood down; bike shorts; thick-sole trainer; small silver hoop earrings — no logos visible' },
 
   // Personality pieces emerging (energy 60–80)
   { gender: 'female', energy: 62, tags: ['editorial','urban','street'],
     niches: ['fashion','entertainment','lifestyle'],
-    text: 'Oversized washed black structured blazer over a fitted white baby tee; straight-leg dark denim; chunky white platform sneaker; a single oversized signet ring — no logos visible' },
+    text: 'Fluid-cut collarless oversized blazer worn open over a fitted ribbed bodysuit or tank; clean straight-leg tailored trousers in a contrasting neutral; pointed-toe leather mule, slight block heel; one sculptural resin or stone ring — no logos visible' },
   { gender: 'female', energy: 65, tags: ['y2k','casual','playful'],
     niches: ['lifestyle','entertainment','fashion'],
-    text: 'Y2K-adjacent low-rise straight-leg medium-wash denim; fitted pale blue ribbed halter top; a thin silver chain belt; clean white low-top sneaker — no logos visible' },
-  { gender: 'female', energy: 68, tags: ['earthy','bohemian','warm'],
+    text: 'Y2K-adjacent low-rise straight-leg medium-wash denim; fitted ribbed halter top; a thin silver chain belt; clean low-top sneaker — no logos visible' },
+  { gender: 'female', energy: 68, tags: ['earthy','bohemian','natural'],
     niches: ['travel','lifestyle','fashion'],
-    text: 'Rust orange wrap blouse in lightweight viscose, tied at the front, slightly billowing at the sleeves; high-waist wide-leg dark denim; leather wedge espadrille; two thin layered necklaces — no logos visible' },
+    text: 'Wrap blouse in lightweight viscose, tied at the front, slightly billowing at the sleeves; high-waist wide-leg denim; leather wedge espadrille; two thin layered necklaces — no logos visible' },
   { gender: 'female', energy: 72, tags: ['dark','moody','street'],
     niches: ['entertainment','fashion','lifestyle'],
-    text: 'Oversized faded black graphic tee, neckline slightly wide, tucked at the front into high-waist straight-leg black denim with subtle knee distress; chunky black platform boot, zip detail at ankle; a worn leather cuff — no logos visible' },
+    text: 'Oversized faded graphic tee, neckline slightly wide, tucked at the front into high-waist straight-leg denim with subtle knee distress; chunky platform boot, zip detail at ankle; a worn leather cuff — no logos visible' },
   { gender: 'female', energy: 75, tags: ['casual','street','y2k'],
     niches: ['lifestyle','entertainment','fashion'],
-    text: 'Cropped raw-edge denim jacket worn open over a fitted white ribbed tank; high-waist flared dark denim; a simple thin leather belt; clean vintage white leather sneaker — no logos visible' },
+    text: 'Cropped raw-edge denim jacket worn open over a fitted ribbed tank; high-waist flared denim; a simple thin leather belt; clean vintage leather sneaker — no logos visible' },
   { gender: 'female', energy: 78, tags: ['editorial','structured','polished'],
     niches: ['fashion','finance','tech'],
-    text: 'Sharply tailored double-breasted charcoal grey blazer with a strong shoulder, worn as the only top layer; matching wide-leg trouser; clean pointed-toe leather oxford; a single architectural earring in silver — no logos visible' },
+    text: 'Sharply tailored double-breasted blazer with a strong shoulder, worn as the only top layer; matching wide-leg trouser; clean pointed-toe leather oxford; a single architectural earring — no logos visible' },
 
   // Bold / expressive (energy 80–100)
   { gender: 'female', energy: 82, tags: ['glam','editorial','bold'],
     niches: ['fashion','entertainment'],
-    text: 'Faux-fur trim coat in warm caramel, worn open; fitted black ribbed turtleneck underneath; straight black trousers; black pointed-toe ankle boot; statement oversized resin drop earrings — no logos visible' },
+    text: 'Faux-fur trim coat, worn open; fitted ribbed turtleneck underneath; straight tailored trousers; pointed-toe ankle boot; statement oversized resin drop earrings — no logos visible' },
   { gender: 'female', energy: 88, tags: ['editorial','bold','structured'],
     niches: ['fashion'],
-    text: 'Bold cobalt blue wide-leg trousers in structured crepe; matching blazer worn open over a barely-there black bralette; sculptural square-toe block heel; one architectural silver cuff — no logos visible' },
+    text: 'Wide-leg trousers in structured crepe; matching blazer worn open over a barely-there bralette; sculptural square-toe block heel; one architectural cuff — no logos visible' },
   { gender: 'female', energy: 92, tags: ['editorial','dark','glam'],
     niches: ['fashion','entertainment'],
-    text: 'Sheer black organza blouse, buttons to the collar, translucent over a black bralette; wide-leg black tailored trousers; black strappy heeled sandal; a single large sculptural resin ring — no logos visible' },
-  { gender: 'female', energy: 96, tags: ['bold','colorful','playful'],
+    text: 'Sheer organza blouse, buttons to the collar, translucent over a bralette; wide-leg tailored trousers; strappy heeled sandal; a single large sculptural resin ring — no logos visible' },
+  { gender: 'female', energy: 96, tags: ['bold','playful','editorial'],
     niches: ['fashion','entertainment'],
-    text: 'Acid-yellow cropped structured blazer worn open, no top underneath; wide-leg cream tailored trouser; pointed-toe yellow leather kitten heel; a stack of thin gold rings — no logos visible' },
+    text: 'Cropped structured blazer worn open, no top underneath; wide-leg tailored trouser; pointed-toe leather kitten heel; a stack of thin gold rings — no logos visible' },
 
-  // Dressy / glam at medium energy — for "fancy dress / events" personas
-  { gender: 'female', energy: 48, tags: ['glam', 'evening', 'polished'],
-    niches: ['fashion', 'lifestyle', 'entertainment', 'any'],
-    text: 'Satin slip midi dress in warm ivory, thin adjustable straps, fabric draping softly at the hip with a subtle liquid sheen; dainty thin-strap gold sandal; two delicate layered chains at the collarbone — no logos visible' },
-  { gender: 'female', energy: 56, tags: ['glam', 'editorial', 'structured'],
-    niches: ['fashion', 'entertainment', 'lifestyle'],
-    text: 'Tailored blazer dress in deep forest green, single-button, hitting mid-thigh with slight shoulder structure; sheer natural-toned tights; pointed-toe kitten heel in black; a simple gold bracelet — no logos visible' },
-  { gender: 'female', energy: 62, tags: ['glam', 'evening', 'polished'],
-    niches: ['fashion', 'entertainment', 'any'],
-    text: 'Fitted ribbed knit midi dress in warm caramel with a modest scoop neckline; strappy heeled sandal in bone; thin layered gold chains and small sculptural gold hoops — no logos visible' },
-  { gender: 'female', energy: 70, tags: ['glam', 'bold', 'evening'],
-    niches: ['fashion', 'entertainment'],
-    text: 'Silky wrap midi dress in deep burgundy, thin tie at the waist, the fabric catching light as she moves; pointed-toe strappy heeled sandal in cognac; gold drop earrings and a single thin chain — no logos visible' },
+  // Dressy / glam at medium energy
+  { gender: 'female', energy: 48, tags: ['glam','evening','polished'],
+    niches: ['fashion','lifestyle','entertainment','any'],
+    text: 'Satin slip midi dress, thin adjustable straps, fabric draping softly at the hip with a subtle liquid sheen; dainty thin-strap sandal; two delicate layered chains at the collarbone — no logos visible' },
+  { gender: 'female', energy: 56, tags: ['glam','editorial','structured'],
+    niches: ['fashion','entertainment','lifestyle'],
+    text: 'Tailored blazer dress, single-button, hitting mid-thigh with slight shoulder structure; sheer tights; pointed-toe kitten heel; a simple gold bracelet — no logos visible' },
+  { gender: 'female', energy: 62, tags: ['glam','evening','polished'],
+    niches: ['fashion','entertainment','any'],
+    text: 'Fitted ribbed knit midi dress with a modest scoop neckline; strappy heeled sandal; thin layered gold chains and small sculptural gold hoops — no logos visible' },
+  { gender: 'female', energy: 70, tags: ['glam','bold','evening'],
+    niches: ['fashion','entertainment'],
+    text: 'Silky wrap midi dress, thin tie at the waist, the fabric catching light as she moves; pointed-toe strappy heeled sandal; gold drop earrings and a single thin chain — no logos visible' },
 
-  // Fitness/sport (separate energy track)
+  // Dark & Moody (expanded) — all entries embed explicit dark colors so Soul model renders correctly
+  { gender: 'female', energy: 60, tags: ['dark','moody','structured'],
+    niches: ['fashion','entertainment','lifestyle'],
+    text: 'Fitted ribbed all-black turtleneck, long sleeve; high-waist wide-leg tailored trousers in black or deep charcoal; pointed-toe ankle boot in black leather; a single thin silver chain at the collarbone — no logos visible' },
+  { gender: 'female', energy: 65, tags: ['dark','moody','editorial'],
+    niches: ['fashion','entertainment'],
+    text: 'Midi-length slip-style dress in deep black matte satin, thin straps, fabric skimming the body closely; barely-there heeled sandal in black; a thin silver chain stacked with a small drop pendant — no logos visible' },
+  { gender: 'female', energy: 78, tags: ['dark','moody','street'],
+    niches: ['fashion','entertainment','lifestyle'],
+    text: 'Oversized structured black leather-look jacket, slightly stiff at the shoulder; fitted ribbed black midi skirt underneath; chunky black lug-sole boot; no jewelry — no logos visible' },
+  { gender: 'female', energy: 85, tags: ['dark','moody','editorial'],
+    niches: ['fashion','entertainment'],
+    text: 'Long draped overcoat in black or deep charcoal, minimal lapel, worn open or loosely belted; slim-cut trousers in the same dark tone; sleek pointed-toe boot in black leather; one architectural sculptural ring — no logos visible' },
+
+  // Cottagecore (expanded)
+  { gender: 'female', energy: 30, tags: ['cottagecore','natural','earthy'],
+    niches: ['lifestyle','any'],
+    text: 'Flowy midi-length printed cotton dress, fitted at the chest with a square neckline and soft gathered skirt; flat leather sandal with a simple strap; small delicate stud earrings — no logos visible' },
+  { gender: 'female', energy: 42, tags: ['cottagecore','earthy','quiet'],
+    niches: ['lifestyle','any'],
+    text: 'Linen pinafore dress, adjustable shoulder straps, worn over a long-sleeve fitted top; simple leather mule; small woven basket bag — no logos visible' },
+  { gender: 'female', energy: 55, tags: ['cottagecore','natural','bohemian'],
+    niches: ['lifestyle','any'],
+    text: 'Puff-sleeve cotton blouse with smocking at the wrists, collar slightly open; high-waist straight-leg denim; leather ankle boot, round-toe; a small delicate crossbody bag — no logos visible' },
+  { gender: 'female', energy: 65, tags: ['cottagecore','earthy','editorial'],
+    niches: ['lifestyle','fashion'],
+    text: 'Prairie-style cotton midi dress with a fitted bodice, long flowing skirt, and small puffed sleeves; leather loafer or low boot; thin layered necklaces, dainty and botanical in feel — no logos visible' },
+
+  // Coastal (female)
+  { gender: 'female', energy: 25, tags: ['coastal','natural','quiet'],
+    niches: ['lifestyle','travel','any'],
+    text: 'Wide-leg linen trousers, slightly relaxed; simple fitted ribbed tank, thin straps; flat leather sandal, worn soft; no jewelry — no logos visible' },
+  { gender: 'female', energy: 42, tags: ['coastal','natural','casual'],
+    niches: ['lifestyle','travel','any'],
+    text: 'Linen button-down shirt, oversized and half-tucked, sleeves rolled high; straight-leg denim cut-offs, frayed hem at mid-thigh; flat leather slide; thin woven cord anklet — no logos visible' },
+  { gender: 'female', energy: 58, tags: ['coastal','natural','earthy'],
+    niches: ['lifestyle','travel','fashion'],
+    text: 'Lightweight crochet cover-up worn over a simple ribbed bralette, hem hitting mid-thigh; flat woven sandal; layered cord and natural-material necklaces — no logos visible' },
+  { gender: 'female', energy: 72, tags: ['coastal','natural','bohemian'],
+    niches: ['lifestyle','travel','fashion'],
+    text: 'Flowy wrap midi skirt in lightweight woven fabric, tied at the hip; fitted linen crop top; strappy flat sandal; layered shell and cord jewellery, sun-worn and natural — no logos visible' },
+
+  // Fitness/sport — gym context
   { gender: 'female', energy: 30, tags: ['sport','functional','clean'],
-    niches: ['fitness','wellness'],
-    text: 'Seamless sage green sports bra with subtle vertical ribbing; matching high-waist compression leggings, slight sheen at the hip; clean white training shoe — no logos visible' },
+    niches: ['fitness','wellness','lifestyle'],
+    text: 'Seamless sports bra with subtle vertical ribbing; matching high-waist compression leggings, slight sheen at the hip; clean training shoe — no logos visible' },
   { gender: 'female', energy: 40, tags: ['sport','earthy','natural'],
-    niches: ['fitness','wellness'],
-    text: 'Sage green seamless sports bra with subtle cross-back detail; matching high-waist compression leggings; warm beige trail-running shoe — no logos visible' },
-  { gender: 'female', energy: 50, tags: ['sport','clean','pastel'],
-    niches: ['fitness','wellness'],
-    text: 'Lavender matching set: ribbed high-neck sports bra and high-waist leggings; clean white low-profile trainer; small pearl stud earrings — no logos visible' },
-  { gender: 'female', energy: 65, tags: ['sport','earthy','warm'],
-    niches: ['fitness','wellness'],
-    text: 'Warm rust-toned sports bra with wide straps; matching full-length high-waist leggings in amber; clean gum-sole running shoe — a thin gold chain necklace — no logos visible' },
+    niches: ['fitness','wellness','lifestyle'],
+    text: 'Seamless sports bra with subtle cross-back detail; matching high-waist compression leggings; trail-running shoe — no logos visible' },
+  { gender: 'female', energy: 50, tags: ['sport','clean','natural'],
+    niches: ['fitness','wellness','lifestyle'],
+    text: 'Matching set: ribbed high-neck sports bra and high-waist leggings; clean low-profile trainer; small pearl stud earrings — no logos visible' },
+  { gender: 'female', energy: 65, tags: ['sport','earthy','casual'],
+    niches: ['fitness','wellness','lifestyle'],
+    text: 'Sports bra with wide straps; matching full-length high-waist leggings; clean gum-sole running shoe — a thin gold chain necklace — no logos visible' },
+
+  // Athleisure — sporty vibe for non-gym lifestyle contexts
+  { gender: 'female', energy: 48, tags: ['sport','casual','clean'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Wide-leg track pants in soft jersey fabric, slight sheen; fitted ribbed crop top with thin straps; clean low-profile trainer; small gold hoops — no logos visible' },
+  { gender: 'female', energy: 55, tags: ['sport','casual','urban'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Pleated tennis mini skirt; fitted ribbed athletic tank, thin straps; clean low-top leather sneaker; a thin chain necklace — no logos visible' },
+  { gender: 'female', energy: 62, tags: ['sport','casual','street'],
+    niches: ['lifestyle','fashion','entertainment','any'],
+    text: 'Fitted zip-up track jacket, zipped halfway; matching wide-leg track pants; chunky clean trainer; small hoop earrings — no logos visible' },
+  { gender: 'female', energy: 75, tags: ['sport','casual','playful'],
+    niches: ['lifestyle','fashion','entertainment','any'],
+    text: 'Pleated tennis mini skirt; fitted cropped athletic zip-up, zipped halfway; clean chunky-sole trainer; small gold hoops — no logos visible' },
+  { gender: 'female', energy: 85, tags: ['sport','casual','bold'],
+    niches: ['lifestyle','fashion','entertainment'],
+    text: 'Pleated micro tennis mini skirt; fitted cropped graphic athletic tee, slightly oversized at the shoulder; bold chunky trainer with a thick sole; stacked thin gold chains — no logos visible' },
 
   // ── MALE ────────────────────────────────────────────────────
   // Quiet / understated (energy 0–20)
   { gender: 'male', energy: 8,  tags: ['quiet','minimalist','natural'],
     niches: ['fashion','lifestyle','travel','any'],
-    text: 'Washed natural linen overshirt, all buttons done, sleeves folded; loose straight-leg light sand trousers; leather Birkenstock-style sandal; no accessories — no logos visible' },
+    text: 'Washed linen overshirt, all buttons done, sleeves folded; loose straight-leg trousers; leather sandal; no accessories — no logos visible' },
   { gender: 'male', energy: 15, tags: ['quiet','minimalist','clean'],
     niches: ['fashion','tech','finance','lifestyle'],
-    text: 'Soft white cotton crewneck sweater, slightly oversize; straight-leg charcoal wool-blend trousers, clean break at the ankle; clean white leather low sneaker — no logos visible' },
+    text: 'Soft cotton crewneck sweater, slightly oversize; straight-leg wool-blend trousers, clean break at the ankle; clean leather low sneaker — no logos visible' },
   { gender: 'male', energy: 18, tags: ['quiet','structured','minimalist'],
     niches: ['tech','finance','fashion'],
-    text: 'Fine-knit charcoal grey turtleneck; tailored straight-leg dark navy trousers; clean black leather oxford; no accessories — no logos visible' },
+    text: 'Fine-knit turtleneck; tailored straight-leg dark trousers; clean leather oxford; no accessories — no logos visible' },
 
   // Understated with one intentional element (energy 20–40)
   { gender: 'male', energy: 25, tags: ['minimalist','earthy','casual'],
     niches: ['lifestyle','travel','fashion'],
-    text: 'Unstructured dark olive linen jacket worn open; white fitted tee underneath; slim straight light-wash denim; white leather loafer — no logos visible' },
+    text: 'Unstructured linen jacket worn open; fitted tee underneath; slim straight denim; leather loafer — no logos visible' },
   { gender: 'male', energy: 30, tags: ['minimalist','quiet','preppy'],
     niches: ['tech','finance','lifestyle'],
-    text: 'Soft grey quarter-zip merino sweater; slim straight dark navy chino; clean white low-profile sneaker; a simple stainless steel watch — no logos visible' },
+    text: 'Soft quarter-zip merino sweater; slim straight chino; clean low-profile sneaker; a simple stainless steel watch — no logos visible' },
   { gender: 'male', energy: 35, tags: ['casual','clean','natural'],
     niches: ['lifestyle','travel','any'],
-    text: 'Cream relaxed-fit linen button-down, collar open, tucked at front only; straight-leg medium-wash denim; clean suede chukka in warm tan — no logos visible' },
+    text: 'Relaxed-fit linen button-down, collar open, tucked at front only; straight-leg medium-wash denim; clean suede chukka — no logos visible' },
   { gender: 'male', energy: 38, tags: ['preppy','classic','clean'],
     niches: ['lifestyle','fashion','tech'],
-    text: 'Relaxed Oxford shirt in washed pale blue, collar open one button; slim straight-leg oat chino; clean white leather low sneaker — a single thin woven bracelet — no logos visible' },
+    text: 'Relaxed Oxford shirt, collar open one button; slim straight-leg chino; clean leather low sneaker — a single thin woven bracelet — no logos visible' },
 
   // Balanced (energy 40–60)
   { gender: 'male', energy: 42, tags: ['casual','clean','urban'],
     niches: ['any'],
-    text: 'Clean white heavyweight cotton tee, crew neck slightly relaxed from washing; well-worn straight-leg dark denim; clean low-profile white trainer — no logos visible' },
+    text: 'Heavyweight cotton tee, crew neck slightly relaxed from washing; well-worn straight-leg dark denim; clean low-profile trainer — no logos visible' },
   { gender: 'male', energy: 45, tags: ['casual','dark','urban'],
     niches: ['lifestyle','fashion','entertainment'],
-    text: 'Washed black overshirt worn open over a fitted white tee; slim straight dark grey jeans; clean dark leather low sneaker — no logos visible' },
+    text: 'Washed overshirt worn open over a fitted tee; slim straight dark jeans; clean leather low sneaker — no logos visible' },
   { gender: 'male', energy: 50, tags: ['earthy','casual','natural'],
     niches: ['lifestyle','travel'],
-    text: 'Soft moss-green relaxed-fit shirt, collar open two buttons, sleeves rolled; straight-leg tan chino; leather loafer in natural tan — no logos visible' },
+    text: 'Soft relaxed-fit shirt, collar open two buttons, sleeves rolled; straight-leg chino; leather loafer — no logos visible' },
   { gender: 'male', energy: 55, tags: ['minimalist','casual','clean'],
     niches: ['lifestyle','any'],
-    text: 'Ivory relaxed-fit linen shirt, collar open, slightly untucked; straight-leg washed black denim; clean white canvas slip-on; no accessories — no logos visible' },
+    text: 'Relaxed-fit linen shirt, collar open, slightly untucked; straight-leg denim; clean canvas slip-on; no accessories — no logos visible' },
+
+  // Dark & Moody (male) — all entries embed explicit dark colors so Soul model renders correctly
+  { gender: 'male', energy: 55, tags: ['dark','moody','casual'],
+    niches: ['lifestyle','entertainment','fashion'],
+    text: 'Oversized ribbed crewneck sweater in black or deep charcoal, relaxed fit, hem sitting at the hip; dark straight-leg denim; clean black leather low sneaker; a worn thin leather cord bracelet — no logos visible' },
 
   // Personality pieces (energy 60–80)
   { gender: 'male', energy: 62, tags: ['street','urban','casual'],
     niches: ['fashion','entertainment','lifestyle'],
-    text: 'Washed charcoal oversized heavyweight jersey crewneck, dropped shoulder seam; straight-leg dark indigo denim, clean hem; clean white low-profile leather sneakers, toe box faintly creased — no logos visible' },
+    text: 'Washed oversized heavyweight jersey crewneck, dropped shoulder seam; straight-leg dark denim, clean hem; clean low-profile leather sneakers, toe box faintly creased — no logos visible' },
   { gender: 'male', energy: 68, tags: ['urban','casual','dark'],
     niches: ['lifestyle','travel','entertainment'],
-    text: 'Dark green waxed canvas overshirt, collar slightly popped; fitted white tee underneath; slim straight black denim; clean black leather low sneaker; a worn thin leather cord necklace — no logos visible' },
+    text: 'Waxed canvas overshirt, collar slightly popped; fitted tee underneath; slim straight dark denim; clean leather low sneaker; a worn thin leather cord necklace — no logos visible' },
   { gender: 'male', energy: 72, tags: ['street','y2k','urban'],
     niches: ['fashion','entertainment'],
-    text: 'Wide-leg black carpenter denim with subtle hardware at the thigh pocket; oversized washed white tee, hem asymmetric; clean chunky white trainer; a thin chain around the neck — no logos visible' },
-  { gender: 'male', energy: 75, tags: ['street','casual','warm'],
+    text: 'Wide-leg carpenter denim with subtle hardware at the thigh pocket; oversized washed tee, hem asymmetric; clean chunky trainer; a thin chain around the neck — no logos visible' },
+  { gender: 'male', energy: 75, tags: ['street','casual','urban'],
     niches: ['lifestyle','entertainment'],
-    text: 'Oversized washed terracotta crewneck hoodie, drawstrings slightly uneven; wide-leg dark grey sweatpant, tapered at the ankle; clean white low-top canvas shoe; a small hoop earring — no logos visible' },
+    text: 'Oversized washed crewneck hoodie, drawstrings slightly uneven; wide-leg sweatpant, tapered at the ankle; clean low-top canvas shoe; a small hoop earring — no logos visible' },
   { gender: 'male', energy: 78, tags: ['editorial','structured','dark'],
     niches: ['fashion','entertainment'],
-    text: 'Long black overcoat, collar turned up; fitted black turtleneck; slim straight black trouser; clean black leather chelsea boot; no other accessories — no logos visible' },
+    text: 'Long black overcoat in a heavy wool-blend, collar turned up; fitted black turtleneck; slim straight trouser in the same dark tone; clean leather chelsea boot in black; no accessories — no logos visible' },
 
   // Bold / expressive (energy 80–100)
+  { gender: 'male', energy: 82, tags: ['dark','moody','editorial'],
+    niches: ['fashion','entertainment'],
+    text: 'Heavy structured overcoat in all-black, draped open; fitted black turtleneck underneath; slim straight trouser in black; pointed-toe leather boot in black; one thin silver chain at the collarbone — no logos visible' },
   { gender: 'male', energy: 85, tags: ['editorial','bold','glam'],
     niches: ['fashion','entertainment'],
-    text: 'Wide-leg houndstooth suit trouser; matching blazer worn open, no shirt, a thin chain at the collarbone; clean pointed-toe leather oxford in cognac — no logos visible' },
+    text: 'Wide-leg patterned suit trouser; matching blazer worn open, no shirt, a thin chain at the collarbone; clean pointed-toe leather oxford — no logos visible' },
   { gender: 'male', energy: 92, tags: ['editorial','bold','colorful'],
     niches: ['fashion','entertainment'],
-    text: 'Bold cobalt blue wide-leg cord trousers; fitted black ribbed turtleneck; clean white leather boot; a stack of thin silver rings — no logos visible' },
+    text: 'Wide-leg cord trousers; fitted ribbed turtleneck; clean leather boot; a stack of thin silver rings — no logos visible' },
 
-  // Male fitness
+  // Male fitness — gym context
   { gender: 'male', energy: 30, tags: ['sport','functional','clean'],
-    niches: ['fitness'],
-    text: 'Fitted dark navy performance tee, slightly damp at the collar; black tapered training shorts with small side-slit; clean white training shoe, toe box faintly scuffed — no logos visible' },
+    niches: ['fitness','lifestyle'],
+    text: 'Fitted performance tee, slightly damp at the collar; tapered training shorts with small side-slit; clean training shoe, toe box faintly scuffed — no logos visible' },
   { gender: 'male', energy: 50, tags: ['sport','casual','street'],
     niches: ['fitness','lifestyle'],
-    text: 'Oversized washed grey hoodie, hem hitting mid-thigh; black fitted training short; clean minimalist training shoe in white — no logos visible' },
+    text: 'Oversized washed hoodie, hem hitting mid-thigh; fitted training short; clean minimalist training shoe — no logos visible' },
   { gender: 'male', energy: 40, tags: ['sport','clean','functional'],
-    niches: ['fitness'],
-    text: 'White tech-fabric sleeveless training vest, slight drape; black compression training shorts; clean white trainer — no logos visible' },
+    niches: ['fitness','lifestyle'],
+    text: 'Tech-fabric sleeveless training vest, slight drape; compression training shorts; clean trainer — no logos visible' },
+
+  // Male athleisure — sporty vibe for lifestyle contexts
+  { gender: 'male', energy: 45, tags: ['sport','casual','urban'],
+    niches: ['lifestyle','any'],
+    text: 'Straight-leg jogger in soft jersey, slightly tapered at the ankle; clean fitted crewneck; low-profile trainer; no accessories — no logos visible' },
+  { gender: 'male', energy: 60, tags: ['sport','casual','street'],
+    niches: ['lifestyle','entertainment','any'],
+    text: 'Athletic shorts, mid-thigh, slight technical drape; clean fitted tee; clean mid-top trainer; a thin cord bracelet — no logos visible' },
+
+  // Coastal (male)
+  { gender: 'male', energy: 20, tags: ['coastal','natural','quiet'],
+    niches: ['lifestyle','travel','any'],
+    text: 'Loose straight-leg linen trousers, slightly creased from wear; simple fitted cotton tee; leather sandal; no accessories — no logos visible' },
+  { gender: 'male', energy: 35, tags: ['coastal','casual','natural'],
+    niches: ['lifestyle','travel','any'],
+    text: 'Linen short-sleeve shirt, collar open three buttons, slightly oversized, half-tucked; straight-leg chino shorts, hem at mid-thigh; leather sandal; a thin cord necklace — no logos visible' },
+  { gender: 'male', energy: 52, tags: ['coastal','casual','earthy'],
+    niches: ['lifestyle','travel'],
+    text: 'Worn canvas shorts, slightly baggy, faded at the hem; fitted cotton tee, slightly faded; flat leather sandal; a thin leather wristband — no logos visible' },
+  { gender: 'male', energy: 65, tags: ['coastal','natural','casual'],
+    niches: ['lifestyle','travel','fashion'],
+    text: 'Loose linen trousers, cropped slightly above the ankle; linen overshirt, collar open, sleeves rolled; woven sandal; a small pendant on a cord — no logos visible' },
 
   // ── OLD MONEY / QUIET LUXURY ─────────────────────────────────
   { gender: 'male', energy: 15, tags: ['old-money','classic','quiet','polished'],
     niches: ['lifestyle','fashion','travel','any'],
-    text: 'Unstructured camel linen blazer, lapels slightly soft from wear, over a white Oxford shirt with three buttons casually open; slim straight-leg cream chino with a faint crease; tan penny loafer in full-grain leather, slightly worn at the heel; a chunky gold signet ring on the left pinky; a simple leather-strap watch on the wrist — no logos visible' },
+    text: 'Unstructured linen blazer, lapels slightly soft from wear, over an Oxford shirt with three buttons casually open; slim straight-leg chino with a faint crease; penny loafer in full-grain leather, slightly worn at the heel; a chunky gold signet ring on the left pinky; a simple leather-strap watch on the wrist — no logos visible' },
   { gender: 'male', energy: 18, tags: ['old-money','natural','casual'],
     niches: ['lifestyle','travel','any'],
-    text: 'Fine-knit off-white cotton polo, very relaxed fit, lightly sun-faded; well-worn straight-leg pale blue denim with a clean hem; white leather tennis sneaker, slightly soft at the toe; a gold signet ring on the left pinky; a steel watch on a leather strap — no logos visible' },
+    text: 'Fine-knit cotton polo, very relaxed fit, lightly sun-faded; well-worn straight-leg denim with a clean hem; leather tennis sneaker, slightly soft at the toe; a gold signet ring on the left pinky; a steel watch on a leather strap — no logos visible' },
   { gender: 'male', energy: 22, tags: ['old-money','preppy','polished'],
     niches: ['lifestyle','fashion'],
-    text: 'Navy linen blazer worn open over a faded white linen shirt, collar three buttons open, sleeves pushed; straight-leg sand chino; cognac leather loafer, worn smooth at the sole edge; a thin gold watch with a worn brown leather strap — no logos visible' },
+    text: 'Linen blazer worn open over a faded linen shirt, collar three buttons open, sleeves pushed; straight-leg chino; leather loafer, worn smooth at the sole edge; a thin gold watch with a worn leather strap — no logos visible' },
   { gender: 'male', energy: 28, tags: ['old-money','casual','quiet'],
     niches: ['lifestyle','travel'],
-    text: 'Soft washed Oxford shirt in faded pale blue, oversized and fully untucked, buttons open to mid-chest; well-worn straight-leg light sand chino; faded canvas boat shoe in tan; a gold signet ring; a simple leather-strap watch — no logos visible' },
+    text: 'Soft washed Oxford shirt, oversized and fully untucked, buttons open to mid-chest; well-worn straight-leg chino; faded canvas boat shoe; a gold signet ring; a simple leather-strap watch — no logos visible' },
   { gender: 'male', energy: 20, tags: ['old-money','structured','quiet'],
     niches: ['fashion','lifestyle'],
-    text: 'Tailored cream linen trousers with a clean crease; a white linen shirt collar open, untucked; tan leather loafer with a light scuff at the toe; a thin gold chain at the collarbone; a slim leather-strap watch — no logos visible' },
+    text: 'Tailored linen trousers with a clean crease; a linen shirt, collar open, untucked; leather loafer with a light scuff at the toe; a thin gold chain at the collarbone; a slim leather-strap watch — no logos visible' },
   { gender: 'male', energy: 35, tags: ['old-money','classic','relaxed'],
     niches: ['lifestyle','any'],
-    text: 'Soft camel cable-knit crewneck sweater, slightly oversize, hem relaxed over the waistband; slim straight-leg dark navy chino; clean white leather low sneaker; a gold signet ring; no other jewelry — no logos visible' },
+    text: 'Soft cable-knit crewneck sweater, slightly oversize, hem relaxed over the waistband; slim straight-leg chino; clean leather low sneaker; a gold signet ring; no other jewelry — no logos visible' },
 
   { gender: 'female', energy: 12, tags: ['old-money','classic','quiet','polished'],
     niches: ['lifestyle','fashion','any'],
-    text: 'Perfectly tailored cream wide-leg linen trousers; a fine-knit white short-sleeve polo, tucked neatly; a single strand of small pearls at the collarbone; tan leather loafer, buffed; a simple gold bracelet — no logos visible' },
+    text: 'Perfectly tailored wide-leg linen trousers; a fine-knit short-sleeve polo, tucked neatly; a single strand of small pearls at the collarbone; leather loafer, buffed; a simple gold bracelet — no logos visible' },
   { gender: 'female', energy: 18, tags: ['old-money','natural','casual'],
     niches: ['lifestyle','travel','fashion'],
-    text: 'Oversize washed Oxford shirt in pale chambray, three buttons open, half-tucked into straight-leg ecru linen trousers; gold signet ring; worn-in tan leather sandal with a minimal strap — no logos visible' },
+    text: 'Oversize washed Oxford shirt, three buttons open, half-tucked into straight-leg linen trousers; gold signet ring; worn-in leather sandal with a minimal strap — no logos visible' },
   { gender: 'female', energy: 22, tags: ['old-money','preppy','polished'],
     niches: ['lifestyle','fashion'],
-    text: 'Slim-fit navy blazer, single button, worn over a white striped poplin shirt, collar open; straight-leg cream chino, clean hem; flat leather loafer in tan; a thin gold chain and small pearl stud earrings — no logos visible' },
+    text: 'Slim-fit blazer, single button, worn over a striped poplin shirt, collar open; straight-leg chino, clean hem; flat leather loafer; a thin gold chain and small pearl stud earrings — no logos visible' },
   { gender: 'female', energy: 28, tags: ['old-money','classic','quiet'],
     niches: ['lifestyle','any'],
-    text: 'Soft camel cashmere crewneck sweater, slightly oversize; straight-leg oat linen trousers; clean white leather sneaker; a thin gold chain; a small leather tote held at the crook of the arm — no logos visible' },
+    text: 'Soft cashmere crewneck sweater, slightly oversize; straight-leg linen trousers; clean leather sneaker; a thin gold chain; a small leather tote held at the crook of the arm — no logos visible' },
+
+  // ── CLEAN GIRL — dedicated entries (distinct from generic Minimalist) ─
+  // Think Hailey Bieber, Sofia Richie: polished, effortless, gold jewelry, fitted ribbed pieces
+  { gender: 'female', energy: 22, tags: ['clean','natural','quiet'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Fitted ribbed tank top tucked neatly into a high-waist tailored midi skirt in warm ecru or oat; flat leather sandal, thin strap; small gold huggie hoop earrings; no other jewelry — no logos visible' },
+  { gender: 'female', energy: 38, tags: ['clean','natural','casual'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Matching ribbed set: fitted long-sleeve crop top and wide-leg ribbed lounge trousers in warm oat or cream; clean leather low sneaker or flat; small gold huggie hoops; a single thin delicate gold chain — no logos visible' },
+  { gender: 'female', energy: 55, tags: ['clean','natural','casual'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Fitted white or cream ribbed tank tucked into wide-leg linen or satin-finish trousers in camel or warm oat; strappy leather flat sandal; small gold hoop earrings; a layered delicate gold chain necklace — no logos visible' },
+  { gender: 'female', energy: 68, tags: ['clean','natural','polished'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Fitted satin-finish or ribbed cami midi dress in warm ecru or nude; strappy leather flat sandal; gold hoop earrings; stacked thin delicate gold chains and a simple gold bracelet — no logos visible' },
+
+  // ── STREETWEAR — low & mid energy (was missing entirely below 62) ─
+  { gender: 'female', energy: 22, tags: ['street','casual','clean'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Oversized washed heavyweight tee, crew neck, hem slightly cropped by tucking once at the front; high-waist straight-leg dark denim; clean white low-top canvas sneaker, slightly broken in — no logos visible' },
+  { gender: 'female', energy: 38, tags: ['street','casual','urban'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Relaxed straight-leg dark denim; fitted ribbed tank, thin straps, half-tucked; clean low-profile leather sneaker; a small thin chain at the collarbone — no logos visible' },
+  { gender: 'female', energy: 52, tags: ['street','urban','casual'],
+    niches: ['lifestyle','fashion','entertainment','any'],
+    text: 'Wide-leg dark denim, clean hem; fitted graphic tee tucked loosely at one side; clean chunky low-top trainer; a thin chain layered over the tee — no logos visible' },
+
+  { gender: 'male', energy: 22, tags: ['street','casual','clean'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Straight-leg dark denim, clean hem; heavyweight cotton tee, crew neck, slightly oversized; clean white low-top canvas sneaker — no logos visible' },
+  { gender: 'male', energy: 38, tags: ['street','urban','casual'],
+    niches: ['lifestyle','fashion','entertainment'],
+    text: 'Straight-leg dark denim; loose overshirt worn fully open over a fitted tee; clean low-profile leather sneaker — no logos visible' },
+  { gender: 'male', energy: 52, tags: ['street','casual','urban'],
+    niches: ['lifestyle','fashion','entertainment'],
+    text: 'Wide-leg dark denim, clean hem; oversized washed crewneck, dropped shoulder; clean low-profile trainer; a thin cord bracelet — no logos visible' },
+
+  // ── BOHEMIAN — male (was zero entries) ───────────────────────────
+  { gender: 'male', energy: 28, tags: ['bohemian','earthy','natural'],
+    niches: ['lifestyle','travel','any'],
+    text: 'Loose linen shirt, collar open three buttons, slightly oversized, untucked; relaxed straight-leg linen trousers; flat leather sandal; a single thin cord or wooden-bead bracelet — no logos visible' },
+  { gender: 'male', energy: 48, tags: ['bohemian','natural','earthy'],
+    niches: ['lifestyle','travel'],
+    text: 'Loose woven cotton shirt, slightly sun-faded, collar open; relaxed wide-leg linen trousers, cropped above the ankle; flat leather sandal; a layered cord and natural-bead necklace — no logos visible' },
+  { gender: 'male', energy: 65, tags: ['bohemian','earthy','casual'],
+    niches: ['lifestyle','travel','fashion'],
+    text: 'Linen overshirt worn open, fabric slightly crumpled; wide-leg cotton drawstring trousers; leather sandal with a woven strap; layered thin cord necklaces, worn and natural — no logos visible' },
+
+  // ── GLAM — male low & mid energy (was only 1 entry at energy 85) ─
+  { gender: 'male', energy: 32, tags: ['glam','polished','structured'],
+    niches: ['fashion','lifestyle','entertainment'],
+    text: 'Tailored straight-leg trousers in a subtle satin-finish fabric; fitted fine-knit turtleneck; clean leather chelsea boot; a single thin gold chain — no logos visible' },
+  { gender: 'male', energy: 55, tags: ['glam','evening','polished'],
+    niches: ['fashion','entertainment','lifestyle'],
+    text: 'Fitted ribbed turtleneck; slim tailored trousers with a faint sheen at the fabric; clean pointed-toe leather oxford; a thin gold bracelet — no logos visible' },
+  { gender: 'male', energy: 68, tags: ['glam','bold','evening'],
+    niches: ['fashion','entertainment'],
+    text: 'Satin-finish button-up shirt, collar open two buttons, slightly relaxed; well-tailored slim trousers; clean pointed-toe leather boot; a gold signet ring and thin chain at the collarbone — no logos visible' },
+
+  // ── Y2K — low & mid energy (was all 62+ for female, 72 for male) ─
+  { gender: 'female', energy: 28, tags: ['y2k','playful','casual'],
+    niches: ['lifestyle','fashion','entertainment'],
+    text: 'Low-rise straight-leg denim, slightly flared at the hem; fitted ribbed baby tee, slightly cropped, scoop neck; flat strappy sandal; a thin chain bracelet — no logos visible' },
+  { gender: 'female', energy: 48, tags: ['y2k','casual','clean'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Low-rise bootcut denim in a clean medium wash; cropped fitted polo, collar slightly open; clean white low-top sneaker; a delicate thin choker-style necklace — no logos visible' },
+
+  { gender: 'male', energy: 32, tags: ['y2k','casual','urban'],
+    niches: ['lifestyle','fashion','entertainment'],
+    text: 'Wide-leg straight denim, clean medium wash; fitted tee with a subtle graphic, crew neck; clean low-top sneaker; a thin chain necklace — no logos visible' },
+  { gender: 'male', energy: 52, tags: ['y2k','urban','casual'],
+    niches: ['lifestyle','entertainment'],
+    text: 'Baggy low-rise straight-leg denim, slightly faded at the knees; zip-up track jacket in a tonal colour, collar slightly popped, worn open over a fitted tee; clean low-top skate-style sneaker; a thin silver chain at the collarbone — no logos visible' },
+
+  // ── EDITORIAL — male mid-range (was only 78, 82, 85) ─────────────
+  { gender: 'male', energy: 42, tags: ['editorial','structured','clean'],
+    niches: ['fashion','lifestyle'],
+    text: 'Collarless structured cotton jacket, slightly boxy, worn fully buttoned as the only top layer — no shirt visible; clean straight-leg tailored trousers in a contrasting neutral; square-toe leather oxford; no accessories — no logos visible' },
+  { gender: 'male', energy: 60, tags: ['editorial','structured','dark'],
+    niches: ['fashion','entertainment'],
+    text: 'Structured overshirt in heavy black fabric worn fully closed as a jacket, strong shoulder line; fitted black turtleneck underneath; slim tailored trousers in dark charcoal; clean black leather chelsea boot — no logos visible' },
+
+  // ── DARK & MOODY — female low energy (was nothing below 60) ──────
+  { gender: 'female', energy: 22, tags: ['dark','minimalist','quiet'],
+    niches: ['fashion','lifestyle','entertainment'],
+    text: 'Fine-knit fitted black turtleneck, long sleeve, slightly thin at the cuffs; slim straight-leg black trousers, clean hem; clean black leather flat; no jewelry — no logos visible' },
+  { gender: 'female', energy: 38, tags: ['dark','moody','casual'],
+    niches: ['fashion','lifestyle','entertainment'],
+    text: 'Fitted ribbed long-sleeve crew-neck top in black or deep charcoal; slim straight dark denim or black trousers; clean leather ankle boot in black, low block heel; a single thin silver chain necklace — no logos visible' },
+
+  // ── PREPPY — expanded (was 2F / 2M) ──────────────────────────────
+  { gender: 'female', energy: 25, tags: ['preppy','classic','clean'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Fine-knit crewneck sweater in a clean neutral, slightly fitted; slim straight-leg chino; leather loafer; a simple thin gold bracelet — no logos visible' },
+  { gender: 'female', energy: 55, tags: ['preppy','classic','polished'],
+    niches: ['lifestyle','fashion'],
+    text: 'Striped poplin shirt, collar open, tucked into high-waist straight-leg chino; leather loafer; small pearl stud earrings; a simple gold bracelet — no logos visible' },
+  { gender: 'female', energy: 68, tags: ['preppy','editorial','polished'],
+    niches: ['lifestyle','fashion'],
+    text: 'Slim blazer in a classic check, single button, lapels neat; fitted crew-neck tee underneath; straight-leg chino; penny loafer; a thin gold chain — no logos visible' },
+
+  { gender: 'male', energy: 22, tags: ['preppy','classic','quiet'],
+    niches: ['lifestyle','fashion','any'],
+    text: 'Soft cotton crewneck sweater, slightly relaxed, in a clean neutral; well-worn slim straight-leg chino; leather loafer, buffed slightly; a thin stainless watch — no logos visible' },
+  { gender: 'male', energy: 55, tags: ['preppy','classic','clean'],
+    niches: ['lifestyle','fashion'],
+    text: 'Oxford button-down, collar open, slightly tucked at the front; straight-leg chino, clean break; leather loafer; a simple woven cord bracelet — no logos visible' },
+  { gender: 'male', energy: 68, tags: ['preppy','polished','editorial'],
+    niches: ['lifestyle','fashion'],
+    text: 'Linen blazer with a natural rumple, worn open; fitted Oxford shirt underneath, collar two buttons open; slim chino; leather loafer; a gold signet ring — no logos visible' },
 ]
+
+// Defining tag per vibe — used to hard-filter the wardrobe pool before scoring.
+// This ensures a selected vibe always wins over energy proximity.
+// Personality still controls HOW the outfit is worn (getStylingNote), not whether the vibe is respected.
+const VIBE_PRIMARY_TAG = {
+  'Minimalist':   'minimalist',
+  'Editorial':    'editorial',
+  'Streetwear':   'street',
+  'Bohemian':     'bohemian',
+  'Glam':         'glam',
+  'Sporty':       'sport',
+  'Y2K':          'y2k',
+  'Dark & Moody': 'dark',
+  'Clean Girl':   'clean',
+  'Cottagecore':  'cottagecore',
+  'Tech Bro':     'minimalist',
+  'Preppy':       'preppy',
+  'Old Money':    'old-money',
+  'Coastal':      'coastal',
+}
 
 // Vibe words → tag arrays (not 1:1 → single outfit — they filter the library)
 const VIBE_TAG_MAP = {
@@ -306,14 +523,33 @@ const VIBE_TAG_MAP = {
   'Streetwear':    ['street', 'urban', 'casual'],
   'Bohemian':      ['bohemian', 'earthy', 'natural'],
   'Glam':          ['glam', 'evening', 'bold'],
-  'Sporty':        ['sport', 'functional', 'active'],
-  'Y2K':           ['y2k', 'playful', 'nostalgic'],
-  'Dark & Moody':  ['dark', 'moody', 'urban'],
-  'Clean Girl':    ['clean', 'minimalist', 'natural'],
+  'Sporty':        ['sport', 'functional', 'casual'],
+  'Y2K':           ['y2k', 'playful', 'casual'],
+  'Dark & Moody':  ['dark', 'moody', 'structured'],
+  'Clean Girl':    ['clean', 'natural', 'casual'],
   'Cottagecore':   ['cottagecore', 'natural', 'earthy'],
-  'Tech Bro':      ['minimalist', 'structured', 'clean'],
+  'Tech Bro':      ['structured', 'quiet', 'minimalist'],
   'Preppy':        ['preppy', 'classic', 'polished'],
   'Old Money':     ['old-money', 'classic', 'polished', 'quiet'],
+  'Coastal':       ['coastal', 'natural', 'casual'],
+}
+
+// Vibe → color palette hint injected into the Wardrobe section
+const VIBE_PALETTE_MAP = {
+  'Minimalist':    'Palette: muted neutrals — off-white, ecru, stone, warm grey, oat. No strong saturated colors.',
+  'Editorial':     'Palette: bold monochrome or one statement color — all-black, deep charcoal, pure white, or a single saturated hue.',
+  'Streetwear':    'Palette: washed-out neutrals — faded black, washed grey, dirty white, faded indigo denim.',
+  'Bohemian':      'Palette: warm earthy tones — terracotta, rust, warm ochre, tobacco, deep olive, sun-faded warm neutrals.',
+  'Glam':          'Palette: rich evening tones — deep burgundy, warm ivory, champagne, or a bold jewel-tone statement piece.',
+  'Sporty':        'Palette: clean athletic colors — sage green, lavender, warm rust, classic black-and-white, or a pastel matching set.',
+  'Y2K':           'Palette: 2000s nostalgia — baby blue, lilac, pale pink, warm denim wash, silver hardware, white.',
+  'Dark & Moody':  'Palette: deep darks only — all-black, deep charcoal, dark forest, inky navy. No light or pastel tones.',
+  'Clean Girl':    'Palette: clean warm neutrals — warm white, oat, ecru, nude blush. Nothing saturated or dark.',
+  'Cottagecore':   'Palette: soft botanical — dusty rose, sage, warm cream, muted floral prints, soft lavender.',
+  'Tech Bro':      'Palette: monochrome and minimal — all-black, deep charcoal, dark navy, all-grey. No bright or warm tones.',
+  'Preppy':        'Palette: classic collegiate — navy and white, hunter green, camel and cream, burgundy.',
+  'Old Money':     'Palette: quiet luxury — camel, cream, stone, pale blue, navy, warm tan. Nothing loud or trend-driven.',
+  'Coastal':       'Palette: sun-bleached coastal — off-white linen, warm sand, ocean-washed denim, natural rope and shell tones.',
 }
 
 function getVibeTags(vibeWords) {
@@ -360,19 +596,29 @@ function getStylingNote(personality) {
 }
 
 // Score and select wardrobe from the library
-function selectWardrobe(gender, vibeWords, personality, niche, physicalDesc, backstory) {
+function selectWardrobe(gender, vibeWords, personality, physicalDesc, backstory) {
   const isMale = gender?.toLowerCase() === 'male'
   const vibeTags = [...getVibeTags(vibeWords), ...getStyleCuesFromBio(physicalDesc, backstory)]
-  const { min, max } = getEnergyWindow(personality)
-  const nicheL = niche.toLowerCase()
+
+  // When a vibe is selected, derive its primary/defining tag and hard-filter first.
+  // This ensures vibe is always respected — personality controls HOW it's worn, not whether.
+  const primaryVibeTags = (vibeWords || []).map(v => VIBE_PRIMARY_TAG[v]).filter(Boolean)
 
   // Filter by gender
   const genderPool = WARDROBE.filter(e =>
     isMale ? e.gender === 'male' : e.gender === 'female'
   )
 
+  // Hard-filter to vibe pool if a vibe is selected; fall back if too few entries
+  const pool = primaryVibeTags.length > 0
+    ? (() => {
+        const filtered = genderPool.filter(e => e.tags.some(t => primaryVibeTags.includes(t)))
+        return filtered.length >= 3 ? filtered : genderPool
+      })()
+    : genderPool
+
   // Score each entry
-  const scored = genderPool.map(e => {
+  const scored = pool.map(e => {
     let score = 0
 
     // Energy proximity — entries closer to personality center score higher
@@ -380,10 +626,6 @@ function selectWardrobe(gender, vibeWords, personality, niche, physicalDesc, bac
     if (energyDist <= 15) score += 40        // very close match
     else if (energyDist <= 28) score += 20   // within tolerance
     else score -= 20                          // outside window — penalize but don't fully exclude
-
-    // Niche affinity
-    const nicheMatch = e.niches.includes('any') || e.niches.some(n => nicheL.includes(n))
-    if (nicheMatch) score += 25
 
     // Vibe tag overlap — each matching tag scores
     if (vibeTags.length > 0) {
@@ -480,67 +722,44 @@ const OUTDOOR_CANDID_SCENES = [
   'small outdoor market square, light warm and directional, the square otherwise empty',
 ]
 
-function getScenePool(niche) {
-  const n = niche.toLowerCase()
-  if (n.includes('fashion')) return SCENE_POOLS.fashion
-  if (n.includes('beauty')) return SCENE_POOLS.beauty
-  if (n.includes('fitness') || n.includes('wellness') || n.includes('sport')) return SCENE_POOLS.fitness
-  if (n.includes('travel')) return SCENE_POOLS.travel
-  if (n.includes('gaming')) return SCENE_POOLS.gaming
-  if (n.includes('entertainment')) return SCENE_POOLS.entertainment
-  if (n.includes('tech') || n.includes('finance')) return SCENE_POOLS.tech
-  if (n.includes('lifestyle') || n.includes('food')) return SCENE_POOLS.lifestyle
-  return SCENE_POOLS.default
+const ALL_SCENES = Object.values(SCENE_POOLS).flat()
+
+function getScenePool() {
+  return ALL_SCENES
 }
 
-// ── Prop — niche-appropriate, ~50% chance ────────────────────
-function getProp(niche) {
-  if (Math.random() > 0.55) return null
-  const n = niche.toLowerCase()
-  if (n.includes('fitness') || n.includes('sport') || n.includes('wellness'))
-    return R([
-      'stainless steel wide-mouth water bottle, no logo, condensation on the outside',
-      'small wired earbuds just removed, held loosely in one hand',
-      'green smoothie in a clear cup with a paper straw',
-      null,
-    ])
-  if (n.includes('food') || n.includes('lifestyle') || n.includes('fashion') || n.includes('beauty'))
-    return R([
-      'iced matcha latte in a clear to-go cup, bright green, paper straw, slight condensation on the outside',
-      'bubble milk tea in a clear sealed cup, fat straw, slightly condensated',
-      'iced coffee in a clear coffee shop cup with a dome lid, paper straw',
-      'small paper shopping bag held loosely at the side by the handles',
-      'matcha in a small ceramic takeaway cup, no lid',
-      'croissant in a small paper bag, partially eaten',
-      'iced latte in a clear cup, light brown, ice visible through the sides, paper straw',
-      null,
-    ])
-  if (n.includes('travel'))
-    return R([
-      'iced coffee in a clear to-go cup, paper straw',
-      'small travel thermos, no logo',
-      'worn-in paperback held loosely by the spine',
-      'small paper bag from a local shop, handles in hand',
-      null,
-    ])
-  if (n.includes('tech') || n.includes('gaming') || n.includes('finance'))
-    return R(['phone held loosely at the side, screen off', 'coffee in a small paper cup', null])
-  return R([
-    'iced matcha latte in a clear to-go cup, paper straw',
-    'iced coffee in a clear cup, paper straw',
-    'small coffee in a ceramic cup',
-    null,
-  ])
+// ── Prop — niche-appropriate, ~30% chance ────────────────────
+const DRINK_PROP_PATTERN = /latte|matcha|coffee|tea|smoothie|cup|straw|thermos|bubble/
+
+function isDrinkProp(prop) {
+  return !!prop && DRINK_PROP_PATTERN.test(prop)
 }
 
-// ── Camera selection by niche + personality ───────────────────
+const UNIVERSAL_PROPS = [
+  'iced matcha latte in a clear to-go cup, bright green, paper straw, slight condensation',
+  'iced coffee in a clear coffee shop cup with a dome lid, paper straw',
+  'iced latte in a clear cup, light brown, ice visible through the sides, paper straw',
+  'stainless steel wide-mouth water bottle, no logo, condensation on the outside',
+  'small paper shopping bag held loosely at the side by the handles',
+  'small pebbled leather tote held at the crook of the arm',
+  'pair of clean sunglasses held loosely in one hand at the side',
+  'worn-in paperback, held loosely by the spine',
+  'small bouquet of dried or fresh flowers, stems in one hand',
+  'small wired earbuds just removed, held loosely in one hand',
+  'thin notebook held loosely under one arm',
+  'phone held loosely at the side, screen off',
+  null, null, null,
+]
+
+function getProp(noDrink = false) {
+  if (Math.random() > 0.7) return null
+  const options = noDrink ? UNIVERSAL_PROPS.filter(o => !isDrinkProp(o)) : UNIVERSAL_PROPS
+  return R(options)
+}
+
+// ── Camera selection ──────────────────────────────────────────
 // Always iPhone 16 Pro — the entire app identity is iPhone realism, never a professional camera
-function getCamera(niche, personality) {
-  const n = niche.toLowerCase()
-  if (n.includes('fitness') || n.includes('sport'))
-    return 'iPhone 16 Pro 24mm main lens f/1.78, held at arm\'s length or by a nearby friend, slight upward angle, automatic exposure, natural sensor noise in shadow areas, 9:16 vertical, three-quarter to chest-up framing, subject fills the center of the frame'
-  if (n.includes('travel'))
-    return 'iPhone 16 Pro 24mm main lens f/1.78, held at arm\'s length or by a friend standing close, automatic settings, natural lens distortion at corners, sensor noise in shadows, 9:16 vertical, three-quarter or chest-up framing, subject fills the majority of the frame'
+function getCamera() {
   return 'iPhone 16 Pro 24mm main lens f/1.78, held at arm\'s length or by a nearby friend, automatic exposure, natural sensor noise in shadow areas, slight lens barrel distortion at edges, 9:16 vertical, chest-up framing, face at the upper-third line, subject fills the center of the frame'
 }
 
@@ -632,8 +851,6 @@ Rules:
 
 // ── Brief for Claude ──────────────────────────────────────────
 export function buildPromptInput(d) {
-  const nicheArr = Array.isArray(d.niches) && d.niches.length ? d.niches : d.niche ? [d.niche] : []
-  const niche = [...nicheArr.filter(n => n !== 'Other'), d.nicheCustom].filter(Boolean).join(' / ') || 'lifestyle'
   const p = d.personality ?? 50
   const personalityDesc = p < 30
     ? 'deeply introverted — quiet, internal, does not perform for the camera. Wardrobe should be understated and worn without deliberateness.'
@@ -651,8 +868,7 @@ export function buildPromptInput(d) {
 Name: ${d.name || 'unnamed'}
 Gender: ${d.gender || 'unspecified'}
 Age: ${d.age || 'mid-20s'}
-Niche: ${niche}
-Physical description: ${d.physicalDesc || 'not specified — invent something photogenic appropriate for the niche'}
+Physical description: ${d.physicalDesc || 'not specified — invent something photogenic'}
 Aesthetic vibe words: ${vibes}
 Personality (0=introvert, 100=extrovert): ${p}/100 — ${personalityDesc}
 Backstory: ${d.backstory?.trim() || 'not given'}
@@ -667,9 +883,7 @@ Key requirements:
 }
 
 // ── Direct prompt builder — all inputs drive output ───────────
-export function buildDirectPrompt(d, forcePose = null, options = {}) {
-  const nicheArr = Array.isArray(d.niches) && d.niches.length ? d.niches : d.niche ? [d.niche] : []
-  const niche = [...nicheArr.filter(n => n !== 'Other'), d.nicheCustom].filter(Boolean).join(' / ') || 'lifestyle'
+export function buildDirectPrompt(d, forcePose = null, options = {}, aspectRatio = '9:16') {
   const gender = d.gender || 'woman'
   const age = d.age ? `${d.age} year old` : 'mid-20s'
   const physical = d.physicalDesc?.trim() || 'with dark hair, warm complexion, natural features'
@@ -678,12 +892,17 @@ export function buildDirectPrompt(d, forcePose = null, options = {}) {
   const backstory = d.backstory?.trim() || ''
   const isEditorial = vibes.includes('Editorial')
 
-  const timeConfig = R(getTimesForNiche(niche))
-  const scene = options.forceOutdoor ? R(OUTDOOR_CANDID_SCENES) : R(getScenePool(niche))
+  const timeConfig = R(getTimesForNiche())
+  const scene = options.forceOutdoor ? R(OUTDOOR_CANDID_SCENES) : R(getScenePool())
   const poseFn = forcePose || getPoseFromPersonality(personality)
-  const prop = getProp(niche)
-  const wardrobe = selectWardrobe(gender, vibes, personality, niche, d.physicalDesc, d.backstory)
-  const camera = getCamera(niche, personality)
+  // Use pre-generated prop from session manager if provided, otherwise generate one
+  const prop = 'forceProp' in options ? options.forceProp : getProp()
+  const wardrobeBase = selectWardrobe(gender, vibes, personality, d.physicalDesc, d.backstory)
+  const paletteLine = options.model !== 'soul_2'
+    ? vibes.map(v => VIBE_PALETTE_MAP[v]).filter(Boolean).join(' | ')
+    : ''
+  const wardrobe = paletteLine ? `${wardrobeBase}\n${paletteLine}` : wardrobeBase
+  const camera = getCamera()
   const skinBlock = buildSkinBlock(timeConfig.label, gender, physical)
   const characterFraming = getCharacterFraming(personality, backstory)
 
@@ -697,7 +916,7 @@ export function buildDirectPrompt(d, forcePose = null, options = {}) {
     : poseFn === POSES.posed_cute ? 'iPhone feed shot — soft pose, eyes at lens'
     : 'iPhone candid — mid-moment, eyes at the lens'
 
-  return `Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output — unedited. The subject is unaware this will be published — a personal photo, not intended for any shoot. This looks exactly like a photo a real person posted to their Instagram story.
+  return `Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output — unedited. The subject is unaware this will be published — a personal photo, not intended for any shoot.
 
 Scene: ${scene}, ${timeConfig.label}. Empty of other people. If the location is an interior, it shows real signs of habitation — not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it — no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.
 
@@ -716,17 +935,31 @@ ${skinBlock}
 
 Use case: ${poseName}
 
-Constraints: no people in the background. No visible brand logos on any item. Subject fills 60–70% of the 9:16 frame — tight crop, not a wide environmental shot. No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin — zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. This image is indistinguishable from a personal photo posted on Instagram.${isEditorial ? ' Editorial vibe applies to the styling only — the photo itself is a raw iPhone snapshot.' : ''}`
+Constraints: no people in the background. No visible brand logos on any item. ${aspectRatio === '16:9' ? 'Horizontal landscape frame — subject standing close to camera, filling at least half the frame height, environment visible on both sides. Not a distant wide shot — the subject must be close enough that face and outfit detail are fully legible. This is a wide candid, not a portrait crop rotated sideways.' : 'Subject fills 60–70% of the 9:16 frame — tight crop, not a wide environmental shot.'} No background blur or bokeh. Real pore texture and skin imperfections visible on the face and all exposed body skin — zero beauty retouching. No AI aesthetic markers: no unnaturally bright irises, no perfectly symmetrical face, no plastic-smooth skin, no uncanny glow. No phone screen, no social media UI, no app overlay, no notification bar, no status bar, no interface elements of any kind visible anywhere in the image. This is a raw photograph — no digital overlays, no framing devices, no UI chrome. ${isEditorial ? 'Editorial vibe applies to the styling only — the photo itself is a raw iPhone snapshot.' : ''}`
 }
 
 // ── Three distinct variation prompts — different poses per card ─
-export function buildThreeVariationPrompts(d) {
-  // 1. Front facing: direct, calm, present
-  // 2. Front facing (posed cute): soft expression, eyes at lens
-  // 3. Candid outdoor: always outside, mid-action, having fun — still hero of the frame
+export function buildThreeVariationPrompts(d, aspectRatio = '9:16', model = 'gpt_image_2') {
+  // Generate props for the session upfront:
+  // — candid pose never gets a drink (mid-sip is too dominant)
+  // — max 1 drink across all 3 variations
+  let drinkUsed = false
+  function sessionProp(noDrink = false) {
+    const p = getProp(noDrink || drinkUsed)
+    if (isDrinkProp(p)) drinkUsed = true
+    return p
+  }
+
+  if (model === 'soul_2') {
+    return [
+      buildDirectPrompt(d, POSES_SOUL.facing,  { model: 'soul_2', forceProp: sessionProp() }, aspectRatio),
+      buildDirectPrompt(d, POSES_SOUL.angled,  { model: 'soul_2', forceProp: sessionProp() }, aspectRatio),
+      buildDirectPrompt(d, POSES_SOUL.candid,  { forceOutdoor: true, model: 'soul_2', forceProp: sessionProp(true) }, aspectRatio),
+    ]
+  }
   return [
-    buildDirectPrompt(d, POSES.frontfacing),
-    buildDirectPrompt(d, POSES.posed_cute),
-    buildDirectPrompt(d, POSES.candid, { forceOutdoor: true }),
+    buildDirectPrompt(d, POSES.frontfacing, { forceProp: sessionProp() }, aspectRatio),
+    buildDirectPrompt(d, POSES.posed_cute,  { forceProp: sessionProp() }, aspectRatio),
+    buildDirectPrompt(d, POSES.candid,      { forceOutdoor: true, forceProp: sessionProp(true) }, aspectRatio),
   ]
 }

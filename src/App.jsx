@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, useTheme } from './context/theme'
+import { StoreProvider } from './store'
 import Nav from './components/Nav'
 import Landing from './pages/Landing'
 import Influencers from './pages/Influencers'
@@ -58,6 +59,7 @@ function ThemeToggle() {
 export default function App() {
   return (
     <ThemeProvider>
+    <StoreProvider>
     <BrowserRouter>
       <Nav />
       <Routes>
@@ -72,6 +74,7 @@ export default function App() {
       </Routes>
       <ThemeToggle />
     </BrowserRouter>
+    </StoreProvider>
     </ThemeProvider>
   )
 }

@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useInfluencers, generateId } from '../store'
 import ImageGrid from '../components/ImageGrid'
 import MasonryGrid from '../components/MasonryGrid'
@@ -6,6 +7,7 @@ import Lightbox from '../components/Lightbox'
 import { exportInfluencerCard } from '../utils/exportCard'
 import { compressImage } from '../utils/imageUtils'
 import { gColor, pLabel } from '../utils/influencerUtils'
+import { useTheme } from '../context/theme'
 
 function useMobile() {
   const [m, setM] = useState(() => window.innerWidth < 768)
@@ -20,7 +22,7 @@ function useMobile() {
 // ─────────────────────────────────────────────
 // Dark sidebar palette
 const SD = {
-  bg:      '#18181B',
+  bg:      '#0d0d14',
   border:  'rgba(255,255,255,0.07)',
   text:    '#F4F4F5',
   dim:     'rgba(255,255,255,0.38)',
@@ -61,10 +63,11 @@ function accentText(hex) {
 
 function completeness(inf) {
   const c = [
-    inf.name?.trim(), inf.gender, inf.mainImage, inf.characterSheetImage, inf.closeUpImage1,
-    inf.prompt?.trim(), inf.backstory?.trim(), inf.niche, inf.audience?.trim(), inf.voice?.trim(),
+    inf.name?.trim(), inf.gender, inf.mainImage,
+    inf.backstory?.trim(), inf.niche, inf.audience?.trim(), inf.voice?.trim(),
     inf.wardrobeSlots?.some(s => s.image), inf.homeImages?.length > 0,
-    inf.hobbies?.trim(), inf.palette?.length > 0,
+    inf.hobbies?.trim(), inf.palette?.length > 0, inf.dreamBrands?.trim(),
+    inf.clothingStyle?.trim(), inf.location?.trim(),
   ]
   return Math.round(c.filter(Boolean).length / c.length * 100)
 }
@@ -602,24 +605,23 @@ function BareInput({ value, onChange, placeholder, multiline, rows = 3 }) {
 }
 
 // ─────────────────────────────────────────────
-// Description form — brief layout
+// Overview form
 function DescriptionForm({ influencer, onUpdate }) {
   const u = (k, v) => onUpdate(influencer.id, { [k]: v })
   const niches = getNiches(influencer.gender)
   const aPh = audiencePh(influencer.gender, influencer.niche)
-  const gc = gColor(influencer.gender)
   const pv = influencer.introExtrovert ?? 50
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-      {/* ── Row 1: Identity + Personality ── */}
+      {/* ── Identity ── */}
       <div style={{ background: 'var(--bg)', borderRadius: 12, padding: '16px 18px' }}>
-        {/* Identity pills — Gender, Niche, Age as compact editable row */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 12 }}>Identity</div>
+        <div style={{ marginBottom: 12 }}>
           <GenderButtons value={influencer.gender ?? ''} onChange={v => u('gender', v)}/>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr 1fr', gap: 10 }}>
           <div>
             <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 5 }}>Age</div>
             <input value={influencer.age ?? ''} onChange={e => u('age', e.target.value)} placeholder="—"
@@ -633,26 +635,15 @@ function DescriptionForm({ influencer, onUpdate }) {
               {niches.map(n => <option key={n}>{n}</option>)}
             </select>
           </div>
-        </div>
-
-        {/* Personality — compact visual bar */}
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>Personality</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: pColor(pv) }}>{pLabel(pv)}</span>
-          </div>
-          <input type="range" min={0} max={100} value={pv} onChange={e => u('introExtrovert', Number(e.target.value))}
-            style={{ width: '100%', height: 5, borderRadius: 3, background: 'linear-gradient(to right,#FBBF24,#F97316,#EF4444)', outline: 'none', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}/>
-          <style>{`input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:2.5px solid ${pColor(pv)};box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer;}`}</style>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>Introvert</span>
-            <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>Extrovert</span>
+          <div>
+            <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 4 }}>Location</div>
+            <BareInput value={influencer.location ?? ''} onChange={e => u('location', e.target.value)} placeholder="e.g. NYC"/>
           </div>
         </div>
       </div>
 
-      {/* ── Row 2: Backstory — prominent, full width ── */}
-      <InfoCell label="Backstory" icon="✦" span={null}>
+      {/* ── Backstory ── */}
+      <InfoCell label="Backstory" icon="✦">
         <BareInput
           value={influencer.backstory ?? ''}
           onChange={e => u('backstory', e.target.value)}
@@ -661,31 +652,60 @@ function DescriptionForm({ influencer, onUpdate }) {
         />
       </InfoCell>
 
-      {/* ── Row 3: Audience ── */}
+      {/* ── Personality ── */}
+      <div style={{ background: 'var(--bg)', borderRadius: 12, padding: '13px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.7px' }}>Personality</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: pColor(pv) }}>{pLabel(pv)}</span>
+        </div>
+        <input type="range" min={0} max={100} value={pv} onChange={e => u('introExtrovert', Number(e.target.value))}
+          style={{ width: '100%', height: 5, borderRadius: 3, background: 'linear-gradient(to right,#FBBF24,#F97316,#EF4444)', outline: 'none', appearance: 'none', WebkitAppearance: 'none', cursor: 'pointer' }}/>
+        <style>{`input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:2.5px solid ${pColor(pv)};box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:pointer;}`}</style>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>Introvert</span>
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>Extrovert</span>
+        </div>
+      </div>
+
+      {/* ── Target Audience ── */}
       <InfoCell label="Target Audience" icon="👥">
         <BareInput value={influencer.audience ?? ''} onChange={e => u('audience', e.target.value)} placeholder={aPh}/>
       </InfoCell>
 
-      {/* ── Row 4: Style trifecta ── */}
-      <div className="desc-grid-3">
-        <InfoCell label="Clothing Style" icon="👗">
-          <BareInput value={influencer.clothingStyle ?? ''} onChange={e => u('clothingStyle', e.target.value)} placeholder="e.g. Minimalist…"/>
+      {/* ── Physical ── */}
+      {influencer.physicalDesc && (
+        <InfoCell label="Physical Description" icon="✧">
+          <BareInput value={influencer.physicalDesc ?? ''} onChange={e => u('physicalDesc', e.target.value)} placeholder="Physical appearance…"/>
         </InfoCell>
-        <InfoCell label="Hobbies" icon="🎯">
-          <BareInput value={influencer.hobbies ?? ''} onChange={e => u('hobbies', e.target.value)} placeholder="e.g. Yoga, travel…"/>
+      )}
+
+      {/* ── Lifestyle ── */}
+      <div className="desc-grid-2">
+        <InfoCell label="Hobbies & Interests" icon="🎯">
+          <BareInput value={influencer.hobbies ?? ''} onChange={e => u('hobbies', e.target.value)} placeholder="e.g. Yoga, travel, photography…" multiline rows={2}/>
         </InfoCell>
-        <InfoCell label="Dream Brands" icon="💎">
-          <BareInput value={influencer.dreamBrands ?? ''} onChange={e => u('dreamBrands', e.target.value)} placeholder="e.g. Nike, Glossier…"/>
+        <InfoCell label="Aesthetic / Style Vibe" icon="✨">
+          <BareInput value={influencer.clothingStyle ?? ''} onChange={e => u('clothingStyle', e.target.value)} placeholder="e.g. Minimalist, Old Money…" multiline rows={2}/>
         </InfoCell>
       </div>
 
-      {/* ── Row 5: Palette + Voice ── */}
+      {/* ── Brand ── */}
+      <div className="desc-grid-2">
+        <InfoCell label="Dream Brands" icon="💎">
+          <BareInput value={influencer.dreamBrands ?? ''} onChange={e => u('dreamBrands', e.target.value)} placeholder="e.g. Nike, Glossier, Loewe…"/>
+        </InfoCell>
+        <InfoCell label="Content Pillars" icon="📌">
+          <BareInput value={(influencer.contentPillars ?? []).join(', ')} onChange={e => u('contentPillars', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="e.g. Fitness, Mindset, Style…"/>
+        </InfoCell>
+      </div>
+
+      {/* ── Color Palette + Voice ── */}
       <div className="desc-grid-2">
         <InfoCell label="Aesthetic Palette" icon="🎨">
           <ColorPalette palette={influencer.palette ?? []} onChange={v => u('palette', v)} gender={influencer.gender}/>
         </InfoCell>
-        <InfoCell label="Voice" icon="🎙">
-          <BareInput value={influencer.voice ?? ''} onChange={e => u('voice', e.target.value)} placeholder="Higgsfield / ElevenLabs"/>
+        <InfoCell label="Voice / TTS" icon="🎙">
+          <BareInput value={influencer.voice ?? ''} onChange={e => u('voice', e.target.value)} placeholder="e.g. Higgsfield, ElevenLabs…"/>
         </InfoCell>
       </div>
 
@@ -848,7 +868,7 @@ function Sec({ children, style }) {
 
 // ─────────────────────────────────────────────
 // Detail tabs with palette-tinted active state
-const DETAIL_TABS = ['Description','Scripts','Wardrobe','Home','Brand Deals']
+const DETAIL_TABS = ['Overview','Scripts','Wardrobe','Home','Brand Deals']
 
 function Tabs({ active, onChange, ac }) {
   const tc = accentText(ac)
@@ -871,8 +891,11 @@ function Tabs({ active, onChange, ac }) {
 // Main export
 export default function Influencers() {
   const [influencers,setInfluencers]=useInfluencers()
-  const [selectedId,setSelectedId]=useState(influencers[0]?.id??null)
-  const [activeTab,setActiveTab]=useState('Description')
+  const { isDark } = useTheme()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [selectedId,setSelectedId]=useState(null)
+  const [activeTab,setActiveTab]=useState('Overview')
   const [showNew,setShowNew]=useState(false)
   const [lightbox,setLightbox]=useState(null)
   const [ctxMenu,setCtxMenu]=useState(null)
@@ -882,7 +905,22 @@ export default function Influencers() {
   const isMobile=useMobile()
   const tabSecRef=useRef()
 
-  const influencer=influencers.find(i=>i.id===selectedId)
+  // Bulletproof influencer resolution — three-level fallback, never null if any exist
+  const influencer = useMemo(() => {
+    // 1. Just arrived from Create — use the ID passed in navigation state
+    if (location.state?.selectId) {
+      const f = influencers.find(i => i.id === location.state.selectId)
+      if (f) return f
+    }
+    // 2. User clicked something in the sidebar
+    if (selectedId) {
+      const f = influencers.find(i => i.id === selectedId)
+      if (f) return f
+    }
+    // 3. Default to first in list
+    return influencers[0] ?? null
+  }, [influencers, location.state?.selectId, selectedId])
+
   const ac=accent(influencer)
   const pct=influencer?completeness(influencer):0
 
@@ -961,11 +999,15 @@ export default function Influencers() {
           )}
           {influencers.map(inf=>{
             const pct=completeness(inf)
-            const active=selectedId===inf.id
+            const active=influencer?.id===inf.id
             const gc=gColor(inf.gender)
             return (
               <button key={inf.id}
-                onClick={()=>{setSelectedId(inf.id);if(isMobile)setMobileView('detail')}}
+                onClick={()=>{
+                  setSelectedId(inf.id)
+                  if(location.state?.selectId) navigate('/influencers',{replace:true,state:{}})
+                  if(isMobile)setMobileView('detail')
+                }}
                 onContextMenu={e=>openCtx(e,inf.id)}
                 style={{
                   width:'100%',padding:'10px',borderRadius:10,textAlign:'left',
@@ -1058,7 +1100,7 @@ export default function Influencers() {
           <div ref={tabSecRef}><Sec style={{marginBottom:20}}>
             <Tabs active={activeTab} onChange={tab=>{setActiveTab(tab);requestAnimationFrame(()=>tabSecRef.current?.scrollIntoView({behavior:'smooth',block:'start'}))}} ac={ac}/>
 
-            {activeTab==='Description' && <DescriptionForm influencer={influencer} onUpdate={upd}/>}
+            {activeTab==='Overview' && <DescriptionForm influencer={influencer} onUpdate={upd}/>}
             {activeTab==='Scripts' && (
               <ScriptsSection
                 scripts={influencer.scripts??[]}
@@ -1078,45 +1120,40 @@ export default function Influencers() {
 
           </Sec></div>
         </main>
+      ) : isDark ? (
+        <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',background:'#07070E'}}>
+          <div style={{position:'absolute',width:700,height:700,top:'-20%',left:'-15%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(236,72,153,0.22) 0%, transparent 65%)',animation:'orb1 14s ease-in-out infinite'}}/>
+          <div style={{position:'absolute',width:580,height:580,top:'-12%',right:'-10%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(0,113,227,0.18) 0%, transparent 65%)',animation:'orb2 19s ease-in-out infinite'}}/>
+          <div style={{position:'absolute',width:700,height:700,bottom:'-28%',left:'20%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 65%)',animation:'orb3 23s ease-in-out infinite'}}/>
+          <div style={{position:'absolute',inset:0,pointerEvents:'none',backgroundImage:'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)',backgroundSize:'32px 32px'}}/>
+          <div style={{position:'absolute',inset:0,pointerEvents:'none',background:'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(7,7,14,0.75) 100%)'}}/>
+          <div style={{position:'relative',zIndex:1,textAlign:'center'}}>
+            <div style={{width:72,height:72,borderRadius:20,margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(139,92,246,0.45)'}}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5.5" stroke="white" strokeWidth="2"/><path d="M4 28c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
+            </div>
+            <h2 style={{fontSize:26,fontWeight:800,letterSpacing:'-0.6px',color:'#fff',marginBottom:10,lineHeight:1.2}}>Build your first influencer</h2>
+            <p style={{fontSize:14,color:'rgba(255,255,255,0.38)',marginBottom:28}}>Design a unique AI persona in minutes.</p>
+            <button onClick={()=>navigate('/create')} style={{padding:'13px 36px',borderRadius:980,background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',boxShadow:'0 0 32px rgba(139,92,246,0.4),0 4px 16px rgba(0,0,0,0.3)',transition:'transform 0.18s,box-shadow 0.18s'}}
+              onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-1px)';e.currentTarget.style.boxShadow='0 0 52px rgba(139,92,246,0.55),0 8px 24px rgba(0,0,0,0.4)'}}
+              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 32px rgba(139,92,246,0.4),0 4px 16px rgba(0,0,0,0.3)'}}>+ Create Influencer</button>
+          </div>
+        </main>
       ) : (
         <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-
-          {/* Photo grid background */}
           <div style={{position:'absolute',inset:0,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:3,opacity:0.18,pointerEvents:'none',transform:'scale(1.04)'}}>
             {['/inf/i1.png','/inf/i4.jpg','/inf/i2.png','/inf/i5.png','/inf/i3.jpg','/inf/i6.jpg'].map((src,i)=>(
               <img key={i} src={src} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
             ))}
           </div>
-
-          {/* Frosted overlay */}
-          <div style={{position:'absolute',inset:0,backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',background:'rgba(245,245,247,0.82)',pointerEvents:'none'}}/>
-
-          {/* CTA */}
+          <div style={{position:'absolute',inset:0,backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',background:'rgba(255,255,255,0.82)',pointerEvents:'none'}}/>
           <div style={{position:'relative',zIndex:1,textAlign:'center'}}>
-            <div style={{
-              width:72,height:72,borderRadius:20,margin:'0 auto 24px',
-              background:'linear-gradient(135deg,#EC4899,#8B5CF6)',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              boxShadow:'0 8px 32px rgba(139,92,246,0.4)',
-            }}>
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="11" r="5.5" stroke="white" strokeWidth="2"/>
-                <path d="M4 28c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
+            <div style={{width:72,height:72,borderRadius:20,margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 32px rgba(139,92,246,0.4)'}}>
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5.5" stroke="white" strokeWidth="2"/><path d="M4 28c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
             </div>
-            <h2 style={{fontSize:26,fontWeight:800,letterSpacing:'-0.6px',color:'var(--text-primary)',marginBottom:24}}>
-              Build your first influencer
-            </h2>
-            <button onClick={()=>setShowNew(true)} style={{
-              padding:'13px 36px',borderRadius:980,
-              background:'linear-gradient(135deg,#EC4899,#8B5CF6)',
-              color:'#fff',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',
-              boxShadow:'0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)',
-              transition:'transform 0.18s,box-shadow 0.18s',
-            }}
+            <h2 style={{fontSize:26,fontWeight:800,letterSpacing:'-0.6px',color:'var(--text-primary)',marginBottom:24}}>Build your first influencer</h2>
+            <button onClick={()=>navigate('/create')} style={{padding:'13px 36px',borderRadius:980,background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',boxShadow:'0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)',transition:'transform 0.18s,box-shadow 0.18s'}}
               onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-1px)';e.currentTarget.style.boxShadow='0 0 48px rgba(139,92,246,0.5),0 8px 24px rgba(0,0,0,0.14)'}}
-              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)'}}
-            >+ Create Influencer</button>
+              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)'}}>+ Create Influencer</button>
           </div>
         </main>
       ))}

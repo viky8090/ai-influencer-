@@ -16,7 +16,7 @@ export default function Nav() {
   const navBg = landing
     ? 'transparent'
     : isDark
-    ? 'rgba(7,7,14,0.82)'
+    ? 'rgba(7,7,14,0.88)'
     : 'rgba(255,255,255,0.80)'
 
   const navBorder = landing

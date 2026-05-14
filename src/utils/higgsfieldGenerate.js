@@ -125,8 +125,41 @@ function countTerminalJobs(result) {
   }).length
 }
 
+// When the user's style ref note mentions pose or scene/location, replace those text prompt
+// sections with a direct reference to the style image so the text no longer fights the image.
+function applyStyleNoteOverrides(prompts, styleNote, styleImg) {
+  if (!styleNote) return prompts
+  const note = styleNote.toLowerCase()
+
+  const wantsPose  = /\bpose\b|posing/.test(note)
+  const wantsScene = /alley|location|scene|background|setting|café|cafe|park|rooftop|studio|hallway|corridor|street|outdoor|indoor|beach|forest|city|room|bar|restaurant|environment/.test(note)
+
+  if (!wantsPose && !wantsScene) return prompts
+
+  return prompts.map(p => {
+    if (wantsPose)
+      p = p.replace(
+        /(\n\nPose: )[\s\S]+?(\n\nWardrobe & details:)/,
+        `$1Follow ${styleImg} for the pose and body positioning.$2`
+      )
+    if (wantsScene) {
+      p = p.replace(
+        /(\n\nScene: )[\s\S]+?(\n\nSubject:)/,
+        `$1Follow ${styleImg} for the location, background, and setting.$2`
+      )
+      p = p.replace(
+        /(\n\nLighting: )[\s\S]+?(\n\nCamera & capture:)/,
+        `$1Follow ${styleImg} for the lighting conditions and mood.$2`
+      )
+    }
+    return p
+  })
+}
+
 // Poll all jobs together in one job_display call.
-async function pollAllJobs(jobIds, onProgress) {
+// total = number of images we expect (prompts.length), used for termination — not jobIds.length,
+// which can be inflated when Soul responses contain extra UUIDs.
+async function pollAllJobs(jobIds, total, onProgress, staleTolerance = 8) {
   let lastResponse = null
   let lastUrlCount = 0
   let stalePolls = 0
@@ -138,21 +171,27 @@ async function pollAllJobs(jobIds, onProgress) {
       lastResponse = display
       const urls = extractImageUrls(display)
       const terminal = countTerminalJobs(display)
-      console.log(`[HF] poll ${i} → ${urls.length} URLs, ${terminal}/${jobIds.length} terminal, stale=${stalePolls}`)
-      onProgress?.(Math.min(22 + (urls.length / jobIds.length) * 73, 95))
+      console.log(`[HF] poll ${i} → ${urls.length} URLs, ${terminal}/${total} terminal, stale=${stalePolls}`)
+      onProgress?.(Math.min(22 + (urls.length / total) * 73, 95))
 
-      if (urls.length >= jobIds.length) return urls
-      // All jobs in a terminal state — return whatever succeeded
-      if (terminal >= jobIds.length && urls.length > 0) return urls
+      // All URLs back — done
+      if (urls.length >= total) return urls
 
-      // Stale check: if we have ≥1 URL but count hasn't grown for 6 polls (~15s), the rest likely failed
+      // All jobs terminal — return successes or throw if none
+      if (terminal >= total) {
+        if (urls.length > 0) return urls
+        throw new Error('All generation jobs failed — try regenerating')
+      }
+
+      // Stale: have ≥1 URL but count hasn't grown — wait before accepting partial results
       if (urls.length > lastUrlCount) { lastUrlCount = urls.length; stalePolls = 0 }
       else if (urls.length > 0) stalePolls++
-      if (stalePolls >= 6) {
-        console.warn('[HF] stale — returning partial results')
+      if (stalePolls >= staleTolerance) {
+        console.warn(`[HF] stale after ${staleTolerance} polls — returning partial results`)
         return urls
       }
     } catch (e) {
+      if (e.message.includes('All generation jobs failed')) throw e
       console.warn(`[HF] poll ${i} error:`, e.message)
     }
   }
@@ -208,7 +247,13 @@ async function uploadRefImage(dataUrl) {
   return confirmed?.media_id || confirmed?.id || mediaId
 }
 
-export async function generateThreeImages({ prompts, aspectRatio = '9:16', faceRef = null, styleRef = null, onProgress }) {
+function modelBaseParams(model, aspectRatio) {
+  if (model === 'soul_2') return { model, aspect_ratio: aspectRatio, quality: '2k' }
+  if (model === 'gpt_image_2') return { model, aspect_ratio: aspectRatio, count: 1, quality: 'high', resolution: '2k' }
+  return { model, aspect_ratio: aspectRatio, count: 1, resolution: '2k' }
+}
+
+export async function generateThreeImages({ prompts, aspectRatio = '9:16', model = 'gpt_image_2', faceRef = null, styleRef = null, physicalDesc = '', faceRefNote = '', styleRefNote = '', onProgress }) {
   await initSession()
   onProgress?.(5)
 
@@ -226,37 +271,76 @@ export async function generateThreeImages({ prompts, aspectRatio = '9:16', faceR
     onProgress?.(15)
   }
 
-  if (faceRef && styleRef) {
-    refInstruction = ' @image1 is a structural geometry reference only — extract only the abstract spatial proportions between features (eye spacing, jaw width, nose length ratio). The written description above is the sole authority on this person\'s ethnicity, skin tone, hair color and texture, eye shape, and every identity attribute — these must come entirely from the text, not from @image1. Do not transfer any racial, ethnic, or identity characteristics from @image1. Ignore @image1\'s clothing, background, and photographic style entirely. @image2 is a visual style reference — match the aesthetic, color palette, and mood of @image2.'
-  } else if (faceRef) {
-    refInstruction = ' @image1 is a structural geometry reference only — extract only the abstract spatial proportions between features (eye spacing, jaw width, nose length ratio). The written description above is the sole authority on this person\'s ethnicity, skin tone, hair color and texture, eye shape, and every identity attribute — these must come entirely from the text, not from @image1. Do not transfer any racial, ethnic, or identity characteristics from @image1. Ignore @image1\'s clothing, background, and photographic style entirely.'
-  } else if (styleRef) {
-    refInstruction = ' @image1 is a visual style reference — match the aesthetic, color palette, lighting, and mood of @image1. Do not copy the appearance of any person in @image1.'
+  const hasDesc = !!(physicalDesc?.trim())
+  const faceNote = faceRefNote?.trim()
+  const styleNote = styleRefNote?.trim()
+
+  // Build face instruction — user note takes priority; falls back to note-free defaults
+  function buildFaceInstruction(imgTag) {
+    if (faceNote)
+      return `${imgTag}: use specifically "${faceNote}" from this reference.${hasDesc ? ' Use the text description for all other identity attributes.' : ''}`
+    return hasDesc
+      ? `${imgTag} is a facial geometry reference — match the face proportions (eye spacing, jaw width, nose bridge, face shape) but defer to the text description for skin tone, hair, eye color, and identity. Ignore ${imgTag}'s clothing, background, and lighting.`
+      : `${imgTag} is the appearance reference — faithfully recreate this person's face, skin tone, hair, eye color, and overall look exactly as shown.`
   }
 
-  const baseParams = { model: 'gpt_image_2', aspect_ratio: aspectRatio, count: 1, quality: 'high', resolution: '2k' }
+  // Build style instruction — user note takes priority; falls back to full extraction list
+  function buildStyleInstruction(imgTag) {
+    if (styleNote)
+      return `${imgTag}: use specifically "${styleNote}" from this reference. Do not copy the face or identity of any person in ${imgTag}.`
+    return `${imgTag} is a visual style reference — do NOT copy the face or identity of any person in ${imgTag}. Match the pose and body positioning, outfit aesthetic (silhouette, layering, fabric, styling), color palette, scene and background, lighting mood, and overall photographic vibe.`
+  }
+
+  if (faceRef && styleRef) {
+    refInstruction = ` ${buildFaceInstruction('@image1')} ${buildStyleInstruction('@image2')}`
+  } else if (faceRef) {
+    refInstruction = ` ${buildFaceInstruction('@image1')}`
+  } else if (styleRef) {
+    refInstruction = ` ${buildStyleInstruction('@image1')} The subject's face and identity come entirely from the text description above.`
+  }
+
+  const baseParams = modelBaseParams(model, aspectRatio)
   if (medias.length) baseParams.medias = medias
 
-  const launchResults = await Promise.all(
-    prompts.map(prompt => callTool('generate_image', { params: { ...baseParams, prompt: prompt + refInstruction } }))
-  )
+  // If the style note targets pose or scene/location, replace those text sections
+  // so the detailed text descriptions no longer fight the style image reference
+  const styleImg = (faceRef && styleRef) ? '@image2' : '@image1'
+  const finalPrompts = styleRef ? applyStyleNoteOverrides(prompts, styleNote, styleImg) : prompts
+
+  async function launchAndCollect(promptList) {
+    const results = await Promise.all(
+      promptList.map(prompt => callTool('generate_image', { params: { ...baseParams, prompt: prompt + refInstruction } }))
+    )
+    const directUrls = results.flatMap(r => extractImageUrls(r))
+    if (directUrls.length >= promptList.length) return { urls: directUrls, jobIds: [] }
+    // Take exactly 1 job ID per generate_image call — Soul responses often embed extra UUIDs
+    // in descriptive text, which would inflate jobIds and break terminal counting
+    const jobIds = results.map(r => extractJobIds(r)[0]).filter(Boolean)
+    return { urls: directUrls, jobIds }
+  }
+
+  const { urls: directUrls, jobIds } = await launchAndCollect(finalPrompts)
   onProgress?.(22)
 
-  const allDirectUrls = launchResults.flatMap(r => extractImageUrls(r))
-  if (allDirectUrls.length >= prompts.length) {
-    onProgress?.(100)
-    return allDirectUrls.slice(0, prompts.length)
+  if (directUrls.length >= finalPrompts.length) { onProgress?.(100); return directUrls.slice(0, finalPrompts.length) }
+
+  if (!jobIds.length) throw new Error(`No job IDs found. Check browser console for details.`)
+  console.log('[HF] job IDs:', jobIds)
+
+  // With refs, generation takes ~60s longer and variance between jobs is higher
+  const hasRef = !!(faceRef || styleRef)
+  const staleTolerance = model === 'soul_2'
+    ? (hasRef ? 30 : 20)   // Soul: 75s / 50s stale window
+    : (hasRef ? 16 : 8)    // Others: 40s / 20s stale window
+  const urls = await pollAllJobs(jobIds, finalPrompts.length, onProgress, staleTolerance)
+
+  if (urls.length === 0) throw new Error('No images were generated — try regenerating')
+  if (urls.length < finalPrompts.length) {
+    console.warn(`[HF] got ${urls.length}/${finalPrompts.length} — returning partial results`)
   }
 
-  const allJobIds = launchResults.flatMap(r => extractJobIds(r))
-  console.log('[HF] three-image job IDs:', allJobIds)
-  if (!allJobIds.length) {
-    throw new Error(`No job IDs found. Response: ${JSON.stringify(launchResults).slice(0, 300)}`)
-  }
-
-  const urls = await pollAllJobs(allJobIds, onProgress)
   onProgress?.(100)
-  return urls
+  return urls.slice(0, prompts.length)
 }
 
 export async function generateImages({ prompt, count = 3, aspectRatio = '9:16', referenceImage = null, onProgress }) {

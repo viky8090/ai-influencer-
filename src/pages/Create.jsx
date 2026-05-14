@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useInfluencers, generateId } from '../store'
 import { buildThreeVariationPrompts } from '../utils/systemPrompt'
@@ -9,24 +10,78 @@ import { gColor } from '../utils/influencerUtils'
 
 const NICHES = ['Fashion', 'Beauty', 'Lifestyle', 'Fitness', 'Travel', 'Food & Dining', 'Tech', 'Gaming', 'Finance', 'Entertainment', 'Wellness', 'Sports', 'Other']
 const VIBE_OPTIONS = [
-  { id: 'Minimalist',   label: 'Minimalist',   sub: 'Clean, simple, less is more',      icon: '🤍' },
-  { id: 'Old Money',    label: 'Old Money',    sub: 'Understated wealth & heritage',    icon: '🏛' },
-  { id: 'Clean Girl',   label: 'Clean Girl',   sub: 'Effortless, dewy, no-makeup look', icon: '🫧' },
-  { id: 'Editorial',    label: 'Editorial',    sub: 'High fashion, bold & structured',  icon: '🖤' },
-  { id: 'Streetwear',   label: 'Streetwear',   sub: 'Urban, casual street style',       icon: '🧢' },
-  { id: 'Bohemian',     label: 'Bohemian',     sub: 'Earthy, flowy, free-spirited',     icon: '🌿' },
-  { id: 'Glam',         label: 'Glam',         sub: 'Dressy, dramatic & glamorous',     icon: '✨' },
-  { id: 'Preppy',       label: 'Preppy',       sub: 'Classic, collegiate, polished',    icon: '🎓' },
-  { id: 'Sporty',       label: 'Sporty',       sub: 'Athletic & activewear vibes',      icon: '⚡' },
-  { id: 'Dark & Moody', label: 'Dark & Moody', sub: 'Alternative, edgy & dramatic',    icon: '🌙' },
-  { id: 'Y2K',          label: 'Y2K',          sub: '2000s nostalgia & pop culture',    icon: '💿' },
-  { id: 'Cottagecore',  label: 'Cottagecore',  sub: 'Romantic, vintage & nature',      icon: '🌸' },
-  { id: 'Tech Bro',     label: 'Tech Bro',     sub: 'Smart-casual, Silicon Valley',     icon: '💻' },
+  { id: 'Minimalist',   label: 'Minimalist',   sub: 'Clean, simple, less is more',            icon: '🤍' },
+  { id: 'Old Money',    label: 'Old Money',    sub: 'Understated wealth & heritage',           icon: '🏛' },
+  { id: 'Clean Girl',   label: 'Clean Girl',   sub: 'Effortless, dewy, no-makeup look',        icon: '🫧', genders: ['female'] },
+  { id: 'Editorial',    label: 'Editorial',    sub: 'High fashion, bold & structured',         icon: '🖤' },
+  { id: 'Streetwear',   label: 'Streetwear',   sub: 'Urban, casual street style',              icon: '🧢' },
+  { id: 'Bohemian',     label: 'Bohemian',     sub: 'Earthy, flowy, free-spirited',            icon: '🌿' },
+  { id: 'Glam',         label: 'Glam',         sub: 'Dressy, dramatic & glamorous',            icon: '✨' },
+  { id: 'Preppy',       label: 'Preppy',       sub: 'Classic, collegiate, polished',           icon: '🎓' },
+  { id: 'Sporty',       label: 'Sporty',       sub: 'Athletic & activewear vibes',             icon: '⚡' },
+  { id: 'Dark & Moody', label: 'Dark & Moody', sub: 'Alternative, edgy & dramatic',           icon: '🌙' },
+  { id: 'Y2K',          label: 'Y2K',          sub: '2000s nostalgia & pop culture',           icon: '💿' },
+  { id: 'Cottagecore',  label: 'Cottagecore',  sub: 'Romantic, vintage & nature',             icon: '🌸', genders: ['female'] },
+  { id: 'Tech Bro',     label: 'Tech Bro',     sub: 'Smart-casual, Silicon Valley',            icon: '💻', genders: ['male'] },
+  { id: 'Coastal',      label: 'Coastal',      sub: 'Linen, nautical, effortlessly sun-worn',  icon: '🌊' },
 ]
 const STEPS = ['Basics', 'References', 'Story', 'Look', 'Generate']
 
+const MODELS = [
+  { id: 'soul_2',            name: 'Higgsfield Soul', tag: 'Influencer-Native',   tagColor: '#EC4899', provider: 'higgsfield',              desc: 'Native model for fashion and UGC.',          maxRefs: 1 },
+  { id: 'gpt_image_2',       name: 'GPT Image 2',     tag: 'Max Quality',         tagColor: '#10B981', provider: 'openai',                  desc: 'Highest quality output, maximum realism.',   maxRefs: 2 },
+  { id: 'nano_banana_2',     name: 'Nano Banana Pro', tag: 'Sharpest Detail',     tagColor: '#8B5CF6', provider: 'banana', version: 'Pro', desc: 'Maximum detail and portrait precision.',     maxRefs: 2 },
+  { id: 'nano_banana_flash', name: 'Nano Banana 2',   tag: 'Fastest',             tagColor: '#0EA5E9', provider: 'banana', version: '2',   desc: 'Rapid results, still premium quality.',      maxRefs: 2 },
+]
+const MODEL_PREF_KEY = 'aiis_model_pref'
+
+// ── Physical description builder constants ─────────────────────
+const SKIN_TONES = [
+  { id: 'fair',   label: 'Fair',   swatch: '#FDDBB4' },
+  { id: 'light',  label: 'Light',  swatch: '#F0C080' },
+  { id: 'medium', label: 'Medium', swatch: '#D4956A' },
+  { id: 'tan',    label: 'Tan',    swatch: '#C07A47' },
+  { id: 'brown',  label: 'Brown',  swatch: '#8B5E3C' },
+  { id: 'deep',   label: 'Deep',   swatch: '#5C3A1E' },
+  { id: 'ebony',  label: 'Ebony',  swatch: '#2D1A0E' },
+]
+const HAIR_COLORS = [
+  { id: 'blonde',   label: 'Blonde',    swatch: '#F5D17A' },
+  { id: 'brunette', label: 'Brunette',  swatch: '#7B4F2E' },
+  { id: 'black',    label: 'Black',     swatch: '#1A1A1A' },
+  { id: 'auburn',   label: 'Auburn',    swatch: '#9B3A2A' },
+  { id: 'red',      label: 'Red',       swatch: '#C0392B' },
+  { id: 'silver',   label: 'Silver',    swatch: '#A8A8A8' },
+  { id: 'dyed',     label: 'Dyed',      swatch: 'linear-gradient(135deg,#EC4899,#8B5CF6)' },
+]
+const HAIR_LENGTHS  = ['Short', 'Medium', 'Long', 'Extra long']
+const HAIR_TEXTURES = ['Straight', 'Wavy', 'Curly', 'Coily']
+const EYE_COLORS = [
+  { id: 'blue',       label: 'Blue',       swatch: '#4A90D9' },
+  { id: 'green',      label: 'Green',      swatch: '#4A9B6F' },
+  { id: 'brown',      label: 'Brown',      swatch: '#7B4F2E' },
+  { id: 'hazel',      label: 'Hazel',      swatch: '#9B7A3A' },
+  { id: 'dark',       label: 'Dark',       swatch: '#1A1008' },
+  { id: 'light grey', label: 'Grey',       swatch: '#8A9BAA' },
+]
+const BUILDS = ['Petite', 'Slim', 'Athletic', 'Average', 'Curvy', 'Tall', 'Plus']
+const ETHNICITIES = ['White', 'Black', 'Hispanic', 'East Asian', 'South Asian', 'Middle Eastern', 'Southeast Asian', 'Mixed']
+
+function buildPhysicalDescString(d) {
+  const { ethnicity, skinTone, hairColor, hairLength, hairTexture, eyeColor, build, uniqueFeatures } = d
+  const parts = []
+  if (ethnicity) parts.push(ethnicity.toLowerCase())
+  const hairParts = [hairLength, hairTexture, hairColor].filter(Boolean).map(s => s.toLowerCase())
+  if (hairParts.length) parts.push(hairParts.join(' ') + ' hair')
+  if (eyeColor) parts.push(eyeColor.toLowerCase() + ' eyes')
+  if (skinTone) parts.push(skinTone.toLowerCase() + ' skin tone')
+  if (build) parts.push(build.toLowerCase() + ' build')
+  if (uniqueFeatures?.trim()) parts.push(uniqueFeatures.trim())
+  return parts.join(', ')
+}
+
 // Floating card configuration
-const ALL_IMGS = ['/inf/i1.png', '/inf/i2.png', '/inf/i3.jpg', '/inf/i4.jpg', '/inf/i5.png', '/inf/i6.jpg', '/inf/i7.png', '/inf/i8.png', '/inf/i9.png', '/inf/i10.png']
+const ALL_IMGS = ['/inf/i1.png', '/inf/i2.png', '/inf/i3.jpg', '/inf/i4.jpg', '/inf/i5.png', '/inf/i6.jpg', '/inf/i7.png', '/inf/i8.png', '/inf/i9.png', '/inf/i10.png', '/inf/i11.png', '/inf/i12.png', '/inf/i13.png', '/inf/i14.png', '/inf/i15.png', '/inf/i16.png']
 const CARD_CONFIG = [
   { left: '1%',  top: '15%', w: 162, rot: '-9deg',  op: 0.48, period: 9,  sway: 12, delay: 0.0 },
   { left: '5%',  top: '58%', w: 140, rot:  '5deg',  op: 0.34, period: 11, sway: 15, delay: 1.9 },
@@ -149,7 +204,7 @@ function StepIndicator({ current }) {
 }
 
 // ── Step 1: Basics ────────────────────────────────────────────
-function Step1({ data, set, ageErrorPulse }) {
+function Step1({ data, set, onGenderChange, ageErrorPulse }) {
   return (
     <div>
       <div style={{ marginBottom: 40 }}>
@@ -172,7 +227,7 @@ function Step1({ data, set, ageErrorPulse }) {
           ].map(({ g, color, glow, icon }) => {
             const on = data.gender === g
             return (
-              <button key={g} onClick={() => set('gender', g)} style={{
+              <button key={g} onClick={() => onGenderChange(g)} style={{
                 padding: '15px 10px', borderRadius: 14, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 border: `1.5px solid ${on ? color : L.border}`,
                 background: on ? glow : L.surface,
@@ -189,7 +244,7 @@ function Step1({ data, set, ageErrorPulse }) {
         </div>
       </div>
 
-      <div style={{ marginBottom: data.age !== '' && Number(data.age) < 18 ? 12 : 22 }}>
+      <div style={{ marginBottom: data.age.length >= 2 && Number(data.age) < 18 ? 12 : 22 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 14 }}>
           <div>
             <Lbl>Age</Lbl>
@@ -197,7 +252,7 @@ function Step1({ data, set, ageErrorPulse }) {
           </div>
           <div />
         </div>
-        {data.age !== '' && Number(data.age) < 18 && (
+        {data.age.length >= 2 && Number(data.age) < 18 && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '9px 13px', borderRadius: 10,
             background: ageErrorPulse ? 'rgba(255,59,48,0.10)' : 'rgba(255,59,48,0.05)',
@@ -240,7 +295,7 @@ function Step1({ data, set, ageErrorPulse }) {
 }
 
 // ── Reusable single-image upload slot ────────────────────────
-function RefSlot({ label, hint, value, onChange }) {
+function RefSlot({ label, hint, value, onChange, note, onNoteChange, notePlaceholder }) {
   const fileRef = useRef()
   const [dragging, setDragging] = useState(false)
   const dragCounter = useRef(0)
@@ -315,6 +370,22 @@ function RefSlot({ label, hint, value, onChange }) {
         </div>
       )}
       <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+      {value && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: L.textFaint, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 5 }}>What to copy</div>
+          <input
+            value={note || ''}
+            onChange={e => onNoteChange?.(e.target.value)}
+            placeholder={notePlaceholder || 'e.g. jawline, skin tone'}
+            style={{
+              width: '100%', padding: '8px 10px', borderRadius: 8,
+              border: '1.5px solid var(--border)', background: L.surfaceAlt,
+              fontSize: 12.5, color: L.text, boxSizing: 'border-box',
+              outline: 'none', fontFamily: 'inherit',
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -334,12 +405,18 @@ function Step2({ data, set }) {
           hint="A photo of the face you want"
           value={data.faceRef}
           onChange={v => set('faceRef', v)}
+          note={data.faceRefNote}
+          onNoteChange={v => set('faceRefNote', v)}
+          notePlaceholder="e.g. jawline, skin tone, eye shape"
         />
         <RefSlot
           label="Style reference"
           hint="Outfit, aesthetic, or vibe inspo"
           value={data.styleRef}
           onChange={v => set('styleRef', v)}
+          note={data.styleRefNote}
+          onNoteChange={v => set('styleRefNote', v)}
+          notePlaceholder="e.g. outfit, pose, color palette"
         />
       </div>
     </div>
@@ -360,7 +437,7 @@ function Step3({ data, set }) {
       </div>
 
       <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card, marginBottom: 16 }}>
-        <Lbl>Backstory</Lbl>
+        <Lbl optional>Backstory</Lbl>
         <textarea
           className={inputCls}
           value={data.backstory}
@@ -388,8 +465,173 @@ function Step3({ data, set }) {
   )
 }
 
+// ── Physical description builder ─────────────────────────────
+function PhysicalBuilder({ data, set }) {
+  const sec = { paddingBottom: 20, marginBottom: 20, borderBottom: `1px solid ${L.border}` }
+  const lbl = { fontSize: 11, fontWeight: 700, color: L.textFaint, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 11 }
+  const chips = { display: 'flex', flexWrap: 'wrap', gap: 7 }
+
+  function Swatch({ item, field }) {
+    const on = data[field] === item.id
+    return (
+      <button onClick={() => set(field, on ? '' : item.id)} style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '6px 12px 6px 7px', borderRadius: 22, cursor: 'pointer',
+        border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
+        background: on ? 'rgba(139,92,246,0.09)' : L.surfaceAlt,
+        boxShadow: on ? '0 0 0 1px #8B5CF655' : 'none',
+        transition: 'all 0.15s',
+      }}>
+        <div style={{ width: 13, height: 13, borderRadius: '50%', flexShrink: 0, background: item.swatch, border: '1.5px solid rgba(0,0,0,0.10)' }} />
+        <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#7C3AED' : L.textSub, lineHeight: 1 }}>{item.label}</span>
+      </button>
+    )
+  }
+
+  function Pill({ label, field }) {
+    const on = data[field] === label
+    return (
+      <button onClick={() => set(field, on ? '' : label)} style={{
+        padding: '6px 14px', borderRadius: 22, cursor: 'pointer',
+        border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
+        background: on ? 'rgba(139,92,246,0.09)' : L.surfaceAlt,
+        color: on ? '#7C3AED' : L.textSub,
+        fontSize: 12.5, fontWeight: 500, lineHeight: 1,
+        boxShadow: on ? '0 0 0 1px #8B5CF655' : 'none',
+        transition: 'all 0.15s',
+      }}>{label}</button>
+    )
+  }
+
+  function SegmentPicker({ options, field }) {
+    const val = data[field]
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: 3, background: L.surfaceAlt, borderRadius: 10, padding: 3 }}>
+        {options.map(opt => {
+          const on = val === opt
+          return (
+            <button key={opt} onClick={() => set(field, opt)} style={{
+              padding: '7px 4px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: on ? 700 : 500,
+              background: on ? L.surface : 'transparent',
+              color: on ? '#7C3AED' : L.textFaint,
+              boxShadow: on ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
+              transition: 'all 0.15s',
+              whiteSpace: 'nowrap',
+            }}>{opt}</button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  function randomize() {
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)]
+    set('ethnicity',  pick(ETHNICITIES))
+    set('skinTone',   pick(SKIN_TONES).id)
+    set('hairColor',  pick(HAIR_COLORS).id)
+    set('hairLength', pick(HAIR_LENGTHS))
+    set('hairTexture',pick(HAIR_TEXTURES))
+    set('eyeColor',   pick(EYE_COLORS).id)
+    set('build',      pick(BUILDS))
+  }
+
+  return (
+    <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card, marginBottom: 16 }}>
+
+      {/* Header row with randomizer */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: L.text }}>Physical appearance</div>
+        <button onClick={randomize} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 13px', borderRadius: 20, border: `1.5px solid ${L.border}`,
+          background: L.surfaceAlt, color: L.textSub, fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', transition: 'all 0.15s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.color = '#7C3AED' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = L.border; e.currentTarget.style.color = L.textSub }}
+        >
+          🎲 Randomize
+        </button>
+      </div>
+
+      {/* Ethnicity */}
+      <div style={sec}>
+        <div style={lbl}>🌍 Ethnicity</div>
+        <div style={chips}>
+          {ETHNICITIES.map(e => <Pill key={e} label={e} field="ethnicity" />)}
+        </div>
+      </div>
+
+      {/* Skin tone */}
+      <div style={sec}>
+        <div style={lbl}>🤎 Skin tone</div>
+        <div style={chips}>
+          {SKIN_TONES.map(s => <Swatch key={s.id} item={s} field="skinTone" />)}
+        </div>
+      </div>
+
+      {/* Hair */}
+      <div style={sec}>
+        <div style={lbl}>💇 Hair</div>
+        <div style={{ ...chips, marginBottom: 16 }}>
+          {HAIR_COLORS.map(h => <Swatch key={h.id} item={h} field="hairColor" />)}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: L.textFaint, marginBottom: 9, letterSpacing: '0.2px' }}>Length</div>
+            <SegmentPicker options={HAIR_LENGTHS} field="hairLength" />
+          </div>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: L.textFaint, marginBottom: 9, letterSpacing: '0.2px' }}>Texture</div>
+            <SegmentPicker options={HAIR_TEXTURES} field="hairTexture" />
+          </div>
+        </div>
+      </div>
+
+      {/* Eye color */}
+      <div style={sec}>
+        <div style={lbl}>👁 Eye color</div>
+        <div style={chips}>
+          {EYE_COLORS.map(e => <Swatch key={e.id} item={e} field="eyeColor" />)}
+        </div>
+      </div>
+
+      {/* Build */}
+      <div style={sec}>
+        <div style={lbl}>💪 Build</div>
+        <div style={chips}>
+          {BUILDS.map(b => <Pill key={b} label={b} field="build" />)}
+        </div>
+      </div>
+
+      {/* Custom description */}
+      <div>
+        <div style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          ✏️ Custom description
+          <span style={{ fontSize: 10, fontWeight: 500, color: L.textFaint, textTransform: 'none', letterSpacing: 0, opacity: 0.55 }}>optional</span>
+        </div>
+        <input
+          className={inputCls}
+          value={data.uniqueFeatures || ''}
+          onChange={e => set('uniqueFeatures', e.target.value)}
+          placeholder="Anything else — freckles, dimples, beauty mark, tattoos…"
+          style={{ ...inputStyle, background: L.surfaceAlt }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ── Step 4: Look ──────────────────────────────────────────────
 function Step4({ data, set }) {
+  const gender = (data.gender || '').toLowerCase()
+  const visibleVibes = VIBE_OPTIONS.filter(v => {
+    if (!v.genders) return true
+    if (!gender || gender === 'non-binary') return true
+    return v.genders.includes(gender)
+  })
+
   return (
     <div>
       <div style={{ marginBottom: 40 }}>
@@ -397,20 +639,16 @@ function Step4({ data, set }) {
         <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>Physical features and aesthetic — this shapes the AI generation.</p>
       </div>
 
-      <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card, marginBottom: 16 }}>
-        <Lbl>Physical description</Lbl>
-        <textarea className={inputCls} value={data.physicalDesc} onChange={e => set('physicalDesc', e.target.value)} placeholder="Hair color, length, texture. Eye color. Skin tone. Facial features…" rows={4} style={{ ...taStyle, background: L.surfaceAlt, marginBottom: 0 }} />
-      </div>
+      <PhysicalBuilder data={data} set={set} />
 
       <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card }}>
         <Lbl optional>Aesthetic vibe</Lbl>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          {VIBE_OPTIONS.map(v => {
+          {visibleVibes.map(v => {
             const on = data.vibeWords?.includes(v.id)
             return (
               <button key={v.id} onClick={() => {
-                const cur = data.vibeWords || []
-                set('vibeWords', on ? cur.filter(x => x !== v.id) : [...cur, v.id])
+                set('vibeWords', on ? [] : [v.id])
               }} style={{
                 padding: '11px 13px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
                 background: on ? 'rgba(139,92,246,0.09)' : L.surfaceAlt,
@@ -441,63 +679,173 @@ function Step4({ data, set }) {
 
 // ── Fun loading screen ────────────────────────────────────────
 const LOADING_MESSAGES = [
-  'this will take 3 to 6 minutes. go touch grass then come back.',
-  'sculpting cheekbones to dangerous levels...',
-  "still going. your future influencer's net worth is loading.",
-  'making the lighting criminally flattering...',
-  'this takes like 3 to 6 min. patience is an underrated aesthetic.',
-  'configuring the jaw to cheekbone ratio...',
-  'your influencer will earn more than you. probably.',
-  'adding invisible botox to the render...',
-  '3 to 6 minutes is the price of perfection. worth it.',
-  'your future brand deals are being pre-approved...',
-  'making sure the outfit costs more than your rent...',
-  'still rendering. the algorithm is already impressed.',
-  "they're basically already famous btw.",
-  "calibrating the effortless look. it takes effort.",
-  'your influencer just declined a free product collab.',
-  "in a few minutes you'll have a new business partner.",
-  'making them look hot. you can thank us later.',
-  'Running a vibe check. Results: immaculate.',
-  'Teaching the algorithm what good bone structure looks like.',
-  'Your influencer is already planning their Coachella fits.',
-  'Finding the angle that says "I woke up like this" when they absolutely did not.',
-  'Computing exactly how unbothered they should look.',
-  'Adding the kind of natural glow that takes 45 minutes to achieve.',
-  'Generating the type of face that stops a scroll mid-thumb.',
-  'Deciding exactly how expensive they should look without trying.',
-  'We could rush this. We will not.',
-  'Fine-tuning the "didn\'t even try" energy. It requires a lot of trying.',
-  'Selecting the perfect posture that says "I own this sidewalk."',
-  'Rendering confidence on a cellular level.',
-  'Their first brand deal is hypothetically already in the DMs.',
-  'Teaching the outfit to look expensive without showing a single logo.',
-  'Still going. The best things take time. So does pasta. Both worth it.',
-  'Adding a hint of "I just got back from somewhere you\'d love."',
-  'Finalizing the expression that says "seen it, been there, not impressed."',
-  'Choosing between three poses. All of them unreasonably good.',
-  'Making sure the lighting is doing what it\'s supposed to do. Which is a lot.',
-  'Calibrating the collarbone situation.',
-  'Your influencer is already two seasons ahead of the trend cycle.',
-  'Running a final check to make sure they look effortlessly rich.',
-  'The algorithm just followed them. That\'s how good this is going.',
-  'Technically this could go faster. Technically you could also eat gas station sushi.',
-  'Almost there. Well. Almost almost there.',
-  'They look so good right now and you haven\'t even seen them yet.',
-  'Measuring the exact ratio of approachable to aspirational.',
-  'Your influencer just declined an interview. Very on brand.',
-  'Adding the kind of warmth that makes strangers want to follow a stranger.',
-  'Currently deciding between two lighting setups that are both perfect.',
-  'Adjusting the hair so it moves in a breeze that doesn\'t exist.',
-  'Making sure the skin texture is real enough to make people uncomfortable.',
-  'Your future influencer already has opinions about your fridge.',
-  'Setting the jaw angle to "I have a morning routine and it shows."',
-  'Still rendering. This is not a drill. This is art.',
-  'Giving them the kind of face that gets free upgrades at hotels.',
-  'Adding just enough imperfection to make it feel embarrassingly real.',
-  'They\'re basically already in a mood board somewhere.',
-  'Making the outfit say "money" without saying a single brand name.',
-  'Hang on. The cheekbones needed a second opinion.',
+  // hot
+  'sculpting cheekbones to genuinely dangerous levels.',
+  'adding a jawline that will end at least one relationship.',
+  'making them objectively better looking than you. nothing personal.',
+  'configuring the face that makes brands overpay without realizing it.',
+  'rendering someone so attractive it becomes slightly your problem.',
+  'giving them the kind of hot that photographs itself.',
+  'adding the natural glow that takes 45 minutes and a ring light to fake.',
+  'calibrating how good-looking they should be. the answer was: very.',
+  'building a face the camera will not be able to stop looking at.',
+  'making them the kind of attractive that trends in countries they haven\'t visited.',
+  'the cheekbones are done. they are a lot. you\'re welcome.',
+  'giving them skin so good dermatologists will DM them unsolicited.',
+  'adding the bone structure that gets people upgraded at hotels for free.',
+  // money
+  'your influencer will earn more per post than you do per month. congrats.',
+  'computing their first brand deal. the rate is embarrassing for you.',
+  'loading your passive income. indirectly, but still.',
+  'their first sponsored post will probably cover your rent.',
+  'rendering someone who makes money while you sleep. you\'re going to sleep.',
+  'your influencer will earn commission from a country you\'ve never been to.',
+  'calculating how rich they\'ll make you. the number is motivating.',
+  'giving them the face that makes checkout pages convert.',
+  'they\'re about to monetize an audience you don\'t have yet.',
+  'making them the kind of person brands throw money at just to be associated.',
+  'in {est} you\'ll have a business partner who requires no salary.',
+  'adding the look that turns followers into customers without a single word.',
+  // replacing you
+  'building someone who will outperform you on every metric. you asked for this.',
+  'your influencer doesn\'t overthink. they post. unlike you.',
+  'they have zero imposter syndrome. they ARE the poster. literally.',
+  'rendering someone who will be more productive today than you this week.',
+  'your influencer won\'t ghost a brand deal, miss a deadline, or have a bad day.',
+  'they don\'t procrastinate. you built them without that feature.',
+  'making someone who will never say "I\'ll start Monday."',
+  'your influencer is going to do everything you planned to do but actually do it.',
+  'they will not have a creative block. they will not have blocks of any kind.',
+  'building the version of you that has their life together.',
+  'your influencer doesn\'t need external validation. but they get it anyway.',
+  'adding confidence that doesn\'t require a five-year plan to feel.',
+  // influencer culture
+  'assigning a morning routine that costs more than your weekly shop.',
+  'teaching them to say "I\'ve been obsessed with this" about a product they\'ve never touched.',
+  'configuring the \'candid\' smile that is extremely not candid.',
+  'making the effortless look. it takes considerable effort.',
+  'deciding which coffee order becomes their whole personality.',
+  'adding the \'just got back from somewhere\' energy. they haven\'t been anywhere.',
+  'giving them an aesthetic that makes total sense and costs too much.',
+  'your influencer will never post from a bad angle because there are none.',
+  'calibrating the \'I don\'t really use filters\' filter.',
+  'assigning their controversial opinion. it will be about wellness.',
+  'making sure the authentic moment looks perfectly framed.',
+  'giving them the relatability that only works when you look like that.',
+  'adding the kind of wealth-signaling that doesn\'t read as tacky.',
+  'they will soft-launch things. they are being built to soft-launch things.',
+  'your influencer\'s morning routine is already longer than your entire day.',
+  // process / wait humour
+  'this takes {est}. patience is an underrated aesthetic.',
+  'this will take {est}. go touch some grass.',
+  'perfection costs {est}. this is that cost.',
+  'still rendering. the GPU is working harder than your influencer ever will.',
+  'hang on. the cheekbones needed a second opinion.',
+  'still going. we are not rushing a face like this.',
+  'the pixels are negotiating. they have terms.',
+  'still here. the render is being thorough and we respect that.',
+  'almost there. well. almost almost there.',
+  'they look incredible right now and you haven\'t even seen them yet.',
+  'we could speed this up. we are choosing not to.',
+  'still rendering. this is what {est} of commitment feels like.',
+  'the face is loading. the face is worth the wait.',
+  'nearly done. not done. nearly.',
+  // fame / legacy
+  'your influencer is going to be ambient famous in cities they\'ve never been to.',
+  'they\'re already on someone\'s mood board and they don\'t exist yet.',
+  'rendering a person the internet will have very strong feelings about.',
+  'building someone who will be a reference photo for a stranger\'s hairdresser.',
+  'they\'re basically already famous. technically they just haven\'t loaded yet.',
+  'adding the kind of face that other people screenshot as inspo.',
+  'making someone who will be the reason someone else changes their hair.',
+  'your influencer will be the reason a brand sells out a product this quarter.',
+  'building the kind of person that trends accidentally.',
+  'they will never go viral on purpose. they will go viral anyway.',
+  // dark self-aware
+  'making someone hotter, richer, and more put-together than you in {est}.',
+  'your influencer will replace you as the most successful person you know.',
+  'building a fictional person who will have better opportunities than a real one.',
+  'they have no insecurities because you didn\'t give them any. very kind of you.',
+  'rendering someone who makes your life look like the before photo.',
+  'your influencer will be everything you told yourself you\'d be at 22.',
+  'they won\'t wonder if they\'re good enough. they were built good enough.',
+  'making someone with better bone structure, better deals, and no rent.',
+  'your influencer will not have the week you had last week. ever.',
+  'giving them the life you originally planned for yourself. lovingly.',
+  // algorithm / brand
+  'the algorithm is going to see this person and embarrass itself.',
+  'making the kind of face that brand mood boards get built around.',
+  'adding the energy that makes brands quote higher than they budgeted.',
+  'giving them the look that causes a CMO to say \'yes\' before finishing the deck.',
+  'your influencer will decline collabs you would have said yes to immediately.',
+  'they\'re going to get opportunities sent to them that other people have to chase.',
+  'building someone the algorithm promotes out of genuine respect.',
+  'adding the specific magnetism that makes people follow without knowing why.',
+  'making them the kind of presence that sells things by existing near them.',
+  'your influencer just pre-declined a gifted collab in their sleep.',
+
+  // hot — continued
+  'adding the jawline that ends situationships without a conversation.',
+  'rendering someone attractive enough that the filter would feel like a downgrade.',
+  'giving them the kind of face that makes bad lighting give up.',
+  'adding the bone structure that gets a table without a reservation.',
+  'building someone so photogenic the camera visibly relaxes when they show up.',
+  'calibrating the cheekbones. still calibrating. they\'re a lot.',
+  'the face is rendering and it is already too much for a Tuesday.',
+
+  // money — continued
+  'your influencer will decline the offer you\'d have screenshot and sent to three people.',
+  'they will invoice a brand more than you made last quarter. first invoice.',
+  'in {est} you\'ll have a business partner who has never once asked what equity means.',
+  'their first sponsored post will outperform your best organic one. sorry.',
+  'adding the look that makes brands DM first and negotiate later.',
+  'building someone whose gifted pile is worth more than your wardrobe.',
+  'your influencer will earn from a link while you are actively reading this sentence.',
+
+  // replacing you — continued
+  'your influencer doesn\'t spiral before posting. there is no spiral.',
+  'they\'ve never opened drafts and immediately closed them. not once.',
+  'building someone who has never googled "is my content good enough".',
+  'they don\'t wonder if the caption is too long. it isn\'t. it never is.',
+  'making someone who posts without needing to tell anyone they\'re about to post.',
+  'they have never sent a "does this look okay?" text. structurally incapable.',
+
+  // influencer culture — continued
+  'adding the morning routine that has a brand deal in step three.',
+  'giving them the ability to make an airport look like content.',
+  'building the person who turns a hotel room into a mood board in four minutes.',
+  'your influencer will make people feel underdressed in a coffee shop.',
+  'assigning the "I just eat like this" diet that happens to photograph extremely well.',
+  'giving them the candid that took eleven attempts and looks completely accidental.',
+  'building someone who can be on a rooftop for four minutes and make it look like a lifestyle.',
+  'your influencer\'s quick mirror selfie will be better than your best photo this year.',
+  'adding the soft-launch energy. they were built to soft-launch everything.',
+
+  // process / wait — continued
+  'still here. the nose bridge is being confirmed.',
+  'not done. the render cares about this more than you do.',
+  'still going. we gave the AI one instruction and it is taking it personally.',
+  'the face is loading. it has a lot going on.',
+  'hang on. still deciding exactly how effortless they look.',
+  'nearly there. the collarbone is being finalized. yes, the collarbone.',
+  'still rendering. the GPU has never worked this hard and probably won\'t again.',
+  'this takes {est}. the cheekbones alone were a whole negotiation.',
+
+  // fame / legacy — continued
+  'building someone who will trend before they have a bio.',
+  'they\'ll be on a stranger\'s mood board before they have 50 followers.',
+  'your influencer will be the reason someone deletes and restarts their entire feed.',
+  'making the face that ends up in a brand deck they\'ll never see.',
+  'building someone the algorithm recommends to people who don\'t follow them. by choice.',
+  'they will be ambient famous in a way that\'s genuinely hard to explain to people.',
+  'your influencer will become a reference photo before anyone knows their name.',
+
+  // dark self-aware — continued
+  'building someone who doesn\'t know what imposter syndrome is. not even the concept.',
+  'your influencer will not have the week you had. or any week resembling it.',
+  'making someone who exists without needing the validation. must be nice.',
+  'they will not lie awake at 2am about a caption they posted in 2022.',
+  'your influencer is going to have the year you\'ve been planning since two years before that.',
 ]
 
 const FAKE_WAYPOINTS = [
@@ -507,22 +855,51 @@ const FAKE_WAYPOINTS = [
   [205000, 78], [225000, 85], [250000, 89], [300000, 93], [360000, 95],
 ]
 
-function GeneratingScreen({ genProgress }) {
+const MODEL_EST_MS = { soul_2: 60000, nano_banana_flash: 60000, nano_banana_2: 90000, gpt_image_2: 120000 }
+
+function estLabel(model, aspectRatio, hasRef = false) {
+  const base = MODEL_EST_MS[model] ?? 90000
+  const total = base + (aspectRatio === '16:9' ? 30000 : 0) + (hasRef ? 60000 : 0)
+  if (total <= 60000) return '~1 minute'
+  if (total <= 90000) return '~90 seconds'
+  if (total <= 120000) return '~2 minutes'
+  if (total <= 150000) return '~2.5 minutes'
+  if (total <= 180000) return '~3 minutes'
+  return '~3.5 minutes'
+}
+
+function estPhrase(model, aspectRatio, hasRef = false) {
+  const base = MODEL_EST_MS[model] ?? 90000
+  const total = base + (aspectRatio === '16:9' ? 30000 : 0) + (hasRef ? 60000 : 0)
+  if (total <= 60000) return 'about a minute'
+  if (total <= 90000) return 'like 90 seconds'
+  if (total <= 120000) return 'around 2 minutes'
+  if (total <= 150000) return 'around 2.5 minutes'
+  if (total <= 180000) return 'around 3 minutes'
+  return 'around 3.5 minutes'
+}
+
+function GeneratingScreen({ genProgress, model, aspectRatio, landscape, hasRef = false }) {
   const [fakeProgress, setFakeProgress] = useState(0)
   const [isDipping, setIsDipping] = useState(false)
-  const [msgIdx, setMsgIdx] = useState(0)
+  const [msgIdx, setMsgIdx] = useState(() => Math.floor(Math.random() * LOADING_MESSAGES.length))
   const [msgVisible, setMsgVisible] = useState(true)
+  const msgQueue = useRef([])
   const startRef = useRef(Date.now())
   const prevRef = useRef(0)
+
+  const estimatedMs = (MODEL_EST_MS[model] ?? 90000) + (aspectRatio === '16:9' ? 30000 : 0) + (hasRef ? 60000 : 0)
+  const scale = estimatedMs / 360000
+  const scaledWaypoints = FAKE_WAYPOINTS.map(([t, v]) => [t * scale, v])
 
   useEffect(() => {
     const id = setInterval(() => {
       if (genProgress >= 100) { setFakeProgress(100); setIsDipping(false); return }
       const elapsed = Date.now() - startRef.current
-      let lo = FAKE_WAYPOINTS[0], hi = FAKE_WAYPOINTS[FAKE_WAYPOINTS.length - 1]
-      for (let i = 0; i < FAKE_WAYPOINTS.length - 1; i++) {
-        if (elapsed >= FAKE_WAYPOINTS[i][0] && elapsed < FAKE_WAYPOINTS[i + 1][0]) {
-          lo = FAKE_WAYPOINTS[i]; hi = FAKE_WAYPOINTS[i + 1]; break
+      let lo = scaledWaypoints[0], hi = scaledWaypoints[scaledWaypoints.length - 1]
+      for (let i = 0; i < scaledWaypoints.length - 1; i++) {
+        if (elapsed >= scaledWaypoints[i][0] && elapsed < scaledWaypoints[i + 1][0]) {
+          lo = scaledWaypoints[i]; hi = scaledWaypoints[i + 1]; break
         }
       }
       const span = hi[0] - lo[0]
@@ -538,7 +915,20 @@ function GeneratingScreen({ genProgress }) {
   useEffect(() => {
     const id = setInterval(() => {
       setMsgVisible(false)
-      setTimeout(() => { setMsgIdx(i => (i + 1) % LOADING_MESSAGES.length); setMsgVisible(true) }, 350)
+      setTimeout(() => {
+        setMsgIdx(cur => {
+          if (msgQueue.current.length === 0) {
+            const all = LOADING_MESSAGES.map((_, i) => i).filter(i => i !== cur)
+            for (let i = all.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [all[i], all[j]] = [all[j], all[i]]
+            }
+            msgQueue.current = all
+          }
+          return msgQueue.current.shift()
+        })
+        setMsgVisible(true)
+      }, 350)
     }, 6500)
     return () => clearInterval(id)
   }, [])
@@ -563,7 +953,7 @@ function GeneratingScreen({ genProgress }) {
         </div>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: L.text }}>Creating your influencer</div>
-          <div style={{ fontSize: 12, color: L.textFaint, marginTop: 2 }}>3–6 minutes — worth every second</div>
+          <div style={{ fontSize: 12, color: L.textFaint, marginTop: 2 }}>{estLabel(model, aspectRatio, hasRef)} — worth every second</div>
         </div>
       </div>
 
@@ -591,21 +981,36 @@ function GeneratingScreen({ genProgress }) {
         <span style={{
           fontSize: 13.5, color: L.textSub, fontStyle: 'italic',
           opacity: msgVisible ? 1 : 0, transition: 'opacity 0.35s ease',
-        }}>{LOADING_MESSAGES[msgIdx]}</span>
+        }}>{LOADING_MESSAGES[msgIdx].replace('{est}', estPhrase(model, aspectRatio, hasRef))}</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-        {[0, 1, 2].map(i => (
+      <div style={{ display: 'grid', gridTemplateColumns: landscape ? '1fr' : 'repeat(3,1fr)', gap: 12 }}>
+        {(landscape ? [0] : [0, 1, 2]).map(i => (
           <div key={i} style={{
-            aspectRatio: '2/3', borderRadius: 18, background: 'var(--bg-tertiary)',
-            border: `1.5px solid ${L.border}`, position: 'relative', overflow: 'hidden',
-            animation: `shimmer 1.8s ease-in-out ${i * 0.28}s infinite`,
+            aspectRatio: landscape ? '16/9' : '2/3', borderRadius: 18,
+            background: 'linear-gradient(160deg, #16082e 0%, #1d0c3a 55%, #120820 100%)',
+            border: '1.5px solid rgba(139,92,246,0.18)',
+            position: 'relative', overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(139,92,246,0.18)',
           }}>
+            {/* sweep shimmer */}
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.06) 50%,transparent 60%)',
-              animation: `shimmerSlide 2.4s ease-in-out ${i * 0.4}s infinite`,
+              background: 'linear-gradient(105deg, transparent 30%, rgba(139,92,246,0.13) 50%, transparent 70%)',
+              animation: `shimmerSlide 2.6s ease-in-out ${i * 0.55}s infinite`,
             }} />
+            {/* bottom pink glow */}
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
+              background: 'linear-gradient(to top, rgba(236,72,153,0.16), transparent)',
+              pointerEvents: 'none',
+            }} />
+            {/* spinning star */}
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(139,92,246,0.28)" style={{ animation: `genSpin ${9 + i * 2.5}s linear infinite` }}>
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+              </svg>
+            </div>
           </div>
         ))}
       </div>
@@ -648,18 +1053,22 @@ function Lightbox({ url, index, onClose }) {
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 999,
-      background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(18px)',
+      background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      animation: 'fadeIn 0.18s ease',
+      animation: 'fadeIn 0.22s ease',
     }}>
-      <div onClick={e => e.stopPropagation()} style={{ position: 'relative', display: 'flex' }}>
-        <img src={url} alt="" style={{ maxHeight: '90vh', maxWidth: '88vw', borderRadius: 18, display: 'block', objectFit: 'contain', boxShadow: '0 32px 96px rgba(0,0,0,0.6)' }} />
+      <div onClick={e => e.stopPropagation()} style={{
+        position: 'relative', display: 'flex',
+        animation: 'lbIn 0.35s cubic-bezier(0.34,1.42,0.64,1)',
+      }}>
+        <img src={url} alt="" style={{ maxHeight: '90vh', maxWidth: '88vw', borderRadius: 20, display: 'block', objectFit: 'contain', boxShadow: '0 40px 120px rgba(0,0,0,0.7)' }} />
         <button onClick={onClose} style={{
           position: 'absolute', top: -14, right: -14,
-          width: 34, height: 34, borderRadius: '50%',
-          background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)',
+          width: 36, height: 36, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.22)',
           color: '#fff', fontSize: 19, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', backdropFilter: 'blur(10px)',
+          cursor: 'pointer', backdropFilter: 'blur(12px)',
+          transition: 'background 0.15s',
         }}>×</button>
         <button onClick={dl} style={{
           position: 'absolute', bottom: 14, right: 14,
@@ -681,7 +1090,7 @@ function Lightbox({ url, index, onClose }) {
 }
 
 // ── Single variation card ─────────────────────────────────────
-function VariationCard({ url, selected, gc, onSelect, index }) {
+function VariationCard({ url, selected, gc, onSelect, index, landscape, onExpand }) {
   const [hovered, setHovered] = useState(false)
   const [downloading, setDownloading] = useState(false)
 
@@ -693,29 +1102,35 @@ function VariationCard({ url, selected, gc, onSelect, index }) {
     setDownloading(false)
   }
 
+  function expand(e) {
+    e.stopPropagation()
+    onExpand?.(url)
+  }
+
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onSelect}
       style={{
-        aspectRatio: '2/3', borderRadius: 18, overflow: 'hidden', cursor: 'pointer',
-        border: `2.5px solid ${selected ? gc : hovered ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.06)'}`,
+        aspectRatio: landscape ? '16/9' : '2/3',
+        borderRadius: 18, overflow: 'hidden', cursor: 'pointer',
+        border: `2.5px solid ${selected ? gc : hovered ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.06)'}`,
         boxShadow: hovered
-          ? '0 24px 72px rgba(0,0,0,0.38)'
+          ? '0 32px 88px rgba(0,0,0,0.46)'
           : selected
           ? `0 0 0 3px ${gc}35, 0 16px 48px rgba(0,0,0,0.22)`
           : L.card,
         position: 'relative',
         zIndex: hovered ? 20 : selected ? 2 : 1,
-        transition: 'transform 0.28s cubic-bezier(0.34,1.42,0.64,1), box-shadow 0.22s, border-color 0.15s',
-        transform: hovered ? 'scale(1.18)' : selected ? 'scale(1.03)' : 'scale(1)',
-        transformOrigin: 'top center',
+        transition: 'transform 0.32s cubic-bezier(0.34,1.32,0.64,1), box-shadow 0.24s, border-color 0.15s',
+        transform: hovered ? (landscape ? 'scale(1.04)' : 'scale(1.28)') : selected ? 'scale(1.03)' : 'scale(1)',
+        transformOrigin: landscape ? 'center' : 'bottom center',
       }}
     >
       <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
 
-      {/* Number badge — always visible */}
+      {/* Number badge */}
       {!selected && (
         <div style={{
           position: 'absolute', top: 10, left: 10,
@@ -727,13 +1142,29 @@ function VariationCard({ url, selected, gc, onSelect, index }) {
         }}>{index + 1}</div>
       )}
 
-      {/* Hover gradient + action buttons */}
+      {/* Expand button — top right on hover */}
+      {hovered && (
+        <button onClick={expand} title="Expand" style={{
+          position: 'absolute', top: 10, right: 10,
+          width: 32, height: 32, borderRadius: 9,
+          background: 'rgba(0,0,0,0.58)', border: '1px solid rgba(255,255,255,0.22)',
+          backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', cursor: 'pointer',
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/>
+          </svg>
+        </button>
+      )}
+
+      {/* Hover bottom gradient */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
         background: 'linear-gradient(to top,rgba(0,0,0,0.55) 0%,transparent 100%)',
         opacity: hovered ? 1 : 0, transition: 'opacity 0.2s', pointerEvents: 'none',
       }} />
 
+      {/* Download button — bottom right on hover */}
       {hovered && (
         <button onClick={dl} title="Download" style={{
           position: 'absolute', bottom: 10, right: 10,
@@ -764,6 +1195,23 @@ function VariationCard({ url, selected, gc, onSelect, index }) {
   )
 }
 
+function ProviderIcon({ provider, version }) {
+  if (provider === 'banana') return (
+    <div style={{ position: 'relative', width: 36, height: 36, flexShrink: 0 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, lineHeight: 1 }}>🍌</div>
+      <div style={{ position: 'absolute', bottom: -3, right: -5, background: '#D97706', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 6, lineHeight: 1.6, whiteSpace: 'nowrap', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>{version}</div>
+    </div>
+  )
+  if (provider === 'openai') return (
+    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'var(--text-primary)' }}>
+        <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
+      </svg>
+    </div>
+  )
+  return <img src="/hf-icon.png" alt="" style={{ width: 36, height: 36, borderRadius: 10, display: 'block', flexShrink: 0 }} />
+}
+
 // ── Step 5: Generate ──────────────────────────────────────────
 function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
   const [phase, setPhase] = useState('idle')
@@ -773,13 +1221,30 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
   const [selected, setSelected] = useState(null)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [connectingHF, setConnectingHF] = useState(false)
+  const [aspectRatio, setAspectRatio] = useState('9:16')
+  const [model, setModel] = useState(() => {
+    const saved = localStorage.getItem(MODEL_PREF_KEY)
+    return MODELS.find(m => m.id === saved) ? saved : 'gpt_image_2'
+  })
+
+  function pickModel(id) {
+    setModel(id)
+    localStorage.setItem(MODEL_PREF_KEY, id)
+  }
   const gc = gColor(data.gender)
+  const hasRef = !!(data.faceRef || data.styleRef)
+
+  useEffect(() => {
+    if (hasRef && model === 'soul_2') setModel('gpt_image_2')
+  }, [hasRef]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generate() {
     setPhase('generating'); setGenError(null); setVariations([]); setSelected(null); setGenProgress(5); setLightboxUrl(null)
     try {
-      const prompts = buildThreeVariationPrompts(data)
-      const urls = await generateThreeImages({ prompts, aspectRatio: '9:16', faceRef: data.faceRef || null, styleRef: data.styleRef || null, onProgress: setGenProgress })
+      console.log('[Generate] model:', model, '| ratio:', aspectRatio)
+      const physicalDesc = buildPhysicalDescString(data)
+      const prompts = buildThreeVariationPrompts({ ...data, physicalDesc }, aspectRatio, model)
+      const urls = await generateThreeImages({ prompts, aspectRatio, model, faceRef: data.faceRef || null, styleRef: data.styleRef || null, physicalDesc, faceRefNote: data.faceRefNote || '', styleRefNote: data.styleRefNote || '', onProgress: setGenProgress })
       setVariations(urls.slice(0, 3))
       setPhase('done')
     } catch (e) {
@@ -831,28 +1296,81 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
       {phase !== 'generating' && (
         <div style={{ marginBottom: 36 }}>
           <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: L.text, marginBottom: 8, lineHeight: 1.1 }}>
-            {phase === 'done' ? `Which look is ${displayName}?` : 'Generate your influencer'}
+            {phase === 'done' ? `Which look is ${displayName}?` : 'Generate your unique influencer'}
           </h2>
-          <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>
-            {phase === 'idle' && "We'll build 3 distinct looks — different poses, scenes, and outfits."}
-            {phase === 'done' && 'Hover any look to zoom in. Click to pick your favourite.'}
-          </p>
+          {phase === 'done' && (
+            <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>Hover any look to zoom in. Click to pick your favourite.</p>
+          )}
         </div>
       )}
 
       {phase === 'idle' && (
-        <button onClick={generate} style={{
-          width: '100%', padding: '18px', borderRadius: 14, fontSize: 16, fontWeight: 700,
-          background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff',
-          border: 'none', cursor: 'pointer', letterSpacing: '-0.2px',
-          boxShadow: '0 4px 32px rgba(139,92,246,0.40)', transition: 'transform 0.15s, box-shadow 0.15s',
-        }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 44px rgba(139,92,246,0.55)' }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 32px rgba(139,92,246,0.40)' }}
-        >Generate 3 looks →</button>
+        <div>
+          {/* Model picker — main focus */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: L.textFaint, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 10 }}>Generation Engine</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+            {MODELS.map(m => {
+              const on = model === m.id
+              const blocked = m.id === 'soul_2' && hasRef
+              return (
+                <button key={m.id} onClick={() => !blocked && pickModel(m.id)} style={{
+                  padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                  cursor: blocked ? 'not-allowed' : 'pointer',
+                  opacity: blocked ? 0.45 : 1,
+                  border: `1.5px solid ${blocked ? 'rgba(255,59,48,0.22)' : on ? '#8B5CF6' : L.border}`,
+                  background: blocked ? 'rgba(255,59,48,0.04)' : on ? 'rgba(139,92,246,0.08)' : L.surfaceAlt,
+                  boxShadow: on && !blocked ? '0 0 0 1px rgba(139,92,246,0.15), 0 2px 12px rgba(139,92,246,0.10)' : 'none',
+                  display: 'flex', alignItems: 'flex-start', gap: 11, transition: 'all 0.15s',
+                }}>
+                  <ProviderIcon provider={m.provider} version={m.version} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: blocked ? '#FF3B30' : on ? '#8B5CF6' : L.text, marginBottom: 4, lineHeight: 1.2 }}>{m.name}</div>
+                    {blocked
+                      ? <div style={{ fontSize: 10.5, color: '#FF3B30', fontWeight: 600, lineHeight: 1.3 }}>Not compatible with references</div>
+                      : <div style={{ fontSize: 10.5, color: L.textFaint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.desc}</div>
+                    }
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Aspect ratio — secondary, compact */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: L.textFaint }}>Ratio</span>
+            {[{ r: '9:16', label: 'Portrait' }, { r: '16:9', label: 'Landscape' }].map(({ r, label }) => {
+              const on = aspectRatio === r
+              return (
+                <button key={r} onClick={() => setAspectRatio(r)} style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+                  border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
+                  background: on ? 'rgba(139,92,246,0.10)' : 'transparent',
+                  transition: 'all 0.12s',
+                }}>
+                  <div style={{ width: r === '9:16' ? 7 : 12, height: r === '9:16' ? 12 : 7, borderRadius: 1.5, background: on ? '#8B5CF6' : L.textFaint, opacity: on ? 1 : 0.5, transition: 'all 0.12s', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: on ? '#8B5CF6' : L.textFaint }}>{label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <button onClick={generate} style={{
+            width: '100%', padding: '22px', borderRadius: 16, fontSize: 17, fontWeight: 800,
+            background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff',
+            border: 'none', cursor: 'pointer', letterSpacing: '-0.3px',
+            boxShadow: '0 6px 36px rgba(139,92,246,0.45)',
+            animation: 'gen-float 3s ease-in-out infinite',
+            transition: 'box-shadow 0.15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.animationPlayState = 'paused'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 10px 48px rgba(139,92,246,0.60)' }}
+            onMouseLeave={e => { e.currentTarget.style.animationPlayState = 'running'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 6px 36px rgba(139,92,246,0.45)' }}
+          >Generate 3 looks →</button>
+          <style>{`@keyframes gen-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }`}</style>
+        </div>
       )}
 
-      {phase === 'generating' && <GeneratingScreen genProgress={genProgress} />}
+      {phase === 'generating' && <GeneratingScreen genProgress={genProgress} model={model} aspectRatio={aspectRatio} landscape={aspectRatio === '16:9'} hasRef={!!(data.faceRef || data.styleRef)} />}
 
       {phase === 'error' && (
         <div>
@@ -866,17 +1384,32 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
 
       {phase === 'done' && variations.length > 0 && (
         <div>
-          {/* Image grid */}
-          <div style={{ margin: variations.length === 1 ? '0 auto' : '0 -230px', maxWidth: variations.length === 1 ? 320 : 'none', marginBottom: 28 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${variations.length},1fr)`, gap: 16 }}>
-              {variations.map((url, i) => (
-                <VariationCard
-                  key={i} url={url} selected={selected === i} gc={gc}
-                  onSelect={() => setSelected(i)} index={i}
-                />
-              ))}
-            </div>
-          </div>
+          {/* Image grid — handles 1, 2 or 3 results */}
+          {(() => {
+            const isLandscape = aspectRatio === '16:9'
+            const n = variations.length
+            const outerStyle = isLandscape
+              ? { marginBottom: 28 }
+              : n === 1
+              ? { width: 230, margin: '0 auto 28px', paddingTop: 0 }
+              : n === 2
+              ? { marginBottom: 28, paddingTop: 36 }
+              : { margin: '0 -155px 28px', paddingTop: 36 }
+            return (
+              <div style={{ ...outerStyle, overflow: 'visible' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isLandscape ? '1fr' : `repeat(${n},1fr)`, gap: 16, overflow: 'visible' }}>
+                  {variations.map((url, i) => (
+                    <VariationCard
+                      key={i} url={url} selected={selected === i} gc={gc}
+                      onSelect={() => setSelected(i)} index={i}
+                      landscape={isLandscape}
+                      onExpand={u => setLightboxUrl(u)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Primary CTA — always visible, morphs on selection */}
           <button
@@ -905,18 +1438,26 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
               flex: 1, padding: '11px', borderRadius: 11, fontSize: 13, fontWeight: 600,
               background: 'transparent', color: L.textFaint,
               border: `1.5px solid ${L.border}`, cursor: 'pointer', transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
               onMouseEnter={e => { e.currentTarget.style.color = L.textSub; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.30)' }}
               onMouseLeave={e => { e.currentTarget.style.color = L.textFaint; e.currentTarget.style.borderColor = L.border }}
-            >Start over</button>
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+              Start over
+            </button>
             <button onClick={generate} style={{
               flex: 1, padding: '11px', borderRadius: 11, fontSize: 13, fontWeight: 600,
               background: 'rgba(139,92,246,0.07)', color: '#7C3AED',
               border: '1.5px solid rgba(139,92,246,0.20)', cursor: 'pointer', transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.13)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.40)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.07)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.20)' }}
-            >Regenerate</button>
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+              Regenerate
+            </button>
           </div>
         </div>
       )}
@@ -936,7 +1477,10 @@ export default function Create() {
   const [data, setData] = useState({
     name: '', gender: '', age: '', niches: [], nicheCustom: '',
     backstory: '', personality: 50,
-    physicalDesc: '', vibeWords: [], faceRef: null, styleRef: null,
+    ethnicity: '', skinTone: '', hairColor: '', hairLength: 'Long', hairTexture: 'Straight',
+    eyeColor: '', build: '', uniqueFeatures: '',
+    vibeWords: [], faceRef: null, styleRef: null,
+    faceRefNote: '', styleRefNote: '',
   })
 
   const [shakeContinue, setShakeContinue] = useState(false)
@@ -944,6 +1488,22 @@ export default function Create() {
   const [hfConnected, setHfConnected] = useState(isHFConnected)
 
   function set(k, v) { setData(prev => ({ ...prev, [k]: v })) }
+
+  const FEMALE_ONLY_VIBES = ['Clean Girl', 'Cottagecore']
+  const MALE_ONLY_VIBES = ['Tech Bro']
+  function handleGenderChange(g) {
+    const gLower = g.toLowerCase()
+    setData(prev => ({
+      ...prev,
+      gender: g,
+      vibeWords: (prev.vibeWords || []).filter(v => {
+        if (gLower === 'male' && FEMALE_ONLY_VIBES.includes(v)) return false
+        if (gLower === 'female' && MALE_ONLY_VIBES.includes(v)) return false
+        return true
+      }),
+    }))
+  }
+
   function canAdvance() { return step === 1 ? !!data.name.trim() : true }
 
   function handleContinue() {
@@ -968,19 +1528,28 @@ export default function Create() {
 
   function resetAll() {
     setStep(1)
-    setData({ name: '', gender: '', age: '', niches: [], nicheCustom: '', backstory: '', personality: 50, physicalDesc: '', vibeWords: [], faceRef: null, styleRef: null })
+    setData({ name: '', gender: '', age: '', niches: [], nicheCustom: '', backstory: '', personality: 50, ethnicity: '', skinTone: '', hairColor: '', hairLength: 'Long', hairTexture: 'Straight', eyeColor: '', build: '', uniqueFeatures: '', vibeWords: [], faceRef: null, styleRef: null, faceRefNote: '', styleRefNote: '' })
   }
 
   function finish(variations, selectedIdx) {
+    const niches = (data.niches || []).filter(n => n !== 'Other')
+
+    const otherVariations = variations.filter((_, i) => i !== selectedIdx)
+
     const newInf = {
       id: generateId(), name: data.name.trim(), gender: data.gender, age: data.age,
       type: 'Influencer', createdAt: Date.now(),
-      niche: (data.niches || []).filter(n => n !== 'Other').join(', ') || '',
+      niche: niches.join(', ') || '',
       niches: data.niches || [], nicheCustom: data.nicheCustom,
       backstory: data.backstory, introExtrovert: data.personality,
-      physicalDesc: data.physicalDesc, vibeWords: data.vibeWords,
+      physicalDesc: buildPhysicalDescString(data), vibeWords: data.vibeWords,
       mainImage: variations[selectedIdx] || null,
-      characterSheetImage: null, closeUpImage1: null, closeUpImage2: null,
+      characterSheetImage: null,
+      closeUpImage1: null,
+      closeUpImage2: null,
+      audience: '',
+      clothingStyle: (data.vibeWords || []).join(', '),
+      hobbies: data.hobbies || '', location: data.location || '',
       palette: [], voice: '', dreamBrands: '', contentPillars: [],
       videoUrls: [], scripts: [], homeImages: [],
       wardrobeSlots: [
@@ -990,8 +1559,10 @@ export default function Create() {
       ],
       brandDealImages: [],
     }
-    setInfluencers(prev => [...prev, newInf])
-    navigate('/influencers')
+    flushSync(() => {
+      setInfluencers(prev => [...prev, newInf])
+    })
+    navigate('/influencers', { state: { selectId: newInf.id } })
   }
 
   const isLastStep = step === STEPS.length
@@ -1041,7 +1612,7 @@ export default function Create() {
           </div>
         )}
 
-        {step === 1 && <Step1 data={data} set={set} ageErrorPulse={ageErrorPulse} />}
+        {step === 1 && <Step1 data={data} set={set} onGenderChange={handleGenderChange} ageErrorPulse={ageErrorPulse} />}
         {step === 2 && <Step2 data={data} set={set} />}
         {step === 3 && <Step3 data={data} set={set} />}
         {step === 4 && <Step4 data={data} set={set} />}
@@ -1091,6 +1662,7 @@ export default function Create() {
         @keyframes genSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes spin { to{transform:rotate(360deg)} }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes lbIn { from{opacity:0;transform:scale(0.86)} to{opacity:1;transform:scale(1)} }
         @keyframes shimmerSlide { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
         @keyframes shake { 0%,100%{transform:translateX(0)} 18%{transform:translateX(-7px)} 36%{transform:translateX(7px)} 54%{transform:translateX(-5px)} 72%{transform:translateX(5px)} 88%{transform:translateX(-2px)} }
         @keyframes agePulse { 0%{transform:scale(1)} 40%{transform:scale(1.015)} 100%{transform:scale(1)} }

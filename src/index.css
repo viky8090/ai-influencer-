@@ -145,6 +145,23 @@ a {
   .inf-img-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
 }
 
+
+/* ── Orb animations (shared across Landing + Influencers empty state) ── */
+@keyframes orb1 {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  33%       { transform: translate(55px,-45px) scale(1.07); }
+  66%       { transform: translate(-35px,38px) scale(0.93); }
+}
+@keyframes orb2 {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  50%       { transform: translate(-45px,55px) scale(1.11); }
+}
+@keyframes orb3 {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  40%       { transform: translate(35px,-55px) scale(0.90); }
+  70%       { transform: translate(-55px,22px) scale(1.08); }
+}
+
 /* ── Nav mobile ── */
 @media (max-width: 640px) {
   .nav-root { padding: 0 12px !important; gap: 2px !important; }
