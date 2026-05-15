@@ -58,12 +58,28 @@ const KAYLA_SEED = {
   physicalDesc: 'white, long wavy blonde hair, blue eyes, medium skin tone, athletic build',
 }
 
+// Runs synchronously at module load — before React renders anything.
+// Guarantees Kayla is in localStorage before useState reads it, so every
+// tab and every visitor (including Vercel) sees her immediately.
+try {
+  const raw = localStorage.getItem('influencers')
+  if (!raw) {
+    localStorage.setItem('influencers', JSON.stringify([KAYLA_SEED]))
+  } else {
+    const list = JSON.parse(raw)
+    if (!list.some(i => i.id === 'kayla-template')) {
+      localStorage.setItem('influencers', JSON.stringify([KAYLA_SEED, ...list]))
+    }
+  }
+} catch (_) {}
+
 export function StoreProvider({ children }) {
-  const influencers = useLocalStorage('influencers', [KAYLA_SEED])
+  const influencerStore = useLocalStorage('influencers', [KAYLA_SEED])
   const inspiration = useLocalStorage('inspiration_boards', [])
   const brandDeals  = useLocalStorage('brand_deals', [])
+
   return (
-    <InfluencersCtx.Provider value={influencers}>
+    <InfluencersCtx.Provider value={influencerStore}>
       <InspirationCtx.Provider value={inspiration}>
         <BrandDealsCtx.Provider value={brandDeals}>
           {children}
