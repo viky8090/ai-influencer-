@@ -58,11 +58,11 @@ export default function Lightbox({ images, startIndex = 0, onClose }) {
         >‹</button>
       )}
 
-      {/* Image */}
+      {/* Image — click to close */}
       <img
         src={images[idx]}
-        onClick={e => e.stopPropagation()}
-        style={{
+        onClick={onClose}
+        style={{cursor:'zoom-out',
           maxWidth: '88vw', maxHeight: '88vh',
           objectFit: 'contain',
           borderRadius: 8,

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import Lightbox from './Lightbox'
-import { compressImage } from '../utils/imageUtils'
+import { compressImage, downloadImage } from '../utils/imageUtils'
 
 export default function MasonryGrid({ images = [], onChange, emptyLabel = 'Add images', cols = 3 }) {
   const fileRef = useRef()
@@ -34,8 +34,8 @@ export default function MasonryGrid({ images = [], onChange, emptyLabel = 'Add i
             cursor: 'pointer', background: 'var(--bg-tertiary)',
             transition: 'border-color 0.15s',
           }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
         >
           <div style={{ fontSize: 22, opacity: 0.25, marginBottom: 8 }}>+</div>
           <div style={{ fontSize: 13, color: 'var(--text-tertiary)', fontWeight: 500 }}>{emptyLabel}</div>
@@ -51,6 +51,17 @@ export default function MasonryGrid({ images = [], onChange, emptyLabel = 'Add i
                 style={{ width: '100%', display: 'block' }}
               />
               <button
+                onClick={e => { e.stopPropagation(); downloadImage(src, `image-${i + 1}.jpg`) }}
+                style={{
+                  position: 'absolute', bottom: 7, left: 7,
+                  width: 24, height: 24, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.6)', color: '#fff',
+                  fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1, border: '1px solid rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(4px)',
+                }}
+              >↓</button>
+              <button
                 onClick={e => { e.stopPropagation(); remove(i) }}
                 style={{
                   position: 'absolute', bottom: 7, right: 7,
@@ -60,8 +71,8 @@ export default function MasonryGrid({ images = [], onChange, emptyLabel = 'Add i
                   lineHeight: 1, border: '1px solid rgba(255,255,255,0.15)',
                   backdropFilter: 'blur(4px)', transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,50,50,0.85)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.6)'}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,50,50,0.85)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
               >×</button>
             </div>
           ))}

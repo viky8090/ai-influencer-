@@ -47,6 +47,19 @@
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.7), 0 4px 8px rgba(0,0,0,0.4);
 }
 
+@keyframes cs-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1;   }
+}
+@keyframes cs-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%);  }
+}
+@keyframes cs-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 html, body {
   height: 100%;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
@@ -160,6 +173,15 @@ a {
   0%, 100% { transform: translate(0,0) scale(1); }
   40%       { transform: translate(35px,-55px) scale(0.90); }
   70%       { transform: translate(-55px,22px) scale(1.08); }
+}
+
+@keyframes progress-slide {
+  from { background-position: 100% 0; }
+  to   { background-position: -100% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Nav mobile ── */

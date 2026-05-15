@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import Lightbox from './Lightbox'
-import { compressImage } from '../utils/imageUtils'
+import { compressImage, downloadImage } from '../utils/imageUtils'
 
 export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add images', columns = 3 }) {
   const fileRef = useRef()
@@ -93,9 +93,22 @@ export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add ima
                 background: 'rgba(0,0,0,0)',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.18)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0)'}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.18)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0)' }}
             />
+
+            {/* Download button */}
+            <button
+              onClick={e => { e.stopPropagation(); downloadImage(src, `image-${i + 1}.jpg`) }}
+              style={{
+                position: 'absolute', bottom: 6, left: 6,
+                width: 22, height: 22, borderRadius: '50%',
+                background: 'rgba(0,0,0,0.6)', color: '#fff',
+                fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                lineHeight: 1, zIndex: 2, border: '1px solid rgba(255,255,255,0.15)',
+                backdropFilter: 'blur(4px)',
+              }}
+            >↓</button>
 
             {/* Delete button */}
             <button
@@ -142,8 +155,8 @@ export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add ima
             alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', gap: 6, transition: 'border-color 0.15s',
           }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
         >
           <span style={{ fontSize: 20, opacity: 0.3 }}>+</span>
           <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, textAlign: 'center' }}>{emptyLabel}</span>

@@ -1,10 +1,35 @@
-import { getHFToken } from './higgsfieldAuth'
+import { getHFToken, refreshHFToken } from './higgsfieldAuth'
 
 const MCP_URL = '/api/hf/mcp'
+const PENDING_KEY = 'hf_pending_gens'
 
 let _sessionId = null
+const _mediaCache = new Map() // fingerprint → uploaded CDN URL, lives for the browser session
 
-async function mcpPost(body) {
+function mediaFingerprint(dataUrl) {
+  return `${dataUrl.length}:${dataUrl.slice(0, 48)}:${dataUrl.slice(-24)}`
+}
+
+// ── Pending generation persistence ──────────────────────────────
+export function savePendingGen(influencerId, slot, jobIds) {
+  const list = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]')
+  const filtered = list.filter(j => !(j.influencerId === influencerId && j.slot === slot))
+  filtered.push({ influencerId, slot, jobIds, startedAt: Date.now() })
+  localStorage.setItem(PENDING_KEY, JSON.stringify(filtered))
+}
+
+export function clearPendingGen(influencerId, slot) {
+  const list = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]')
+  localStorage.setItem(PENDING_KEY, JSON.stringify(
+    list.filter(j => !(j.influencerId === influencerId && j.slot === slot))
+  ))
+}
+
+export function getPendingGens() {
+  return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]')
+}
+
+async function mcpPost(body, isRetry = false) {
   const token = getHFToken()
   const headers = {
     'Content-Type': 'application/json',
@@ -15,7 +40,16 @@ async function mcpPost(body) {
 
   const res = await fetch(MCP_URL, { method: 'POST', headers, body: JSON.stringify(body) })
 
-  if (res.status === 401) throw new Error('Higgsfield session expired — please reconnect in Settings')
+  if (res.status === 401) {
+    if (isRetry) throw new Error('Higgsfield session expired — please reconnect in Settings')
+    try {
+      await refreshHFToken()
+      _sessionId = null // force new session with fresh token
+      return mcpPost(body, true)
+    } catch {
+      throw new Error('Higgsfield session expired — please reconnect in Settings')
+    }
+  }
   if (!res.ok) {
     const errText = await res.text().catch(() => '')
     throw new Error(`Higgsfield API error ${res.status}: ${errText}`)
@@ -35,18 +69,26 @@ async function mcpPost(body) {
 }
 
 function parseSSEText(text) {
-  let last = null
+  let resultEvent = null
+  let lastNonNull = null
   for (const line of text.split('\n')) {
     const trimmed = line.trim()
     if (!trimmed.startsWith('data:')) continue
     const raw = trimmed.slice(5).trim()
     if (!raw || raw === '[DONE]') continue
-    try { const d = JSON.parse(raw); if (d !== null) last = d } catch {}
+    try {
+      const d = JSON.parse(raw)
+      if (d !== null) {
+        lastNonNull = d
+        // Prefer events that carry an actual tool result, not notifications
+        if (d.result !== undefined) resultEvent = d
+      }
+    } catch {}
   }
-  return last
+  return resultEvent ?? lastNonNull
 }
 
-async function initSession() {
+export async function initSession() {
   _sessionId = null
   await mcpPost({
     jsonrpc: '2.0', id: 1, method: 'initialize',
@@ -96,6 +138,146 @@ function extractJobIds(result) {
   const uuids = str.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || []
   console.log('[HF] extracted UUIDs from text:', uuids)
   return [...new Set(uuids)]
+}
+
+function extractVideoUrls(result) {
+  const data = unwrapMCP(result)
+  // Structured path — rawUrl / minUrl are CDN video links (no extension filter needed)
+  if (Array.isArray(data?.results)) {
+    const urls = data.results
+      .map(r => r?.results?.rawUrl || r?.results?.minUrl || r?.result_url)
+      .filter(Boolean)
+    if (urls.length) return [...new Set(urls)]
+  }
+  // Plain-text fallback — scan for video extensions
+  const str = typeof data === 'string' ? data : JSON.stringify(data)
+  const raw = str.match(/https:\/\/[^\s"\\]+\.(?:mp4|webm|mov)(?:[^\s"\\]*)?/g) || []
+  return [...new Set(raw.map(u => u.replace(/[\\}"']+$/, '')))]
+}
+
+async function pollVideoJobs(jobIds, total, onProgress, onPartialResults, isCancelled) {
+  let lastPartialCount = 0
+  for (let i = 0; i < 180; i++) { // 180 × 3s = 9 minutes max
+    if (isCancelled?.()) throw new Error('CANCELLED')
+    if (i > 0) await new Promise(r => setTimeout(r, 3000))
+    if (isCancelled?.()) throw new Error('CANCELLED')
+    try {
+      const display = await callTool('job_display', { ids: jobIds })
+      const urls = extractVideoUrls(display)
+      const terminal = countTerminalJobs(display)
+      console.log(`[HF] video poll ${i} → ${urls.length} URLs, ${terminal}/${total} terminal`)
+      onProgress?.(Math.min(30 + (urls.length / total) * 65, 95))
+      // Fire partial results callback whenever new URLs arrive
+      if (urls.length > lastPartialCount) {
+        lastPartialCount = urls.length
+        onPartialResults?.(urls.slice(0, total))
+      }
+      if (urls.length >= total) return urls.slice(0, total)
+      if (terminal >= total) {
+        if (urls.length > 0) return urls.slice(0, total)
+        throw new Error('Video generation failed — all jobs ended without output')
+      }
+    } catch (e) {
+      if (e.message.includes('failed')) throw e
+      console.warn('[HF] video poll error:', e.message)
+    }
+  }
+  throw new Error('Video generation timed out — check Higgsfield dashboard')
+}
+
+async function uploadAudioFile(dataUrl) {
+  const fp = mediaFingerprint(dataUrl)
+  if (_mediaCache.has(fp)) return _mediaCache.get(fp)
+
+  const res = await fetch(dataUrl)
+  const blob = await res.blob()
+  const contentType = blob.type || 'audio/mpeg'
+  const ext = contentType.includes('wav') ? 'wav' : contentType.includes('mp4') || contentType.includes('m4a') ? 'm4a' : 'mp3'
+  const filename = `audio_${Date.now()}.${ext}`
+
+  const uploadResult = await callTool('media_upload', { method: 'upload_url', filename, content_type: contentType })
+  const uploadData = unwrapMCP(uploadResult)
+
+  const f0 = uploadData?.uploads?.[0] ?? uploadData?.files?.[0] ?? uploadData?.data?.[0]
+  let uploadUrl = uploadData?.upload_url || uploadData?.url || f0?.upload_url || f0?.url
+  let mediaId   = uploadData?.media_id  || uploadData?.id  || f0?.media_id  || f0?.id
+
+  if (!uploadUrl || !mediaId) {
+    const text = typeof uploadData === 'string' ? uploadData : JSON.stringify(uploadData ?? '')
+    const uuids = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || []
+    if (uuids.length) mediaId = uuids[0]
+    const urlMatch = text.match(/https:\/\/[^\s"'\\]+/)
+    if (urlMatch) uploadUrl = urlMatch[0]
+  }
+  if (!uploadUrl || !mediaId) throw new Error(`Audio upload failed — got: ${JSON.stringify(uploadData)?.slice(0, 200)}`)
+
+  const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } })
+  if (!putRes.ok) throw new Error(`Audio file upload failed: ${putRes.status}`)
+
+  const confirmResult = await callTool('media_confirm', { media_id: mediaId, type: 'audio' })
+  const confirmed = unwrapMCP(confirmResult)
+  const cdnUrl = confirmed?.url || confirmed?.media_url || confirmed?.rawUrl || confirmed?.cdn_url || mediaId
+  _mediaCache.set(fp, cdnUrl)
+  return cdnUrl
+}
+
+export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8, count = 1, referenceImages = [], audioRef = null, model = 'seedance_2_0', onProgress, onPartialResults, isCancelled }) {
+  await initSession()
+  onProgress?.(5)
+
+  // Upload audio first (becomes @audio_1), then images (@image_1, @image_2, ...)
+  const medias = []
+
+  if (audioRef) {
+    try {
+      const audioId = await uploadAudioFile(audioRef)
+      medias.push({ value: audioId, role: 'audio' })
+    } catch (e) {
+      console.warn('[HF] audio upload failed, skipping:', e.message)
+    }
+  }
+
+  // Upload all reference images in parallel — order preserved for correct @image_N mapping
+  const imageMedias = (await Promise.all(
+    referenceImages.filter(Boolean).map(async imgDataUrl => {
+      try {
+        return { value: await uploadRefImage(imgDataUrl), role: 'image' }
+      } catch (e) {
+        console.warn('[HF] video ref upload failed, skipping:', e.message)
+        return null
+      }
+    })
+  )).filter(Boolean)
+  medias.push(...imageMedias)
+
+  const params = {
+    model,
+    prompt,
+    aspect_ratio: aspectRatio,
+    duration,
+    resolution: '1080p',
+    mode: 'std',
+  }
+  if (medias.length) params.medias = medias
+  onProgress?.(25)
+
+  // Higgsfield video API generates 1 per call — fire N sequential requests for count > 1
+  // (parallel calls conflict over the shared MCP session)
+  const results = []
+  for (let i = 0; i < count; i++) {
+    results.push(await callTool('generate_video', { params }))
+  }
+  onProgress?.(30)
+
+  const directUrls = results.flatMap(r => extractVideoUrls(r))
+  if (directUrls.length >= count) { onProgress?.(100); return directUrls.slice(0, count) }
+
+  const jobIds = results.flatMap(r => extractJobIds(r)).filter(Boolean)
+  if (!jobIds.length) throw new Error(`No job IDs returned. Response: ${JSON.stringify(unwrapMCP(results[0]))?.slice(0, 300)}`)
+
+  const urls = await pollVideoJobs(jobIds, count, onProgress, onPartialResults, isCancelled)
+  onProgress?.(100)
+  return urls.slice(0, count)
 }
 
 function extractImageUrls(result) {
@@ -159,7 +341,7 @@ function applyStyleNoteOverrides(prompts, styleNote, styleImg) {
 // Poll all jobs together in one job_display call.
 // total = number of images we expect (prompts.length), used for termination — not jobIds.length,
 // which can be inflated when Soul responses contain extra UUIDs.
-async function pollAllJobs(jobIds, total, onProgress, staleTolerance = 8) {
+export async function pollAllJobs(jobIds, total, onProgress, staleTolerance = 8) {
   let lastResponse = null
   let lastUrlCount = 0
   let stalePolls = 0
@@ -203,6 +385,12 @@ async function pollAllJobs(jobIds, total, onProgress, staleTolerance = 8) {
 }
 
 async function uploadRefImage(dataUrl) {
+  const fp = mediaFingerprint(dataUrl)
+  if (_mediaCache.has(fp)) {
+    console.log('[HF] media cache hit — skipping upload')
+    return _mediaCache.get(fp)
+  }
+
   const res = await fetch(dataUrl)
   const blob = await res.blob()
   const contentType = blob.type || 'image/jpeg'
@@ -213,8 +401,10 @@ async function uploadRefImage(dataUrl) {
   const uploadData = unwrapMCP(uploadResult)
   console.log('[HF] media_upload raw:', JSON.stringify(uploadData)?.slice(0, 500))
 
-  let uploadUrl = uploadData?.upload_url || uploadData?.url
-  let mediaId = uploadData?.media_id || uploadData?.id
+  // Real response shape: { uploads: [{ upload_url, media_id, url }] }
+  const f0 = uploadData?.uploads?.[0] ?? uploadData?.files?.[0] ?? uploadData?.data?.[0]
+  let uploadUrl = uploadData?.upload_url || uploadData?.url || f0?.upload_url || f0?.url
+  let mediaId   = uploadData?.media_id  || uploadData?.id  || f0?.media_id  || f0?.id
 
   // Response is plain text (curl instructions) — extract via regex
   if (!uploadUrl || !mediaId) {
@@ -225,7 +415,10 @@ async function uploadRefImage(dataUrl) {
     if (urlMatch) uploadUrl = urlMatch[0]
   }
 
-  if (!uploadUrl || !mediaId) throw new Error(`media_upload: could not extract upload_url/media_id from response`)
+  if (!uploadUrl || !mediaId) {
+    const debug = JSON.stringify(uploadData)?.slice(0, 300) ?? 'null'
+    throw new Error(`media_upload failed — got: ${debug}`)
+  }
 
   const putRes = await fetch(uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': contentType } })
   if (!putRes.ok) throw new Error(`Reference image upload failed: ${putRes.status}`)
@@ -236,15 +429,17 @@ async function uploadRefImage(dataUrl) {
 
   // Structured response
   const cdnUrl = confirmed?.url || confirmed?.media_url || confirmed?.rawUrl || confirmed?.cdn_url
-  if (cdnUrl) return cdnUrl
+  if (cdnUrl) { _mediaCache.set(fp, cdnUrl); return cdnUrl }
 
   // Text response — extract URL or fall back to media_id
   if (typeof confirmed === 'string') {
     const urlMatch = confirmed.match(/https:\/\/[^\s"'\\]+/)
-    if (urlMatch) return urlMatch[0]
+    if (urlMatch) { _mediaCache.set(fp, urlMatch[0]); return urlMatch[0] }
   }
 
-  return confirmed?.media_id || confirmed?.id || mediaId
+  const fallback = confirmed?.media_id || confirmed?.id || mediaId
+  _mediaCache.set(fp, fallback)
+  return fallback
 }
 
 function modelBaseParams(model, aspectRatio) {
@@ -347,7 +542,7 @@ export async function generateImages({ prompt, count = 3, aspectRatio = '9:16', 
   await initSession()
   onProgress?.(10)
 
-  const params = { model: 'gpt_image_2', prompt, aspect_ratio: aspectRatio, count, quality: 'high', resolution: '2k' }
+  const params = { model: 'gpt_image_2', prompt, aspect_ratio: aspectRatio, count, quality: 'high', resolution: '4k' }
   if (referenceImage && referenceImage.startsWith('http')) {
     params.medias = [{ value: referenceImage, role: 'image' }]
   }
@@ -364,7 +559,45 @@ export async function generateImages({ prompt, count = 3, aspectRatio = '9:16', 
     throw new Error(`No job IDs found. Response: ${JSON.stringify(unwrapMCP(result))?.slice(0, 300)}`)
   }
 
-  const allUrls = await pollAllJobs(jobIds, onProgress)
+  const allUrls = await pollAllJobs(jobIds, count, onProgress)
   onProgress?.(100)
   return allUrls
+}
+
+// Single image generation — uploads base64 ref images properly before generating
+export async function generateSingleImage({ prompt, aspectRatio = '16:9', referenceImage = null, onProgress, pendingKey = null }) {
+  await initSession()
+  onProgress?.(5)
+
+  const params = { ...modelBaseParams('gpt_image_2', aspectRatio), prompt, resolution: '4k' }
+
+  if (referenceImage) {
+    try {
+      console.log('[HF] uploading face reference...')
+      const mediaId = await uploadRefImage(referenceImage)
+      params.medias = [{ value: mediaId, role: 'image' }]
+      onProgress?.(18)
+    } catch (e) {
+      console.warn('[HF] reference upload failed, generating without it:', e.message)
+      // Continue — generation runs without face lock
+    }
+  }
+
+  onProgress?.(20)
+  const result = await callTool('generate_image', { params })
+
+  const directUrls = extractImageUrls(result)
+  if (directUrls.length > 0) { onProgress?.(100); return directUrls[0] }
+
+  const jobIds = extractJobIds(result)
+  if (!jobIds.length) throw new Error(`No job IDs found. Response: ${JSON.stringify(unwrapMCP(result))?.slice(0, 300)}`)
+
+  if (pendingKey) savePendingGen(pendingKey.influencerId, pendingKey.slot, jobIds)
+  try {
+    const urls = await pollAllJobs(jobIds, 1, onProgress)
+    onProgress?.(100)
+    return urls[0] ?? null
+  } finally {
+    if (pendingKey) clearPendingGen(pendingKey.influencerId, pendingKey.slot)
+  }
 }

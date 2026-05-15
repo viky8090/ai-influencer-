@@ -103,6 +103,13 @@ const L = {
   cardHover: 'var(--shadow-lg)',
 }
 
+const CREATION_PARAMS_KEY = 'hf_creation_params'
+function saveCreationParams(influencerId, params) {
+  const d = JSON.parse(localStorage.getItem(CREATION_PARAMS_KEY) || '{}')
+  d[influencerId] = params
+  localStorage.setItem(CREATION_PARAMS_KEY, JSON.stringify(d))
+}
+
 const inputCls = 'create-input'
 const inputStyle = {
   width: '100%', padding: '13px 16px', borderRadius: 12,
@@ -1413,7 +1420,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
 
           {/* Primary CTA — always visible, morphs on selection */}
           <button
-            onClick={selected !== null ? () => onFinish(variations, selected) : undefined}
+            onClick={selected !== null ? () => onFinish(variations, selected, model, aspectRatio) : undefined}
             style={{
               width: '100%', padding: '17px', borderRadius: 14, fontSize: 15, fontWeight: 700,
               border: 'none', cursor: selected !== null ? 'pointer' : 'default',
@@ -1531,7 +1538,7 @@ export default function Create() {
     setData({ name: '', gender: '', age: '', niches: [], nicheCustom: '', backstory: '', personality: 50, ethnicity: '', skinTone: '', hairColor: '', hairLength: 'Long', hairTexture: 'Straight', eyeColor: '', build: '', uniqueFeatures: '', vibeWords: [], faceRef: null, styleRef: null, faceRefNote: '', styleRefNote: '' })
   }
 
-  function finish(variations, selectedIdx) {
+  function finish(variations, selectedIdx, genModel, genAspectRatio) {
     const niches = (data.niches || []).filter(n => n !== 'Other')
 
     const otherVariations = variations.filter((_, i) => i !== selectedIdx)
@@ -1559,6 +1566,20 @@ export default function Create() {
       ],
       brandDealImages: [],
     }
+    saveCreationParams(newInf.id, {
+      faceRef: data.faceRef || null,
+      styleRef: data.styleRef || null,
+      faceRefNote: data.faceRefNote || '',
+      styleRefNote: data.styleRefNote || '',
+      model: genModel || 'gpt_image_2',
+      aspectRatio: genAspectRatio || '9:16',
+      physicalDesc: buildPhysicalDescString(data),
+      gender: data.gender,
+      age: data.age,
+      vibeWords: data.vibeWords || [],
+      personality: data.personality,
+      backstory: data.backstory || '',
+    })
     flushSync(() => {
       setInfluencers(prev => [...prev, newInf])
     })
@@ -1605,8 +1626,8 @@ export default function Create() {
                 boxShadow: '0 2px 8px rgba(201,255,0,0.4)',
                 whiteSpace: 'nowrap', transition: 'opacity 0.15s',
               }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
               >Connect →</button>
             </div>
           </div>

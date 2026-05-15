@@ -27,8 +27,39 @@ const InfluencersCtx = createContext(null)
 const InspirationCtx = createContext(null)
 const BrandDealsCtx  = createContext(null)
 
+const KAYLA_SEED = {
+  id: 'kayla-template',
+  name: 'Kayla',
+  gender: 'Female',
+  type: 'Influencer',
+  createdAt: 1715000000000,
+  mainImage: '/kayla/main.jpg',
+  characterSheetImage: '/kayla/sheet.jpg',
+  closeUpImage1: '/kayla/closeup1.jpg',
+  closeUpImage2: '/kayla/closeup2.jpg',
+  prompt: '',
+  age: '18',
+  backstory: 'wanna be influencer',
+  introExtrovert: 85,
+  niche: 'Fashion',
+  nicheCustom: '',
+  audience: '',
+  hobbies: '',
+  clothingStyle: 'Streetwear',
+  dreamBrands: '',
+  voice: '',
+  contentPillars: [],
+  palette: ['#F472B6', '#FBCFE8', '#C084FC', '#DB2777'],
+  videoUrls: [],
+  scripts: [],
+  homeImages: [],
+  brandDealImages: [],
+  wardrobeSlots: [],
+  physicalDesc: 'white, long wavy blonde hair, blue eyes, medium skin tone, athletic build',
+}
+
 export function StoreProvider({ children }) {
-  const influencers = useLocalStorage('influencers', [])
+  const influencers = useLocalStorage('influencers', [KAYLA_SEED])
   const inspiration = useLocalStorage('inspiration_boards', [])
   const brandDeals  = useLocalStorage('brand_deals', [])
   return (

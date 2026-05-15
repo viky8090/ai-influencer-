@@ -124,6 +124,30 @@ export function disconnectHF() {
     .forEach(k => localStorage.removeItem(k))
 }
 
+export async function refreshHFToken() {
+  const refreshToken = localStorage.getItem('hf_refresh_token')
+  const clientId = localStorage.getItem('hf_client_id')
+  if (!refreshToken || !clientId) throw new Error('No refresh token — please reconnect in Settings')
+
+  const res = await fetch(`${AUTH_PROXY}/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: clientId,
+    }),
+  })
+  if (!res.ok) {
+    disconnectHF()
+    throw new Error('Session expired — please reconnect in Settings')
+  }
+  const tokens = await res.json()
+  localStorage.setItem('hf_access_token', tokens.access_token)
+  if (tokens.refresh_token) localStorage.setItem('hf_refresh_token', tokens.refresh_token)
+  return tokens.access_token
+}
+
 // Fire the referral link once per device so affiliate tracking is captured.
 // Must be called from a user-interaction handler (click) to avoid popup blockers.
 export function fireReferralOnce() {
