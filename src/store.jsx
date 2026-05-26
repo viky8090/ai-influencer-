@@ -475,14 +475,15 @@ export function StoreProvider({ children }) {
           didWrite = true
         }
 
-        // Always merge global brand deals — add missing ones, patch existing ones that lack images
+        // Always merge global brand deals — add missing ones, patch existing ones whose images changed
         const existingDeals = JSON.parse(localStorage.getItem('brand_deals') || '[]')
         const existingDealMap = new Map(existingDeals.map(d => [d.id, d]))
         const newDeals = (seeds.brand_deals || []).filter(d => d.id && !existingDealMap.has(d.id))
         const patchedDeals = existingDeals.map(d => {
           const seed = (seeds.brand_deals || []).find(s => s.id === d.id)
-          if (seed && !d.image && seed.image) return { ...d, image: seed.image, characterSheet: seed.characterSheet || d.characterSheet }
-          if (seed && !d.characterSheet && seed.characterSheet) return { ...d, characterSheet: seed.characterSheet }
+          if (!seed) return d
+          const needsPatch = (seed.image && d.image !== seed.image) || (seed.characterSheet && d.characterSheet !== seed.characterSheet)
+          if (needsPatch) return { ...d, image: seed.image || d.image, characterSheet: seed.characterSheet || d.characterSheet }
           return d
         })
         const dealsChanged = newDeals.length || patchedDeals.some((d, i) => d !== existingDeals[i])
