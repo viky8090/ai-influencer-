@@ -118,6 +118,7 @@ function NewDealModal({ onClose, onSave }) {
 function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGenerate }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(deal.brand)
+  const [showSheet, setShowSheet] = useState(true)
 
   function commitRename() {
     const trimmed = name.trim()
@@ -126,8 +127,11 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
     setEditing(false)
   }
 
-  const displayImage = deal.characterSheet || deal.image
   const hasSheet = !!deal.characterSheet
+  const hasOriginal = !!deal.image
+  const displayImage = hasSheet && hasOriginal
+    ? (showSheet ? deal.characterSheet : deal.image)
+    : (deal.characterSheet || deal.image)
 
   return (
     <div
@@ -186,16 +190,30 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
           </div>
         )}
 
-        {/* Sheet badge */}
-        {hasSheet && !generating && (
-          <div style={{
-            position: 'absolute', top: 8, right: 8,
-            background: 'rgba(139,92,246,0.85)', color: '#fff',
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.3px',
-            padding: '3px 7px', borderRadius: 6,
-            backdropFilter: 'blur(4px)',
-          }}>
-            SHEET
+        {/* Original / Sheet toggle pill */}
+        {hasSheet && hasOriginal && !generating && (
+          <div
+            onClick={e => { e.stopPropagation(); setShowSheet(v => !v) }}
+            style={{
+              position: 'absolute', top: 8, left: 8,
+              display: 'flex', borderRadius: 8, overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.2)',
+              backdropFilter: 'blur(6px)',
+              cursor: 'pointer',
+            }}
+          >
+            {['Original', 'Sheet'].map(label => {
+              const active = label === 'Sheet' ? showSheet : !showSheet
+              return (
+                <div key={label} style={{
+                  padding: '3px 9px', fontSize: 10, fontWeight: 700,
+                  background: active ? 'rgba(139,92,246,0.9)' : 'rgba(0,0,0,0.45)',
+                  color: active ? '#fff' : 'rgba(255,255,255,0.6)',
+                  letterSpacing: '0.3px',
+                  transition: 'background 0.15s',
+                }}>{label}</div>
+              )
+            })}
           </div>
         )}
       </div>

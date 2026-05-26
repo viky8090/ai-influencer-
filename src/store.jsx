@@ -197,9 +197,9 @@ const CAMILA_SEED = {
   characterSheetImage: '/camila/sheet.jpg',
   closeUpImage1: '/camila/closeup1.png',
   closeUpImage2: '/camila/closeup2.png',
-  prompt: '',
+  prompt: 'Candid iPhone photo of @image1, wearing the complete outfit from @image2, reproducing all clothing, headwear, and accessories exactly. Match skin texture and facial detail from @image3 and @image4. Mid-action — mid-laugh, mid-sip, mid-step, or mid-reach — body fully committed to the action, expression caught at the apex. Eyes can be on lens (late-arrival) or completely off-axis. Hands engaged with the action, not posed. Expression: direct and serious — neutral mouth at rest, steady gaze into the lens, no smile. Composed and self-assured. Eyes directed off-axis — looking to the side or slightly above the camera, as if unaware of being photographed. A small front window table, street traffic soft and blurred outside the glass, a half-drunk flat white on the table beside her. Soft morning window light from one side, cool and directional. Eye-level, 24mm, handheld. 9:16, chest-up framing. Deep focus, no bokeh, photorealistic. No other people in frame.',
   age: '22',
-  backstory: '',
+  backstory: "Camilla got into fitness relatively young, but after realizing she wasn't passionate in personal training clients in the gym, she switched careers to teaching yoga classes.",
   introExtrovert: 70,
   niche: 'Fashion',
   nicheCustom: '',
@@ -464,6 +464,22 @@ export function StoreProvider({ children }) {
           }
 
           didWrite = true
+        }
+
+        // Always patch existing influencers that are missing prompt or backstory from seeds
+        for (const [id, seedInf] of Object.entries(seeds.influencers || {})) {
+          if (!currentIds.has(id)) continue // will be written above if missing
+          const existing = readInfluencer(id)
+          if (!existing) continue
+          const needsPatch = (seedInf.prompt && !existing.prompt) || (seedInf.backstory && !existing.backstory)
+          if (needsPatch) {
+            writeInfluencer({
+              ...existing,
+              prompt: existing.prompt || seedInf.prompt || '',
+              backstory: existing.backstory || seedInf.backstory || '',
+            })
+            didWrite = true
+          }
         }
 
         // Always merge inspiration boards — add seed boards that aren't already there
