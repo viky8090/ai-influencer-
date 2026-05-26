@@ -2014,8 +2014,9 @@
       "id": "mpan5nonfy3trqamf4a",
       "brand": "prime",
       "category": "drink",
-      "image": "",
-      "createdAt": 1779074725415
+      "image": "/prime/product.jpg",
+      "createdAt": 1779074725415,
+      "characterSheet": "https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/hf_20260526_135800_04ea4235-89ee-4546-a91b-20d54ddbbcf6.png"
     }
   ],
   "inspiration_boards": [
