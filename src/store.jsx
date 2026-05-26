@@ -433,26 +433,42 @@ export function StoreProvider({ children }) {
   const inspiration = useLocalStorage('inspiration_boards', [])
   const brandDeals  = useLocalStorage('brand_deals', [])
 
-  // On fresh installs (no user-created influencers yet), seed everything from /seeds.json
+  // Seed from /seeds.json when seed IDs are missing from localStorage
   useEffect(() => {
-    if (localStorage.getItem('hf_seeds_v1')) return
-    const ids = readIds() || []
-    const hasUserData = ids.some(id => !TEMPLATE_IDS.has(id))
-    if (hasUserData) {
-      // Existing user — mark seeded so we never overwrite their data
-      localStorage.setItem('hf_seeds_v1', '1')
-      return
-    }
     fetch('/seeds.json')
       .then(r => r.json())
       .then(seeds => {
-        writeIds(seeds.influencer_ids)
-        for (const inf of Object.values(seeds.influencers)) writeInfluencer(inf)
-        try { localStorage.setItem('photo_studio_history', JSON.stringify(seeds.photo_studio_history || [])) } catch {}
-        inspiration[1](seeds.inspiration_boards || [])
-        brandDeals[1](seeds.brand_deals || [])
-        influencerStore[1](seeds.influencer_ids.map(id => seeds.influencers[id]).filter(Boolean))
-        localStorage.setItem('hf_seeds_v1', '1')
+        const currentIds = new Set(readIds() || [])
+        const missingSeedIds = seeds.influencer_ids.filter(id => !currentIds.has(id))
+        if (!missingSeedIds.length) return  // all seeds already present — nothing to do
+
+        // Write only the missing seed influencers, preserve everything already there
+        const allIds = [...seeds.influencer_ids]
+        // Also keep any user IDs not in seeds (in case user added new ones)
+        for (const id of currentIds) {
+          if (!allIds.includes(id)) allIds.push(id)
+        }
+        writeIds(allIds)
+        for (const id of missingSeedIds) {
+          if (seeds.influencers[id]) writeInfluencer(seeds.influencers[id])
+        }
+
+        // Merge photo history — add seed photos that aren't already there
+        const existingPhotos = JSON.parse(localStorage.getItem('photo_studio_history') || '[]')
+        const existingPhotoUrls = new Set(existingPhotos.map(p => p.url))
+        const newPhotos = (seeds.photo_studio_history || []).filter(p => !existingPhotoUrls.has(p.url))
+        if (newPhotos.length) {
+          const merged = [...existingPhotos, ...newPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+          try { localStorage.setItem('photo_studio_history', JSON.stringify(merged)) } catch {}
+        }
+
+        // Update React state with all influencers (existing + newly added seeds)
+        const finalIds = readIds() || []
+        const loaded = finalIds.map(id => {
+          const existing = readInfluencer(id)
+          return existing || seeds.influencers[id] || null
+        }).filter(Boolean)
+        influencerStore[1](loaded)
       })
       .catch(e => console.warn('[seeds] failed to load:', e))
   }, []) // eslint-disable-line
