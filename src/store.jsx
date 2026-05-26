@@ -462,6 +462,22 @@ export function StoreProvider({ children }) {
           try { localStorage.setItem('photo_studio_history', JSON.stringify(merged)) } catch {}
         }
 
+        // Merge inspiration boards — add seed boards that aren't already there
+        const existingBoards = JSON.parse(localStorage.getItem('inspiration_boards') || '[]')
+        const existingBoardIds = new Set(existingBoards.map(b => b.id))
+        const newBoards = (seeds.inspiration_boards || []).filter(b => b.id && !existingBoardIds.has(b.id))
+        if (newBoards.length) {
+          try { localStorage.setItem('inspiration_boards', JSON.stringify([...newBoards, ...existingBoards])) } catch {}
+        }
+
+        // Merge global brand deals — add seed deals that aren't already there
+        const existingDeals = JSON.parse(localStorage.getItem('brand_deals') || '[]')
+        const existingDealIds = new Set(existingDeals.map(d => d.id))
+        const newDeals = (seeds.brand_deals || []).filter(d => d.id && !existingDealIds.has(d.id))
+        if (newDeals.length) {
+          try { localStorage.setItem('brand_deals', JSON.stringify([...newDeals, ...existingDeals])) } catch {}
+        }
+
         // Reload so all components initialize from the freshly seeded localStorage
         window.location.reload()
       })

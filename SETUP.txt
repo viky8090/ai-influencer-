@@ -1,0 +1,67 @@
+====================================================
+  AI INFLUENCER STUDIO — LOCAL SETUP GUIDE
+====================================================
+
+WHAT YOU NEED (one-time installs)
+--------------------------------------------------
+1. Node.js 18 or higher
+   → Download at: https://nodejs.org
+   → Click the "LTS" version (recommended)
+   → Install it like any normal app
+
+2. Antigravity IDE
+   → Download and install it like any normal app
+
+
+HOW TO GET THE PROJECT
+--------------------------------------------------
+1. Go to the GitHub repo link provided
+2. Click the green "Code" button
+3. Click "Download ZIP"
+4. Unzip the downloaded file somewhere on your computer
+   (e.g. Desktop or Documents)
+
+
+HOW TO RUN IT
+--------------------------------------------------
+1. Open Antigravity IDE
+2. Go to File → Open Folder
+   → Select the unzipped project folder
+3. Open the Terminal inside Antigravity IDE
+   (Menu: Terminal → New Terminal)
+4. Type this and press Enter:
+
+   npm install
+
+   Wait for it to finish (may take 1-2 minutes first time)
+
+5. Then type this and press Enter:
+
+   npm run dev
+
+6. Open your browser and go to:
+
+   http://localhost:5173
+
+That's it! The app will load with all influencers,
+photos, videos, and brand deals already pre-loaded.
+
+
+CONNECTING HIGGSFIELD (to generate images & videos)
+--------------------------------------------------
+1. Go to Settings (gear icon top right)
+2. Click "Connect Higgsfield"
+3. Log in with your Higgsfield account
+4. Done — use your own Higgsfield credits to generate
+
+
+NOTES
+--------------------------------------------------
+- Keep the terminal open while using the app.
+  Closing it stops the local server.
+- To stop the app, click the terminal and press Ctrl+C
+- To start it again, just run: npm run dev
+- All your data is saved locally in your browser.
+  Clearing browser data will reset everything.
+- The app works fully offline once loaded
+  (generation still needs internet for Higgsfield)

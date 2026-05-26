@@ -2020,6 +2020,19 @@
   ],
   "inspiration_boards": [
     {
+      "id": "seed-board-streetwear",
+      "name": "Streetwear",
+      "images": [
+        "/inspiration/streetwear/1.jpg",
+        "/inspiration/streetwear/2.jpg",
+        "/inspiration/streetwear/3.jpg",
+        "/inspiration/streetwear/4.jpg",
+        "/inspiration/streetwear/5.jpg",
+        "/inspiration/streetwear/6.jpg"
+      ],
+      "createdAt": 1748257200000
+    },
+    {
       "id": "mpb5gropucu3x4hg2pg",
       "name": "New Board",
       "images": [],
