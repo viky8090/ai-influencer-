@@ -440,46 +440,52 @@ export function StoreProvider({ children }) {
       .then(seeds => {
         const currentIds = new Set(readIds() || [])
         const missingSeedIds = seeds.influencer_ids.filter(id => !currentIds.has(id))
-        if (!missingSeedIds.length) return  // all seeds already present — nothing to do
+        let didWrite = false
 
-        // Write only the missing seed influencers, preserve everything already there
-        const allIds = [...seeds.influencer_ids]
-        // Also keep any user IDs not in seeds (in case user added new ones)
-        for (const id of currentIds) {
-          if (!allIds.includes(id)) allIds.push(id)
-        }
-        writeIds(allIds)
-        for (const id of missingSeedIds) {
-          if (seeds.influencers[id]) writeInfluencer(seeds.influencers[id])
+        if (missingSeedIds.length) {
+          // Write only the missing seed influencers, preserve everything already there
+          const allIds = [...seeds.influencer_ids]
+          // Also keep any user IDs not in seeds (in case user added new ones)
+          for (const id of currentIds) {
+            if (!allIds.includes(id)) allIds.push(id)
+          }
+          writeIds(allIds)
+          for (const id of missingSeedIds) {
+            if (seeds.influencers[id]) writeInfluencer(seeds.influencers[id])
+          }
+
+          // Merge photo history — add seed photos that aren't already there
+          const existingPhotos = JSON.parse(localStorage.getItem('photo_studio_history') || '[]')
+          const existingPhotoUrls = new Set(existingPhotos.map(p => p.url))
+          const newPhotos = (seeds.photo_studio_history || []).filter(p => !existingPhotoUrls.has(p.url))
+          if (newPhotos.length) {
+            const merged = [...existingPhotos, ...newPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            try { localStorage.setItem('photo_studio_history', JSON.stringify(merged)) } catch {}
+          }
+
+          didWrite = true
         }
 
-        // Merge photo history — add seed photos that aren't already there
-        const existingPhotos = JSON.parse(localStorage.getItem('photo_studio_history') || '[]')
-        const existingPhotoUrls = new Set(existingPhotos.map(p => p.url))
-        const newPhotos = (seeds.photo_studio_history || []).filter(p => !existingPhotoUrls.has(p.url))
-        if (newPhotos.length) {
-          const merged = [...existingPhotos, ...newPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-          try { localStorage.setItem('photo_studio_history', JSON.stringify(merged)) } catch {}
-        }
-
-        // Merge inspiration boards — add seed boards that aren't already there
+        // Always merge inspiration boards — add seed boards that aren't already there
         const existingBoards = JSON.parse(localStorage.getItem('inspiration_boards') || '[]')
         const existingBoardIds = new Set(existingBoards.map(b => b.id))
         const newBoards = (seeds.inspiration_boards || []).filter(b => b.id && !existingBoardIds.has(b.id))
         if (newBoards.length) {
           try { localStorage.setItem('inspiration_boards', JSON.stringify([...newBoards, ...existingBoards])) } catch {}
+          didWrite = true
         }
 
-        // Merge global brand deals — add seed deals that aren't already there
+        // Always merge global brand deals — add seed deals that aren't already there
         const existingDeals = JSON.parse(localStorage.getItem('brand_deals') || '[]')
         const existingDealIds = new Set(existingDeals.map(d => d.id))
         const newDeals = (seeds.brand_deals || []).filter(d => d.id && !existingDealIds.has(d.id))
         if (newDeals.length) {
           try { localStorage.setItem('brand_deals', JSON.stringify([...newDeals, ...existingDeals])) } catch {}
+          didWrite = true
         }
 
         // Reload so all components initialize from the freshly seeded localStorage
-        window.location.reload()
+        if (didWrite) window.location.reload()
       })
       .catch(e => console.warn('[seeds] failed to load:', e))
   }, []) // eslint-disable-line
