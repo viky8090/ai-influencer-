@@ -24,40 +24,6 @@ export default function Settings() {
   const [claudeKey, setClaudeKey] = useState(() => localStorage.getItem(CLAUDE_KEY) || '')
   const [claudeInput, setClaudeInput] = useState('')
   const [showClaudeInput, setShowClaudeInput] = useState(false)
-  const [exporting, setExporting] = useState(false)
-
-  function exportData() {
-    setExporting(true)
-    try {
-      const ids = JSON.parse(localStorage.getItem('influencer_ids') || '[]')
-      const influencers = {}
-      for (const id of ids) {
-        try {
-          const raw = localStorage.getItem(`hf_influencer_${id}`)
-          if (raw) influencers[id] = JSON.parse(raw)
-        } catch {}
-      }
-      const payload = {
-        exportedAt: new Date().toISOString(),
-        influencer_ids: ids,
-        influencers,
-        photo_studio_history: JSON.parse(localStorage.getItem('photo_studio_history') || '[]'),
-        brand_deals: JSON.parse(localStorage.getItem('brand_deals') || '[]'),
-        inspiration_boards: JSON.parse(localStorage.getItem('inspiration_boards') || '[]'),
-      }
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ai-influencer-export-${new Date().toISOString().slice(0, 10)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      alert('Export failed: ' + e.message)
-    } finally {
-      setExporting(false)
-    }
-  }
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     if (params.get('connected') === '1') {
@@ -154,30 +120,6 @@ export default function Settings() {
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </button>
           )}
-        </Section>
-
-        <Section title="Data">
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
-            Export all your influencers, photos, videos, brand deals, and history as a single JSON file.
-          </p>
-          <button
-            onClick={exportData}
-            disabled={exporting}
-            style={{
-              padding: '10px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600,
-              background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff',
-              border: 'none', cursor: exporting ? 'default' : 'pointer',
-              opacity: exporting ? 0.6 : 1, fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}
-          >
-            {exporting ? (
-              <>
-                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite' }} />
-                Exporting…
-              </>
-            ) : '↓ Export All Data'}
-          </button>
         </Section>
 
         <Section title="Claude AI">
