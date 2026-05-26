@@ -380,6 +380,8 @@ try {
   const RESTORE_VIDEOS = [
     // Brad
     { name: 'Brad', id: 'brad-video-restore-1', url: `${CDN}/hf_20260526_110221_3922b091-289c-4ad4-8d40-a57b7e82f9cc.mp4`, date: 1748261341000 },
+    // Derek
+    { name: 'Derek', id: 'derek-video-restore-1', url: `${CDN}/hf_20260526_113121_248608f1-9f0f-4759-b338-3173ce804261.mp4`, date: 1748259081000 },
   ]
   const ids = readIds() || []
   const nameToId = {}
@@ -424,10 +426,36 @@ try {
   }
 } catch (_) {}
 
+const TEMPLATE_IDS = new Set(['kayla-template', 'camila-template', 'marcus-template'])
+
 export function StoreProvider({ children }) {
   const influencerStore = useInfluencerStore([KAYLA_SEED, CAMILA_SEED, MARCUS_SEED])
   const inspiration = useLocalStorage('inspiration_boards', [])
   const brandDeals  = useLocalStorage('brand_deals', [])
+
+  // On fresh installs (no user-created influencers yet), seed everything from /seeds.json
+  useEffect(() => {
+    if (localStorage.getItem('hf_seeds_v1')) return
+    const ids = readIds() || []
+    const hasUserData = ids.some(id => !TEMPLATE_IDS.has(id))
+    if (hasUserData) {
+      // Existing user — mark seeded so we never overwrite their data
+      localStorage.setItem('hf_seeds_v1', '1')
+      return
+    }
+    fetch('/seeds.json')
+      .then(r => r.json())
+      .then(seeds => {
+        writeIds(seeds.influencer_ids)
+        for (const inf of Object.values(seeds.influencers)) writeInfluencer(inf)
+        try { localStorage.setItem('photo_studio_history', JSON.stringify(seeds.photo_studio_history || [])) } catch {}
+        inspiration[1](seeds.inspiration_boards || [])
+        brandDeals[1](seeds.brand_deals || [])
+        influencerStore[1](seeds.influencer_ids.map(id => seeds.influencers[id]).filter(Boolean))
+        localStorage.setItem('hf_seeds_v1', '1')
+      })
+      .catch(e => console.warn('[seeds] failed to load:', e))
+  }, []) // eslint-disable-line
 
   return (
     <InfluencersCtx.Provider value={influencerStore}>
