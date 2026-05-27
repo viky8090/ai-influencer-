@@ -72,7 +72,6 @@ export async function startHiggsfieldOAuthPopup() {
   if (!popup) throw new Error('Popup blocked — please allow popups for this site and try again')
 
   if (!referralDone) {
-    localStorage.setItem('hf_referral_fired', '1')
     // Give the referral page ~2.5 s to load and set its cookie, then send to OAuth
     setTimeout(() => { try { popup.location.href = authUrl } catch (_) {} }, 2500)
   }
@@ -80,7 +79,11 @@ export async function startHiggsfieldOAuthPopup() {
   return new Promise((resolve, reject) => {
     function onMessage(e) {
       if (e.origin !== window.location.origin) return
-      if (e.data?.type === 'hf_auth_success') { cleanup(); resolve() }
+      if (e.data?.type === 'hf_auth_success') {
+        // Only mark referral as fired after OAuth actually succeeds
+        if (!referralDone) localStorage.setItem('hf_referral_fired', '1')
+        cleanup(); resolve()
+      }
       else if (e.data?.type === 'hf_auth_error') { cleanup(); reject(new Error(e.data.error)) }
     }
     const poll = setInterval(() => { if (popup.closed) { cleanup(); reject(new Error('cancelled')) } }, 600)
@@ -158,12 +161,14 @@ export async function refreshHFToken() {
       signal: controller.signal,
     })
   } catch (e) {
-    disconnectHF()
-    throw new Error('Session expired — please reconnect in Settings')
+    // Network errors (timeout, connection failure) don't mean the session is invalid —
+    // don't disconnect. The error will surface on the next actual API call.
+    throw new Error('Network error during token refresh — please check your connection')
   } finally {
     clearTimeout(timeout)
   }
   if (!res.ok) {
+    // Auth rejection (401/400) means the session truly expired — disconnect
     disconnectHF()
     throw new Error('Session expired — please reconnect in Settings')
   }

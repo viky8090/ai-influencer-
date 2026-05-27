@@ -37,9 +37,9 @@ function getTimesForNiche() {
 // Higgsfield Soul struggles with detailed spatial pose instructions,
 // so these strip body-angle / weight / hand geometry down to a natural feel cue.
 const POSES_SOUL = {
-  facing: _prop => 'standing upright facing the camera, body straight and balanced, shoulders level, arms relaxed at the sides — calm and simple, not leaning, not posed',
-  angled: _prop => 'standing upright with the body turned slightly toward the camera, balanced and straight, shoulders relaxed — simple and still, not leaning forward, not posed',
-  candid: _prop => 'standing upright and looking toward the camera with a calm, natural expression, body balanced and still — simple presence, not leaning, not mid-motion, not posed',
+  facing: prop => `standing upright facing the camera, body straight and balanced, shoulders level, ${prop ? `${prop} held loosely at the side in one hand` : 'arms relaxed at the sides'} — calm and simple, not leaning, not posed`,
+  angled: prop => `standing upright with the body turned slightly toward the camera, balanced and straight, ${prop ? `${prop} held naturally in one hand at the side` : 'shoulders relaxed, arms at sides'} — simple and still, not leaning forward, not posed`,
+  candid: prop => `standing upright and looking toward the camera with a calm, natural expression, ${prop ? `${prop} held loosely in one hand at the side` : 'body balanced and still, arms relaxed'} — simple presence, not leaning, not mid-motion, not posed`,
 }
 
 // ── Pose — driven by personality slider ──────────────────────
@@ -48,7 +48,7 @@ const POSES = {
   contemplative: prop => `body facing 45° away from camera, weight forward on one leg. ${prop ? `${prop} held loosely at the side, almost forgotten` : 'hands relaxed loosely in front, fingers barely interlaced'}. Head turned back toward the lens mid-thought, eyes glancing toward but not fully meeting it — somewhere else mentally. A quiet, inward expression — not performing.`,
   plandid: prop => `body angled 25–30° to camera, weight settled on the back leg, hips slightly offset. ${prop ? `${prop} held naturally in one hand, wrist relaxed` : 'one hand mid-loose-gesture near the hip, the other hanging naturally'}. Eyes glancing down-and-off-axis, 15° away from lens. Expression caught mid-thought — a specific private moment. The "noticed the camera half a second ago" framing.`,
   posed_cute: prop => `body in soft 3/4 angle to camera, shoulders relaxed and slightly dropped. ${prop ? `${prop} held in both hands at chest height, elbows soft` : 'one hand gently touching the side of the jaw, fingers loose and natural'}. Eyes meeting the lens with a quiet small expression — a half-smile just forming, not fully committed. Posing but acting like she isn't.`,
-  candid: prop => `mid-action — caught at the apex of ${prop ? `bringing the ${prop} toward the mouth, mid-sip, body naturally leaning slightly forward` : 'a genuine mid-laugh or bright spontaneous expression, body and shoulders caught in motion, one hand mid-gesture near the chest'}. Eyes looking directly toward the lens — spontaneous, unguarded eye contact full of real energy. Not posed, not looking away — the camera caught them in a real moment while they were already looking at it.`,
+  candid: prop => `mid-action — caught at the apex of ${prop && DRINK_PROP_PATTERN.test(prop) ? `bringing the ${prop} toward the mouth, mid-sip, body naturally leaning slightly forward` : 'a genuine mid-laugh or bright spontaneous expression, body and shoulders caught in motion, one hand mid-gesture near the chest'}. Eyes looking directly toward the lens — spontaneous, unguarded eye contact full of real energy. Not posed, not looking away — the camera caught them in a real moment while they were already looking at it.`,
 }
 
 function getPoseFromPersonality(p) {
@@ -556,25 +556,307 @@ function getVibeTags(vibeWords) {
   return (vibeWords || []).flatMap(v => VIBE_TAG_MAP[v] || [])
 }
 
-// Bio keyword → wardrobe tag boost (backstory / physical desc inform styling cues)
-function getStyleCuesFromBio(physicalDesc, backstory) {
+// ── Backstory archetype engine ────────────────────────────────
+// Each entry: test (regex), tags (wardrobe boost), sceneNiche (scene pool key),
+// buildHint (inferred body type — used if user left build blank),
+// physicalDetail (visible marker — glasses etc. — added to subject),
+// lockedScene (specific scene for variation 3; null = pick from sceneNiche pool)
+const BACKSTORY_ARCHETYPES = [
+  // ── FITNESS ─────────────────────────────────────────────────
+  { test: /yoga.?instructor|yoga.?teacher|yoga.?coach/,
+    tags: ['sport','natural','earthy','bohemian'], sceneNiche: 'fitness',
+    buildHint: 'lean, flexible, long-limbed',
+    lockedScene: 'yoga studio, pale wood floor, floor-to-ceiling mirror wall, soft diffused morning light through large windows' },
+  { test: /pilates.?instructor|pilates.?teacher|reformer/,
+    tags: ['sport','clean','natural'], sceneNiche: 'fitness',
+    buildHint: 'lean, toned, precise upright posture',
+    lockedScene: 'pilates studio, reformer machines visible soft in background, clean bright space with natural light' },
+  { test: /crossfit|hiit.?coach|functional.?fitness/,
+    tags: ['sport','functional','casual'], sceneNiche: 'fitness',
+    buildHint: 'muscular, functional build',
+    lockedScene: 'crossfit box, pull-up rigs and bumper plates visible soft behind, industrial ceiling and rubber flooring' },
+  { test: /personal.?trainer|fitness.?coach|strength.?coach|gym.?owner|gym.?instructor/,
+    tags: ['sport','functional','casual'], sceneNiche: 'fitness',
+    buildHint: 'athletic, visibly fit',
+    lockedScene: 'minimalist gym interior, rubber floor, weight racks and barbells visible soft in background, large windows letting in hard morning side-light from camera-left' },
+  { test: /nutritionist|dietitian|sports.?nutritionist/,
+    tags: ['sport','earthy','natural'], sceneNiche: 'fitness' },
+  { test: /marathon|ultra.?runner|long.?distance.?runner/,
+    tags: ['sport','earthy','functional'], sceneNiche: 'fitness',
+    buildHint: 'lean endurance build' },
+  { test: /\brunner\b|running.?coach|track.?athlete/,
+    tags: ['sport','functional','casual'], sceneNiche: 'fitness',
+    buildHint: 'lean runner\'s build' },
+  { test: /cyclist|road.?bike|mountain.?bik/,
+    tags: ['sport','functional'], sceneNiche: 'fitness',
+    buildHint: 'lean, powerful legs' },
+  { test: /\bswimmer\b|swimming|open.?water/,
+    tags: ['sport','coastal','natural'], sceneNiche: 'fitness',
+    buildHint: 'broad-shouldered, lean swimmer\'s build' },
+  { test: /\bsurfer\b|surfing|surf.?instructor/,
+    tags: ['coastal','natural','casual','earthy'], sceneNiche: 'fitness',
+    buildHint: 'lean, sun-bronzed' },
+  { test: /dancer|dance.?teacher|choreographer|ballet|contemporary.?dance/,
+    tags: ['editorial','bold','sport'], sceneNiche: 'entertainment',
+    buildHint: 'lean, long-limbed, precise upright posture',
+    lockedScene: 'dance studio, sprung wood floor, floor-to-ceiling mirror, barre visible in background' },
+  { test: /martial.?art|mma|boxing|kickboxing|judo|jiu.?jitsu|muay.?thai/,
+    tags: ['sport','dark','functional'], sceneNiche: 'fitness',
+    buildHint: 'lean, compact, coiled' },
+  { test: /gymnast|gymnastics/,
+    tags: ['sport','functional','editorial'], sceneNiche: 'fitness',
+    buildHint: 'compact, powerfully built' },
+  { test: /meditation.?teacher|mindfulness.?coach|breathwork/,
+    tags: ['earthy','natural','bohemian'], sceneNiche: 'fitness' },
+  { test: /life.?coach|wellness.?coach|holistic.?health|health.?coach/,
+    tags: ['natural','clean','earthy'], sceneNiche: 'lifestyle' },
+  { test: /professional.?athlete|pro.?athlete|olympic|national.?team/,
+    tags: ['sport','functional'], sceneNiche: 'fitness',
+    buildHint: 'peak athletic build' },
+  { test: /\bcoach\b|sports.?coach|athletic.?director/,
+    tags: ['sport','casual','functional'], sceneNiche: 'fitness',
+    buildHint: 'fit, athletic' },
+  { test: /\bgym\b|weightlifting|powerlifting|bodybuilding/,
+    tags: ['sport','functional','casual'], sceneNiche: 'fitness',
+    buildHint: 'visibly muscular, powerful frame',
+    lockedScene: 'gym interior, squat rack and plates visible soft behind, rubber floor, industrial ceiling with high strip lighting' },
+  { test: /tennis|padel/,
+    tags: ['preppy','sport','clean'], sceneNiche: 'fitness' },
+  { test: /\bgolfer\b|\bgolf\b/,
+    tags: ['old-money','preppy','sport'], sceneNiche: 'travel' },
+  { test: /basketball|nba\b/,
+    tags: ['street','sport','casual'], sceneNiche: 'fitness',
+    buildHint: 'tall, athletic' },
+  { test: /football|soccer|footballer|pitch/,
+    tags: ['sport','casual','street'], sceneNiche: 'fitness',
+    buildHint: 'lean, athletic' },
+  { test: /\bskater\b|skateboarding/,
+    tags: ['street','y2k','casual'], sceneNiche: 'entertainment' },
+  { test: /snowboarder|snowboarding|skiing|\bskier\b/,
+    tags: ['casual','earthy','sport'], sceneNiche: 'travel' },
+  { test: /rock.?climber|climbing|bouldering/,
+    tags: ['earthy','functional','casual'], sceneNiche: 'travel',
+    buildHint: 'lean, wiry and strong' },
+  { test: /\bhiker\b|hiking|trekker/,
+    tags: ['earthy','functional','natural'], sceneNiche: 'travel' },
+
+  // ── FOOD & HOSPITALITY ──────────────────────────────────────
+  { test: /executive.?chef|head.?chef|michelin|fine.?dining/,
+    tags: ['editorial','structured','polished'], sceneNiche: 'lifestyle',
+    lockedScene: 'outside a restaurant entrance, warm kitchen light spilling through the open door behind, city street at dusk' },
+  { test: /pastry.?chef|patisserie/,
+    tags: ['cottagecore','earthy','natural'], sceneNiche: 'lifestyle',
+    lockedScene: 'bakery counter or café window, warm morning light, pastries visible soft in background' },
+  { test: /\bbaker\b|baking|sourdough/,
+    tags: ['cottagecore','earthy','natural'], sceneNiche: 'lifestyle',
+    lockedScene: 'bakery counter or café window, warm morning light, bread and pastries soft in background' },
+  { test: /\bchef\b|culinary|kitchen|cook\b/,
+    tags: ['casual','earthy'], sceneNiche: 'lifestyle',
+    lockedScene: 'outside a restaurant or street-food stall, warm ambient evening light, kitchen noise implied behind' },
+  { test: /barista|coffee.?roaster|café.?owner/,
+    tags: ['casual','minimalist','clean'], sceneNiche: 'lifestyle',
+    lockedScene: 'beside a café counter, espresso machine gleaming soft behind, warm amber overhead light' },
+  { test: /bartender|mixologist|bar.?owner/,
+    tags: ['dark','casual','glam'], sceneNiche: 'entertainment',
+    lockedScene: 'bar or venue interior, warm practicals above, moody ambient light, bottles soft in background' },
+  { test: /sommelier|\bwine\b|winery|vineyard/,
+    tags: ['old-money','polished','earthy'], sceneNiche: 'travel' },
+  { test: /food.?blogger|food.?photographer|food.?stylist/,
+    tags: ['casual','earthy','lifestyle'], sceneNiche: 'lifestyle' },
+  { test: /restaurant.?owner|restaurateur/,
+    tags: ['polished','editorial','casual'], sceneNiche: 'lifestyle',
+    lockedScene: 'inside or outside their restaurant, warm ambient lighting, tables soft in background' },
+
+  // ── FASHION & BEAUTY ────────────────────────────────────────
+  { test: /\bmodel\b|fashion.?model|runway|catwalk/,
+    tags: ['editorial','structured','polished'], sceneNiche: 'fashion',
+    buildHint: 'tall, lean, long-limbed' },
+  { test: /fashion.?designer|clothing.?designer/,
+    tags: ['editorial','bold','structured'], sceneNiche: 'fashion' },
+  { test: /\bstylist\b|fashion.?stylist|wardrobe.?stylist|personal.?stylist/,
+    tags: ['editorial','minimalist','structured'], sceneNiche: 'fashion' },
+  { test: /fashion.?blogger|fashion.?influencer/,
+    tags: ['editorial','bold'], sceneNiche: 'fashion' },
+  { test: /makeup.?artist|mua\b|beauty.?artist/,
+    tags: ['glam','editorial','clean'], sceneNiche: 'beauty' },
+  { test: /hairdresser|hair.?stylist|hair.?colorist/,
+    tags: ['casual','editorial','clean'], sceneNiche: 'beauty',
+    lockedScene: 'salon interior, styling chairs visible soft in background, bright salon lighting' },
+  { test: /nail.?artist|nail.?technician/,
+    tags: ['playful','bold','clean'], sceneNiche: 'beauty' },
+  { test: /beauty.?blogger|beauty.?influencer/,
+    tags: ['glam','clean','natural'], sceneNiche: 'beauty' },
+  { test: /esthetician|skincare.?specialist|facialist/,
+    tags: ['clean','natural','minimalist'], sceneNiche: 'beauty' },
+  { test: /creative.?director|art.?director/,
+    tags: ['editorial','structured','bold'], sceneNiche: 'fashion' },
+
+  // ── TECH & BUSINESS ─────────────────────────────────────────
+  { test: /software.?engineer|developer|programmer|coder|full.?stack|backend|frontend/,
+    tags: ['minimalist','quiet','clean'], sceneNiche: 'tech',
+    lockedScene: 'minimal home desk or co-working space, large monitor soft in background, window light from one side' },
+  { test: /startup.?founder|tech.?founder/,
+    tags: ['minimalist','structured','editorial'], sceneNiche: 'tech',
+    lockedScene: 'modern co-working space, city view through full-height glass behind' },
+  { test: /\bceo\b|\bcoo\b|\bcto\b|c-suite/,
+    tags: ['old-money','structured','polished'], sceneNiche: 'tech',
+    lockedScene: 'city office, floor-to-ceiling glass windows, urban skyline visible soft behind' },
+  { test: /entrepreneur|business.?owner|self.?employed|founder/,
+    tags: ['minimalist','casual','structured'], sceneNiche: 'tech' },
+  { test: /ux.?designer|product.?designer|ui.?designer/,
+    tags: ['minimalist','clean','editorial'], sceneNiche: 'tech' },
+  { test: /product.?manager|\bpm\b/,
+    tags: ['minimalist','clean','preppy'], sceneNiche: 'tech' },
+  { test: /crypto|blockchain|web3|\bnft\b|\bdefi\b/,
+    tags: ['street','y2k','casual'], sceneNiche: 'tech' },
+  { test: /real.?estate|property.?developer|realtor/,
+    tags: ['polished','preppy','old-money'], sceneNiche: 'lifestyle' },
+  { test: /financial.?advisor|wealth.?manager|portfolio.?manager/,
+    tags: ['old-money','polished','preppy'], sceneNiche: 'tech' },
+  { test: /\bbanker\b|investment.?bank|private.?equity|hedge.?fund/,
+    tags: ['old-money','structured','polished'], sceneNiche: 'tech' },
+  { test: /day.?trader|\btrader\b|stock.?market/,
+    tags: ['minimalist','casual'], sceneNiche: 'tech' },
+  { test: /\blawyer\b|attorney|solicitor|barrister/,
+    tags: ['old-money','structured','editorial'], sceneNiche: 'lifestyle',
+    lockedScene: 'steps of a courthouse or law office building exterior, clean stone steps, city behind' },
+
+  // ── CREATIVE ────────────────────────────────────────────────
+  { test: /\bphotographer\b|photography/,
+    tags: ['editorial','minimalist','casual'], sceneNiche: 'travel' },
+  { test: /videographer|cinematographer/,
+    tags: ['editorial','casual','dark'], sceneNiche: 'entertainment' },
+  { test: /filmmaker|film.?director|\bdirector\b/,
+    tags: ['editorial','dark','structured'], sceneNiche: 'entertainment' },
+  { test: /graphic.?designer|illustrator/,
+    tags: ['editorial','minimalist','casual'], sceneNiche: 'lifestyle' },
+  { test: /interior.?designer|interior.?decorator/,
+    tags: ['minimalist','editorial','old-money'], sceneNiche: 'lifestyle' },
+  { test: /\bartist\b|painter|sculptor|fine.?art/,
+    tags: ['bohemian','editorial','earthy'], sceneNiche: 'lifestyle',
+    lockedScene: 'artist\'s studio, canvases or artworks visible soft behind, north-facing window light' },
+  { test: /\bmusician\b|\bsinger\b|vocalist|recording.?artist/,
+    tags: ['dark','bohemian','editorial'], sceneNiche: 'entertainment',
+    lockedScene: 'recording studio corner, microphone stand or mixing board soft behind, warm practical lighting' },
+  { test: /\bdj\b|music.?producer|producer\b/,
+    tags: ['street','dark','casual'], sceneNiche: 'entertainment',
+    lockedScene: 'behind a DJ booth or in a studio, equipment visible soft behind, moody low ambient light' },
+  { test: /\brapper\b|hip.?hop|\bmc\b/,
+    tags: ['street','dark','bold'], sceneNiche: 'entertainment' },
+  { test: /\bactor\b|\bactress\b|performer|theatre/,
+    tags: ['editorial','glam','casual'], sceneNiche: 'entertainment' },
+  { test: /\bcomedian\b|stand.?up|comedy.?writer/,
+    tags: ['casual','street','y2k'], sceneNiche: 'entertainment' },
+  { test: /\bwriter\b|\bauthor\b|novelist|screenwriter/,
+    tags: ['quiet','minimalist','earthy'], sceneNiche: 'lifestyle',
+    lockedScene: 'café corner, open notebook or laptop soft on table, afternoon window light' },
+  { test: /podcaster|podcast.?host/,
+    tags: ['casual','minimalist'], sceneNiche: 'tech',
+    lockedScene: 'podcast desk setup, microphone visible in foreground or soft behind, acoustic panels or bookshelf in background' },
+  { test: /journalist|reporter|correspondent/,
+    tags: ['casual','minimalist','preppy'], sceneNiche: 'lifestyle' },
+  { test: /youtuber|youtube.?creator|\bvlogg|\bvlog\b/,
+    tags: ['casual','y2k','street'], sceneNiche: 'lifestyle' },
+  { test: /tiktoker|tiktok.?creator/,
+    tags: ['y2k','casual','playful'], sceneNiche: 'lifestyle' },
+  { test: /streamer|twitch|gaming.?content/,
+    tags: ['casual','street'], sceneNiche: 'gaming',
+    lockedScene: 'gaming setup visible behind, RGB lighting as background ambient, one window as key light' },
+  { test: /\bblogger\b|content.?creator/,
+    tags: ['casual','lifestyle'], sceneNiche: 'lifestyle' },
+
+  // ── HEALTH ──────────────────────────────────────────────────
+  { test: /pharmacist|pharmacy/,
+    tags: ['clean','minimalist','preppy'], sceneNiche: 'lifestyle',
+    physicalDetail: 'thin wire-frame glasses',
+    lockedScene: 'pharmacy counter or clinic corridor, clean institutional light, shelves soft in background' },
+  { test: /\bdoctor\b|\bphysician\b|\bmd\b/,
+    tags: ['clean','minimalist','preppy'], sceneNiche: 'lifestyle',
+    physicalDetail: 'thin wire-frame glasses',
+    lockedScene: 'clinic consultation room, clean desk and framed qualifications soft on the wall behind, diffused overhead light' },
+  { test: /\bnurse\b|nursing|registered.?nurse/,
+    tags: ['clean','casual','minimalist'], sceneNiche: 'lifestyle',
+    lockedScene: 'hospital corridor, clean white walls, soft institutional overhead light' },
+  { test: /therapist|psychologist|counsellor|mental.?health/,
+    tags: ['quiet','minimalist','earthy'], sceneNiche: 'lifestyle',
+    lockedScene: 'calm therapy office, a comfortable armchair and soft lamp visible in background, warm quiet light' },
+  { test: /acupuncturist|chiropractor|physiotherapist|physical.?therapist/,
+    tags: ['earthy','natural','clean'], sceneNiche: 'lifestyle' },
+
+  // ── EDUCATION ───────────────────────────────────────────────
+  { test: /\bstudent\b|college|university|grad.?student/,
+    tags: ['casual','street','preppy'], sceneNiche: 'lifestyle' },
+  { test: /\bprofessor\b|\blecturer\b|academic/,
+    tags: ['preppy','old-money','minimalist'], sceneNiche: 'lifestyle',
+    physicalDetail: 'wire-frame glasses',
+    lockedScene: 'university library or faculty corridor, bookshelves soft in background, warm institutional light' },
+  { test: /\bteacher\b|educator/,
+    tags: ['casual','preppy','clean'], sceneNiche: 'lifestyle' },
+
+  // ── TRAVEL & LIFESTYLE ──────────────────────────────────────
+  { test: /travel.?blogger|travel.?influencer|travel.?creator|travel.?vlog|\btravell?ing\b/,
+    tags: ['bohemian','casual','coastal'], sceneNiche: 'travel' },
+  { test: /digital.?nomad/,
+    tags: ['casual','bohemian','minimalist'], sceneNiche: 'travel' },
+  { test: /\bexpat\b|living.?abroad/,
+    tags: ['bohemian','casual','coastal'], sceneNiche: 'travel' },
+
+  // ── VALUES & LIFESTYLE ──────────────────────────────────────
+  { test: /dog.?owner|dog.?lover|pet.?parent|dog.?mom|dog.?dad/,
+    tags: ['casual','earthy','natural'], sceneNiche: 'lifestyle' },
+  { test: /new.?mom|\bnew mom\b|new.?parent|postpartum/,
+    tags: ['casual','clean','natural'], sceneNiche: 'lifestyle' },
+  { test: /sustainable|eco.?friendly|environmentalist/,
+    tags: ['earthy','natural','bohemian'], sceneNiche: 'lifestyle' },
+  { test: /spiritual|mindfulness|meditation|buddhist/,
+    tags: ['earthy','bohemian','natural'], sceneNiche: 'lifestyle' },
+  { test: /activist|advocate|social.?justice|community.?organizer/,
+    tags: ['street','casual','earthy'], sceneNiche: 'lifestyle' },
+  { test: /luxury|high.?end|yacht|penthouse/,
+    tags: ['old-money','glam','polished'], sceneNiche: 'travel' },
+  { test: /\bfreelance\b|freelancer/,
+    tags: ['casual','minimalist'], sceneNiche: 'lifestyle' },
+
+  // ── AESTHETICS (catch-all style signals) ────────────────────
+  { test: /old.?money|heritage|generational|ivy.?league|equestrian|boarding.?school|country.?club|prep.?school/,
+    tags: ['old-money','classic','polished','quiet'], sceneNiche: null },
+  { test: /designer|couture|high.?fashion|fashion.?week|rick owens|the row|bottega|celine|loewe/,
+    tags: ['polished','editorial','structured','old-money'], sceneNiche: 'fashion' },
+  { test: /street|urban|downtown|brooklyn|graffiti/,
+    tags: ['street','urban','casual'], sceneNiche: null },
+  { test: /\bminimalist\b|\bminimal\b|understated|quiet.?aesthetic|\bquiet\b|\breserved\b|\bintroverted\b/,
+    tags: ['minimalist','quiet','clean'], sceneNiche: null },
+  { test: /boho|bohemian|free.?spirit|wanderer|earthy/,
+    tags: ['bohemian','earthy','natural'], sceneNiche: null },
+  { test: /dark.?aesthetic|gothic|moody|alternative|grunge/,
+    tags: ['dark','moody','urban'], sceneNiche: null },
+  { test: /glam|glamour|sequin|evening.?wear|gala|black.?tie|cocktail/,
+    tags: ['glam','evening','bold'], sceneNiche: null },
+]
+
+// Returns wardrobe tags + scene context from backstory keywords.
+// Used as the tier-3 fallback — runs for all users with zero cost or latency.
+export function getBackstoryContext(physicalDesc, backstory) {
   const text = ((physicalDesc || '') + ' ' + (backstory || '')).toLowerCase()
   const tags = []
-  if (/old.?money|heritage|generational|ivy.?league|yacht|polo|equestrian|boarding.?school|inherited|country.?club|newport|nantucket|vineyard|prep.?school/.test(text))
-    tags.push('old-money', 'classic', 'polished', 'quiet')
-  if (/designer|luxury|couture|high.?end|bespoke|tailored.?wardrobe|curated|high.?fashion|fashion.?week|rick owens|zegna|loro piana|brioni|kiton|loewe|the row|bottega|celine/.test(text))
-    tags.push('polished', 'editorial', 'structured', 'old-money')
-  if (/street|urban|downtown|brooklyn|skate|graffiti/.test(text))
-    tags.push('street', 'urban', 'casual')
-  if (/\bminimalist\b|\bminimal\b|understated|quiet.?aesthetic/.test(text))
-    tags.push('minimalist', 'quiet', 'clean')
-  if (/boho|bohemian|free.?spirit|wanderer|earthy/.test(text))
-    tags.push('bohemian', 'earthy', 'natural')
-  if (/dark.?aesthetic|gothic|moody|alternative|grunge/.test(text))
-    tags.push('dark', 'moody', 'urban')
-  if (/glam|glamour|glitter|sequin|evening.?wear|gala|fancy|formal|black.?tie|cocktail|ball|gown|dressed.?up|dress.?up|party|events|heels/.test(text))
-    tags.push('glam', 'evening', 'bold')
-  return tags
+  let sceneNiche = null
+  let buildHint = null
+  let physicalDetail = null
+  let lockedScene = null
+
+  for (const archetype of BACKSTORY_ARCHETYPES) {
+    if (archetype.test.test(text)) {
+      for (const tag of archetype.tags) {
+        if (!tags.includes(tag)) tags.push(tag)
+      }
+      if (!sceneNiche && archetype.sceneNiche) sceneNiche = archetype.sceneNiche
+      if (!buildHint && archetype.buildHint) buildHint = archetype.buildHint
+      if (!physicalDetail && archetype.physicalDetail) physicalDetail = archetype.physicalDetail
+      if (!lockedScene && archetype.lockedScene) lockedScene = archetype.lockedScene
+    }
+  }
+
+  return { tags, sceneNiche, buildHint, physicalDetail, lockedScene }
 }
 
 // Personality energy → wardrobe energy window
@@ -596,13 +878,14 @@ function getStylingNote(personality) {
 }
 
 // Score and select wardrobe from the library
-function selectWardrobe(gender, vibeWords, personality, physicalDesc, backstory) {
+// forceProfessionTags: when backstory-locked, hard-filter pool to profession tags (bypasses vibe)
+function selectWardrobe(gender, vibeWords, personality, physicalDesc, backstory, forceProfessionTags = null) {
   const isMale = gender?.toLowerCase() === 'male'
-  const vibeTags = [...getVibeTags(vibeWords), ...getStyleCuesFromBio(physicalDesc, backstory)]
+  const vibeTags = [...getVibeTags(vibeWords), ...getBackstoryContext(physicalDesc, backstory).tags]
 
   // When a vibe is selected, derive its primary/defining tag and hard-filter first.
-  // This ensures vibe is always respected — personality controls HOW it's worn, not whether.
-  const primaryVibeTags = (vibeWords || []).map(v => VIBE_PRIMARY_TAG[v]).filter(Boolean)
+  // If profession tags are forced (backstory-locked variation), use those instead.
+  const primaryVibeTags = forceProfessionTags || (vibeWords || []).map(v => VIBE_PRIMARY_TAG[v]).filter(Boolean)
 
   // Filter by gender
   const genderPool = WARDROBE.filter(e =>
@@ -724,8 +1007,29 @@ const OUTDOOR_CANDID_SCENES = [
 
 const ALL_SCENES = Object.values(SCENE_POOLS).flat()
 
-function getScenePool() {
-  return ALL_SCENES
+const NICHE_TO_SCENE_KEY = {
+  'fashion':      'fashion',
+  'beauty':       'beauty',
+  'lifestyle':    'lifestyle',
+  'fitness':      'fitness',
+  'travel':       'travel',
+  'food & dining':'lifestyle',
+  'food':         'lifestyle',
+  'tech':         'tech',
+  'gaming':       'gaming',
+  'finance':      'tech',
+  'entertainment':'entertainment',
+  'wellness':     'fitness',
+  'sports':       'fitness',
+  'sport':        'fitness',
+}
+
+function getScenePool(niches) {
+  if (!niches || niches.length === 0) return ALL_SCENES
+  const keys = [...new Set(niches.map(n => NICHE_TO_SCENE_KEY[n.toLowerCase()]).filter(Boolean))]
+  if (keys.length === 0) return ALL_SCENES
+  const pool = keys.flatMap(k => SCENE_POOLS[k] || [])
+  return pool.length > 0 ? pool : ALL_SCENES
 }
 
 // ── Prop — niche-appropriate, ~30% chance ────────────────────
@@ -790,20 +1094,13 @@ function buildSkinBlock(timeLabel, gender, physicalDesc) {
 — Subtle digital sensor noise in the shadow areas consistent with iPhone auto-ISO`
 }
 
-// ── Character framing from personality + backstory ────────────
-function getCharacterFraming(personality, backstory) {
-  const energy = personality < 30
-    ? 'quiet, inward energy — someone with a rich internal world, not performing for the camera'
-    : personality > 70
-    ? 'open, present energy — moves through the world with ease, comfortable being seen'
-    : 'natural, unhurried energy — comfortable in the moment'
-
-  if (backstory?.trim()) {
-    const brief = backstory.trim().split(/[.!?]/)[0].trim().toLowerCase()
-    if (brief.length > 10 && brief.length < 120)
-      return `${energy}. The feeling of ${brief} — real person, real life, not a model on a shoot`
-  }
-  return `${energy} — the face of someone living their life, not a model on a shoot`
+// ── Character framing from personality ───────────────────────
+function getCharacterFraming(personality) {
+  if (personality < 30)
+    return 'quiet, inward energy — someone with a rich internal world, not performing for the camera. Real person, real life, not a model on a shoot'
+  if (personality > 70)
+    return 'open, present energy — moves through the world with ease, comfortable being seen. Real person, real life, not a model on a shoot'
+  return 'natural, unhurried energy — comfortable in the moment. Real person, real life, not a model on a shoot'
 }
 
 // ── Claude system prompt ──────────────────────────────────────
@@ -892,23 +1189,75 @@ export function buildDirectPrompt(d, forcePose = null, options = {}, aspectRatio
   const backstory = d.backstory?.trim() || ''
   const isEditorial = vibes.includes('Editorial')
 
-  const timeConfig = R(getTimesForNiche())
-  const scene = options.forceOutdoor ? R(OUTDOOR_CANDID_SCENES) : R(getScenePool())
+  // Always run tier-3 — it owns buildHint, physicalDetail, lockedScene.
+  // Claude (tier-2) contributes dailyContext and can override sceneNiche/tags for unusual professions.
+  const tier3Ctx = getBackstoryContext(d.physicalDesc, backstory)
+  const backstoryCtx = d.backstoryContext
+    ? {
+        buildHint:      tier3Ctx.buildHint,
+        physicalDetail: tier3Ctx.physicalDetail,
+        lockedScene:    tier3Ctx.lockedScene,
+        tags:           d.backstoryContext.tags?.length ? d.backstoryContext.tags : tier3Ctx.tags,
+        sceneNiche:     d.backstoryContext.sceneNiche || tier3Ctx.sceneNiche,
+        dailyContext:   d.backstoryContext.dailyContext,
+      }
+    : tier3Ctx
+  const { sceneNiche, buildHint, physicalDetail, lockedScene } = backstoryCtx
+
+  const niches = d.niches || (d.niche ? d.niche.split(',').map(s => s.trim()).filter(Boolean) : [])
+
+  // Scene: backstory-locked → use exact lockedScene or profession pool; otherwise standard logic
+  let scene
+  if (options.backstoryLocked) {
+    if (lockedScene) {
+      scene = lockedScene
+    } else if (sceneNiche && SCENE_POOLS[sceneNiche]) {
+      scene = R(SCENE_POOLS[sceneNiche])
+    } else {
+      scene = R(getScenePool(niches))
+    }
+  } else if (options.forceOutdoor) {
+    scene = R(OUTDOOR_CANDID_SCENES)
+  } else if (sceneNiche && SCENE_POOLS[sceneNiche]) {
+    scene = R(SCENE_POOLS[sceneNiche])
+  } else {
+    scene = R(getScenePool(niches))
+  }
+
+  // Pick time config compatible with the scene — outdoor scenes must not get indoor lighting
+  const OUTDOOR_SCENE_PATTERN = /\b(park|trail|beach|rooftop|street|pavement|outdoor|alley|plaza|market|terrace|harbor|path|square|city|urban|cobblestone|courtyard|sidewalk|promenade)\b/i
+  const isOutdoor = OUTDOOR_SCENE_PATTERN.test(scene)
+  const outdoorTimes = TIME_CONFIGS.filter(t => !t.label.includes('indoor') && !t.label.includes('café'))
+  const timeConfig = R(isOutdoor ? outdoorTimes : TIME_CONFIGS)
+
   const poseFn = forcePose || getPoseFromPersonality(personality)
   // Use pre-generated prop from session manager if provided, otherwise generate one
   const prop = 'forceProp' in options ? options.forceProp : getProp()
-  const wardrobeBase = selectWardrobe(gender, vibes, personality, d.physicalDesc, d.backstory)
+
+  // Backstory-locked: force profession wardrobe tags when no vibe selected.
+  // For lockedScenes (specific indoor profession settings), drop lifestyle tags like 'casual'
+  // so athleisure/street entries don't compete with actual gym/clinical wardrobe.
+  const forcedProfTags = (options.backstoryLocked && !vibes.length)
+    ? (lockedScene ? backstoryCtx.tags.filter(t => t !== 'casual' && t !== 'urban' && t !== 'street') : backstoryCtx.tags)
+    : null
+  const wardrobeBase = selectWardrobe(gender, vibes, personality, d.physicalDesc, d.backstory, forcedProfTags)
   const paletteLine = options.model !== 'soul_2'
     ? vibes.map(v => VIBE_PALETTE_MAP[v]).filter(Boolean).join(' | ')
     : ''
   const wardrobe = paletteLine ? `${wardrobeBase}\n${paletteLine}` : wardrobeBase
   const camera = getCamera()
   const skinBlock = buildSkinBlock(timeConfig.label, gender, physical)
-  const characterFraming = getCharacterFraming(personality, backstory)
+  const characterFraming = getCharacterFraming(personality)
 
   const propDesc = prop
     ? `${prop} held in one hand — no visible brand logo`
     : 'hands in a natural mid-gesture, nothing held'
+
+  const dailyCtxLine = ''
+
+  // Backstory-locked physical additions: build type (if user left build blank) + profession marker
+  const buildDesc = (options.backstoryLocked && buildHint && !d.build?.trim()) ? `, ${buildHint}` : ''
+  const physicalDetailStr = (options.backstoryLocked && physicalDetail) ? `, ${physicalDetail}` : ''
 
   const poseName = poseFn === POSES.frontfacing ? 'iPhone portrait — direct, relaxed, facing camera'
     : poseFn === POSES.contemplative ? 'iPhone portrait — quiet, present, facing camera'
@@ -918,9 +1267,9 @@ export function buildDirectPrompt(d, forcePose = null, options = {}, aspectRatio
 
   return `Photograph style: iPhone 16 Pro snapshot. Taken by the subject or a nearby friend, handheld, automatic settings. No professional crew, no studio, no lighting setup, no direction given. Raw iPhone output — unedited. The subject is unaware this will be published — a personal photo, not intended for any shoot.
 
-Scene: ${scene}, ${timeConfig.label}. Empty of other people. If the location is an interior, it shows real signs of habitation — not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it — no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.
+Scene: ${scene}${options.backstoryLocked && lockedScene ? '' : `, ${timeConfig.label}`}. Empty of other people. If the location is an interior, it shows real signs of habitation — not a styled showroom. Background is real, in-focus, and unmanipulated exactly as an iPhone captures it — no blur, no bokeh, no artificial depth of field. The subject is the hero through tight framing and natural lighting, not through background manipulation.
 
-Subject: ${gender}, ${age}, ${physical}. ${characterFraming}. Natural micro-asymmetries in the face — this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead — and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.
+Subject: ${gender}, ${age}, ${physical}${buildDesc}${physicalDetailStr}. ${characterFraming}.${dailyCtxLine} Natural micro-asymmetries in the face — this is a real iPhone photograph of a real person, not a 3D render or CGI. Real visible pore texture on the nose, cheeks, and forehead — and on all exposed skin including arms, neck, and shoulders. Zero skin smoothing anywhere on the body, zero airbrushing, zero beauty filter applied.
 
 Pose: ${poseFn(prop)} ${propDesc}.
 
@@ -957,9 +1306,16 @@ export function buildThreeVariationPrompts(d, aspectRatio = '9:16', model = 'gpt
       buildDirectPrompt(d, POSES_SOUL.candid,  { forceOutdoor: true, model: 'soul_2', forceProp: sessionProp(true) }, aspectRatio),
     ]
   }
+  // Variation 3 is backstory-locked when a profession is detected.
+  // Tier-3 always owns lockedScene; Claude can add sceneNiche for unusual professions.
+  const tier3Ctx = getBackstoryContext(d.physicalDesc, d.backstory?.trim() || '')
+  const hasBackstoryLock = !!(tier3Ctx.sceneNiche || tier3Ctx.lockedScene || d.backstoryContext?.sceneNiche)
+
   return [
     buildDirectPrompt(d, POSES.frontfacing, { forceProp: sessionProp() }, aspectRatio),
     buildDirectPrompt(d, POSES.posed_cute,  { forceProp: sessionProp() }, aspectRatio),
-    buildDirectPrompt(d, POSES.candid,      { forceOutdoor: true, forceProp: sessionProp(true) }, aspectRatio),
+    hasBackstoryLock
+      ? buildDirectPrompt(d, POSES.candid, { backstoryLocked: true, forceProp: null }, aspectRatio)
+      : buildDirectPrompt(d, POSES.candid, { forceOutdoor: true, forceProp: sessionProp(true) }, aspectRatio),
   ]
 }

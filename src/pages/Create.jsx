@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useInfluencers, generateId } from '../store'
 import { buildThreeVariationPrompts } from '../utils/systemPrompt'
+import { analyzeBackstory } from '../utils/backstoryAnalysis'
 import { generateThreeImages } from '../utils/higgsfieldGenerate'
 import { isHFConnected, startHiggsfieldOAuthPopup } from '../utils/higgsfieldAuth'
 import { compressImage } from '../utils/imageUtils'
@@ -252,7 +253,7 @@ function Step1({ data, set, onGenderChange, ageErrorPulse }) {
         </div>
       </div>
 
-      <div style={{ marginBottom: data.age.length >= 2 && Number(data.age) < 18 ? 12 : 22 }}>
+      <div style={{ marginBottom: data.age !== '' && Number(data.age) < 18 ? 12 : 22 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 14 }}>
           <div>
             <Lbl>Age</Lbl>
@@ -260,7 +261,7 @@ function Step1({ data, set, onGenderChange, ageErrorPulse }) {
           </div>
           <div />
         </div>
-        {data.age.length >= 2 && Number(data.age) < 18 && (
+        {data.age !== '' && Number(data.age) < 18 && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '9px 13px', borderRadius: 10,
             background: ageErrorPulse ? 'rgba(255,59,48,0.10)' : 'rgba(255,59,48,0.05)',
@@ -1234,27 +1235,40 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
   const [connectingHF, setConnectingHF] = useState(false)
   const [generatedPrompts, setGeneratedPrompts] = useState([])
   const [aspectRatio, setAspectRatio] = useState('9:16')
+  const backstoryCtxRef = useRef(null)
   const [model, setModel] = useState(() => {
     const saved = localStorage.getItem(MODEL_PREF_KEY)
     return MODELS.find(m => m.id === saved) ? saved : 'gpt_image_2'
   })
+  const userModelRef = useRef(model)
 
   function pickModel(id) {
     setModel(id)
+    userModelRef.current = id
     localStorage.setItem(MODEL_PREF_KEY, id)
   }
   const gc = gColor(data.gender)
   const hasRef = !!(data.faceRef || data.styleRef)
 
   useEffect(() => {
-    if (hasRef && model === 'soul_2') setModel('gpt_image_2')
+    if (hasRef && model === 'soul_2') {
+      setModel('gpt_image_2')
+    } else if (!hasRef && userModelRef.current === 'soul_2' && model !== 'soul_2') {
+      setModel('soul_2')
+    }
   }, [hasRef]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generate() {
     setPhase('generating'); setGenError(null); setVariations([]); setSelected(null); setGenProgress(5); setLightboxUrl(null)
     try {
       const physicalDesc = buildPhysicalDescString(data)
-      const prompts = buildThreeVariationPrompts({ ...data, physicalDesc }, aspectRatio, model)
+
+      // Tier 2: Claude analyzes the backstory before building prompts
+      const backstoryContext = await analyzeBackstory(data.backstory, physicalDesc)
+      backstoryCtxRef.current = backstoryContext
+
+      const d = { ...data, physicalDesc, ...(backstoryContext ? { backstoryContext } : {}) }
+      const prompts = buildThreeVariationPrompts(d, aspectRatio, model)
       setGeneratedPrompts(prompts)
       const urls = await generateThreeImages({
         prompts, aspectRatio, model,
@@ -1332,7 +1346,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
               const blocked = m.id === 'soul_2' && hasRef
               return (
                 <button key={m.id} onClick={() => !blocked && pickModel(m.id)} style={{
-                  padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+                  padding: '12px 14px', borderRadius: 12, textAlign: 'left', position: 'relative',
                   cursor: blocked ? 'not-allowed' : 'pointer',
                   opacity: blocked ? 0.45 : 1,
                   border: `1.5px solid ${blocked ? 'rgba(255,59,48,0.22)' : on ? '#8B5CF6' : L.border}`,
@@ -1340,6 +1354,20 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
                   boxShadow: on && !blocked ? '0 0 0 1px rgba(139,92,246,0.15), 0 2px 12px rgba(139,92,246,0.10)' : 'none',
                   display: 'flex', alignItems: 'flex-start', gap: 11, transition: 'all 0.15s',
                 }}>
+                  {m.id === 'gpt_image_2' && (
+                    <>
+                      <style>{`@keyframes rec-pulse{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,0.55)}60%{box-shadow:0 0 0 5px rgba(139,92,246,0)}}`}</style>
+                      <div style={{
+                        position: 'absolute', top: -7, right: -7,
+                        background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+                        borderRadius: 20, padding: '3px 8px',
+                        fontSize: 9, fontWeight: 800, color: '#fff',
+                        letterSpacing: '0.5px', textTransform: 'uppercase',
+                        animation: 'rec-pulse 2s ease-out infinite',
+                        pointerEvents: 'none',
+                      }}>✦ Best</div>
+                    </>
+                  )}
                   <ProviderIcon provider={m.provider} version={m.version} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: blocked ? '#FF3B30' : on ? '#8B5CF6' : L.text, marginBottom: 4, lineHeight: 1.2 }}>{m.name}</div>
@@ -1459,7 +1487,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
 
           {/* Primary CTA — always visible, morphs on selection */}
           <button
-            onClick={selected !== null ? () => onFinish(variations, selected, model, aspectRatio, generatedPrompts[selected] || '') : undefined}
+            onClick={selected !== null ? () => onFinish(variations, selected, model, aspectRatio, generatedPrompts, backstoryCtxRef.current) : undefined}
             style={{
               width: '100%', padding: '17px', borderRadius: 14, fontSize: 15, fontWeight: 700,
               border: 'none', cursor: selected !== null ? 'pointer' : 'default',
@@ -1552,7 +1580,7 @@ export default function Create() {
     }))
   }
 
-  function canAdvance() { return step === 1 ? !!data.name.trim() : true }
+  function canAdvance() { return step === 1 ? (!!data.name.trim() && !!data.gender) : true }
 
   function handleContinue() {
     if (step === 1 && data.age !== '' && Number(data.age) < 18) {
@@ -1579,15 +1607,16 @@ export default function Create() {
     setData({ name: '', gender: '', age: '', niches: [], nicheCustom: '', backstory: '', personality: 50, ethnicity: '', skinTone: '', hairColor: '', hairLength: 'Long', hairTexture: 'Straight', eyeColor: '', build: '', uniqueFeatures: '', vibeWords: [], faceRef: null, styleRef: null, faceRefNote: '', styleRefNote: '' })
   }
 
-  function finish(variations, selectedIdx, genModel, genAspectRatio, genPrompt = '') {
+  function finish(variations, selectedIdx, genModel, genAspectRatio, genPrompts = [], backstoryContext = null) {
+    const prompts = Array.isArray(genPrompts) ? genPrompts : [genPrompts]
+    const genPrompt = prompts[selectedIdx] || ''
     const niches = (data.niches || []).filter(n => n !== 'Other')
-
-    const otherVariations = variations.filter((_, i) => i !== selectedIdx)
     const replaceId = prefill.replaceId || null
+    const now = Date.now()
 
     const newInf = {
       id: replaceId || generateId(), name: data.name.trim(), gender: data.gender, age: data.age,
-      type: 'Influencer', createdAt: Date.now(),
+      type: 'Influencer', createdAt: now,
       niche: niches.join(', ') || '',
       niches: data.niches || [], nicheCustom: data.nicheCustom,
       backstory: data.backstory, introExtrovert: data.personality,
@@ -1608,6 +1637,14 @@ export default function Create() {
         { id: generateId(), name: 'Wardrobe 3', image: null },
       ],
       brandDealImages: [],
+      ...(backstoryContext ? { backstoryContext } : {}),
+      generationHistory: variations.map((url, i) => ({
+        id: generateId(),
+        type: 'image',
+        label: 'Generated Look',
+        url,
+        date: now,
+      })),
     }
     saveCreationParams(newInf.id, {
       faceRef: data.faceRef || null,
@@ -1630,6 +1667,7 @@ export default function Create() {
         setInfluencers(prev => [...prev, newInf])
       }
     })
+
     navigate('/influencers', { state: { selectId: newInf.id } })
   }
 
@@ -1675,6 +1713,40 @@ export default function Create() {
               }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+              >Connect →</button>
+            </div>
+          </div>
+        )}
+
+        {/* Claude API key nudge — same card DNA as HF, visually secondary */}
+        {step === 1 && !localStorage.getItem('claude_api_key') && (
+          <div style={{
+            marginBottom: 32, borderRadius: 14, padding: '1.5px',
+            background: 'rgba(245,158,11,0.45)',
+          }}>
+            <div style={{
+              borderRadius: 13, padding: '11px 14px',
+              background: 'color-mix(in srgb, var(--bg) 94%, #F59E0B 6%)',
+              backdropFilter: 'blur(12px)',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              </div>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Connect Claude for smarter prompts</span>
+              <button onClick={() => navigate('/settings')} style={{
+                flexShrink: 0, padding: '7px 14px', borderRadius: 8,
+                background: 'transparent',
+                color: '#D97706', fontSize: 12, fontWeight: 800,
+                border: '1.5px solid rgba(245,158,11,0.4)',
+                cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.12)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
               >Connect →</button>
             </div>
           </div>
