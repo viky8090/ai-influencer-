@@ -1656,7 +1656,7 @@ function WardrobeGenerator({ influencer, onAdd }) {
     return () => clearInterval(timer)
   }, [generating])
 
-  const refImage = influencer.characterSheetImage || null
+  const refImage = influencer.mainImage || null
 
   // Resume any generation that was running when the user navigated away
   useEffect(() => {
@@ -1838,7 +1838,7 @@ function WardrobeGenerator({ influencer, onAdd }) {
 
         {!refImage && (
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 14, padding: '9px 12px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
-            No character sheet — generate one in the Overview tab first.
+            No main image — add one to the profile first.
           </div>
         )}
         {error && <div style={{ fontSize: 12, color: '#FF3B30', marginTop: 10 }}>{error}</div>}
@@ -5334,31 +5334,45 @@ ${shotsWithBeats.join('\n\n')}`
                       </div>
                     </>
                   ) : (
-                    /* Loading card — matches Photo Studio style */
+                    /* Loading card */
                     <div style={{
                       aspectRatio: aspect==='9:16' ? '9/16' : '16/9',
-                      background:'var(--bg-tertiary)',
-                      border:'1.5px solid var(--border)',
+                      background:'linear-gradient(135deg,rgba(139,92,246,0.08) 0%,rgba(236,72,153,0.06) 100%)',
+                      border:'1.5px solid rgba(139,92,246,0.2)',
                       borderRadius:14,
                       display:'flex',flexDirection:'column',
                       alignItems:'center',justifyContent:'center',
-                      gap:10,padding:16,
+                      gap:14,padding:20,
+                      position:'relative',overflow:'hidden',
                     }}>
-                      <div style={{fontSize:12,fontWeight:600,color:'var(--text-primary)',textAlign:'center'}}>
-                        {lockedOutputs > 1 ? `Generating ${i+1} of ${lockedOutputs}…` : 'Generating…'}
+                      <style>{`@keyframes vidPulse{0%,100%{opacity:0.5;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}@keyframes vidShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}`}</style>
+                      {/* Pulsing icon */}
+                      <div style={{
+                        width:52,height:52,borderRadius:16,
+                        background:'linear-gradient(135deg,rgba(139,92,246,0.18),rgba(236,72,153,0.18))',
+                        border:'1.5px solid rgba(139,92,246,0.3)',
+                        display:'flex',alignItems:'center',justifyContent:'center',
+                        fontSize:22,
+                        animation:'vidPulse 2s ease-in-out infinite',
+                      }}>🎬</div>
+                      <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',marginBottom:3}}>
+                          {lockedOutputs > 1 ? `Generating ${i+1} of ${lockedOutputs}` : 'Generating'}
+                        </div>
+                        <div style={{fontSize:11,color:'var(--text-tertiary)',fontVariantNumeric:'tabular-nums'}}>{fmtElapsed(elapsed)}</div>
                       </div>
-                      <div style={{width:'80%',height:3,background:'var(--border)',borderRadius:2,overflow:'hidden'}}>
+                      {/* Progress bar */}
+                      <div style={{width:'72%',height:4,background:'rgba(139,92,246,0.12)',borderRadius:2,overflow:'hidden'}}>
                         <div style={{
                           height:'100%',
-                          width:`${Math.round(displayProgress)}%`,
+                          width:`${Math.max(4, Math.round(displayProgress))}%`,
                           background:'linear-gradient(90deg,#EC4899,#8B5CF6)',
                           borderRadius:2,
                           transition:'width 0.4s linear',
+                          boxShadow:'0 0 8px rgba(139,92,246,0.6)',
                         }}/>
                       </div>
-                      <div style={{fontSize:11,color:'var(--text-secondary)',fontVariantNumeric:'tabular-nums'}}>
-                        {fmtElapsed(elapsed)}
-                      </div>
+                      <div style={{fontSize:11,color:'var(--text-tertiary)'}}>{Math.round(displayProgress)}%</div>
                     </div>
                   )}
                 </div>

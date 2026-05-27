@@ -108,9 +108,13 @@ const L = {
 
 const CREATION_PARAMS_KEY = 'hf_creation_params'
 function saveCreationParams(influencerId, params) {
-  const d = JSON.parse(localStorage.getItem(CREATION_PARAMS_KEY) || '{}')
-  d[influencerId] = params
-  localStorage.setItem(CREATION_PARAMS_KEY, JSON.stringify(d))
+  try {
+    const d = JSON.parse(localStorage.getItem(CREATION_PARAMS_KEY) || '{}')
+    d[influencerId] = params
+    localStorage.setItem(CREATION_PARAMS_KEY, JSON.stringify(d))
+  } catch (e) {
+    console.warn('saveCreationParams failed (quota?), skipping:', e)
+  }
 }
 
 const inputCls = 'create-input'
@@ -1278,6 +1282,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
         onPartialResults: partial => setVariations(partial.slice(0, 3)),
       })
       setVariations(urls.slice(0, 3))
+      setSelected(0)
       setPhase('done')
     } catch (e) {
       setGenError(e.message); setPhase('error')
@@ -1608,67 +1613,72 @@ export default function Create() {
   }
 
   function finish(variations, selectedIdx, genModel, genAspectRatio, genPrompts = [], backstoryContext = null) {
-    const prompts = Array.isArray(genPrompts) ? genPrompts : [genPrompts]
-    const genPrompt = prompts[selectedIdx] || ''
-    const niches = (data.niches || []).filter(n => n !== 'Other')
-    const replaceId = prefill.replaceId || null
-    const now = Date.now()
+    try {
+      const prompts = Array.isArray(genPrompts) ? genPrompts : [genPrompts]
+      const genPrompt = prompts[selectedIdx] || ''
+      const niches = (data.niches || []).filter(n => n !== 'Other')
+      const replaceId = prefill.replaceId || null
+      const now = Date.now()
 
-    const newInf = {
-      id: replaceId || generateId(), name: data.name.trim(), gender: data.gender, age: data.age,
-      type: 'Influencer', createdAt: now,
-      niche: niches.join(', ') || '',
-      niches: data.niches || [], nicheCustom: data.nicheCustom,
-      backstory: data.backstory, introExtrovert: data.personality,
-      physicalDesc: buildPhysicalDescString(data), vibeWords: data.vibeWords,
-      mainImage: variations[selectedIdx] || null,
-      prompt: genPrompt,
-      characterSheetImage: null,
-      closeUpImage1: null,
-      closeUpImage2: null,
-      audience: '',
-      clothingStyle: (data.vibeWords || []).join(', '),
-      hobbies: data.hobbies || '', location: data.location || '',
-      palette: [], voice: '', dreamBrands: '', contentPillars: [],
-      videoUrls: [], scripts: [], homeImages: [],
-      wardrobeSlots: [
-        { id: generateId(), name: 'Wardrobe 1', image: null },
-        { id: generateId(), name: 'Wardrobe 2', image: null },
-        { id: generateId(), name: 'Wardrobe 3', image: null },
-      ],
-      brandDealImages: [],
-      ...(backstoryContext ? { backstoryContext } : {}),
-      generationHistory: variations.map((url, i) => ({
-        id: generateId(),
-        type: 'image',
-        label: 'Generated Look',
-        url,
-        date: now,
-      })),
-    }
-    saveCreationParams(newInf.id, {
-      faceRef: data.faceRef || null,
-      styleRef: data.styleRef || null,
-      faceRefNote: data.faceRefNote || '',
-      styleRefNote: data.styleRefNote || '',
-      model: genModel || 'gpt_image_2',
-      aspectRatio: genAspectRatio || '9:16',
-      physicalDesc: buildPhysicalDescString(data),
-      gender: data.gender,
-      age: data.age,
-      vibeWords: data.vibeWords || [],
-      personality: data.personality,
-      backstory: data.backstory || '',
-    })
-    flushSync(() => {
-      if (replaceId) {
-        setInfluencers(prev => prev.map(i => i.id === replaceId ? { ...i, ...newInf } : i))
-      } else {
-        setInfluencers(prev => [...prev, newInf])
+      const newInf = {
+        id: replaceId || generateId(), name: data.name.trim(), gender: data.gender, age: data.age,
+        type: 'Influencer', createdAt: now,
+        niche: niches.join(', ') || '',
+        niches: data.niches || [], nicheCustom: data.nicheCustom,
+        backstory: data.backstory, introExtrovert: data.personality,
+        physicalDesc: buildPhysicalDescString(data), vibeWords: data.vibeWords,
+        mainImage: variations[selectedIdx] || null,
+        prompt: genPrompt,
+        characterSheetImage: null,
+        closeUpImage1: null,
+        closeUpImage2: null,
+        audience: '',
+        clothingStyle: (data.vibeWords || []).join(', '),
+        hobbies: data.hobbies || '', location: data.location || '',
+        palette: [], voice: '', dreamBrands: '', contentPillars: [],
+        videoUrls: [], scripts: [], homeImages: [],
+        wardrobeSlots: [
+          { id: generateId(), name: 'Wardrobe 1', image: null },
+          { id: generateId(), name: 'Wardrobe 2', image: null },
+          { id: generateId(), name: 'Wardrobe 3', image: null },
+        ],
+        brandDealImages: [],
+        ...(backstoryContext ? { backstoryContext } : {}),
+        generationHistory: variations.map((url) => ({
+          id: generateId(),
+          type: 'image',
+          label: 'Generated Look',
+          url,
+          date: now,
+        })),
       }
-    })
+      saveCreationParams(newInf.id, {
+        faceRef: data.faceRef || null,
+        styleRef: data.styleRef || null,
+        faceRefNote: data.faceRefNote || '',
+        styleRefNote: data.styleRefNote || '',
+        model: genModel || 'gpt_image_2',
+        aspectRatio: genAspectRatio || '9:16',
+        physicalDesc: buildPhysicalDescString(data),
+        gender: data.gender,
+        age: data.age,
+        vibeWords: data.vibeWords || [],
+        personality: data.personality,
+        backstory: data.backstory || '',
+      })
+      flushSync(() => {
+        if (replaceId) {
+          setInfluencers(prev => prev.map(inf => inf.id === replaceId ? { ...inf, ...newInf } : inf))
+        } else {
+          setInfluencers(prev => [...prev, newInf])
+        }
+      })
 
-    navigate('/influencers', { state: { selectId: newInf.id } })
+      navigate('/influencers', { state: { selectId: newInf.id } })
+    } catch (e) {
+      console.error('finish() failed:', e)
+      alert('Something went wrong saving your influencer: ' + e.message)
+    }
   }
 
   const isLastStep = step === STEPS.length

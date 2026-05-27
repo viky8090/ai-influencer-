@@ -51,7 +51,7 @@ export default function WardrobeDrawer({ influencer, pendingResult, onResult, on
     if (pendingResult && !result) setResult(pendingResult)
   }, [pendingResult])
 
-  const refImage = influencer?.characterSheetImage || null
+  const refImage = influencer?.mainImage || null
   const canGenerate = refImage && !generating && !result && (
     customText.trim() || top.trim() || bottom.trim() || hair.trim() || footwear.trim()
   )
@@ -218,7 +218,7 @@ export default function WardrobeDrawer({ influencer, pendingResult, onResult, on
             </div>
             {!refImage && (
               <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '9px 12px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
-                No character sheet — generate one on the profile page first.
+                No main image — add one to the profile first.
               </div>
             )}
             {error && <div style={{ fontSize: 12, color: '#FF3B30' }}>{error}</div>}
