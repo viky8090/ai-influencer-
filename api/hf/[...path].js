@@ -40,13 +40,6 @@ export default async function handler(req) {
     forward.set(k, v)
   }
 
-  // Forward the real client IP so Higgsfield doesn't see Vercel's datacenter IP
-  const clientIp = req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-  if (clientIp) {
-    forward.set('x-forwarded-for', clientIp)
-    forward.set('x-real-ip', clientIp)
-  }
-
   const upstream = await fetch(target, {
     method: req.method,
     headers: forward,

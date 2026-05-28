@@ -19,7 +19,7 @@ async function ensureClientId() {
   if (stored) return stored
   const res = await fetch(`${AUTH_PROXY}/oauth2/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify({
       client_name: 'AI Influencer Studio',
       redirect_uris: [`${window.location.origin}/auth/callback`],
@@ -29,8 +29,12 @@ async function ensureClientId() {
       code_challenge_method: 'S256',
     }),
   })
-  if (!res.ok) throw new Error('Failed to register OAuth client')
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '')
+    throw new Error(`Failed to register OAuth client (${res.status})${detail ? ': ' + detail.slice(0, 200) : ''}`)
+  }
   const d = await res.json()
+  if (!d.client_id) throw new Error('Registration returned no client_id')
   localStorage.setItem('hf_client_id', d.client_id)
   return d.client_id
 }
@@ -125,7 +129,15 @@ export async function handleOAuthCallback(code, state) {
   })
   if (!res.ok) {
     const e = await res.json().catch(() => ({}))
-    throw new Error(e.error_description || 'Token exchange failed')
+    const reason = e.error_description || e.error || `Token exchange failed (${res.status})`
+    // Stale PKCE/auth code — clear so the next Connect click starts a fresh flow
+    localStorage.removeItem('hf_verifier')
+    localStorage.removeItem('hf_state')
+    // A rejected client means our cached registration is no longer valid upstream — drop it so we re-register
+    if (e.error === 'invalid_client' || res.status === 401) {
+      localStorage.removeItem('hf_client_id')
+    }
+    throw new Error(reason)
   }
   const tokens = await res.json()
   saveTokens(tokens)
