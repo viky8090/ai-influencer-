@@ -1,7 +1,15 @@
+import { rateLimit, clientIp } from '../lib/rateLimit.js'
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   if (req.method === 'OPTIONS') return res.status(200).end()
+
+  const rl = rateLimit(clientIp(req.headers))
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfter))
+    return res.status(429).json({ error: 'Too many requests — slow down a moment and try again.', items: [] })
+  }
 
   const q = req.query?.q || (req.url && new URLSearchParams(req.url.split('?')[1] || '').get('q'))
   if (!q) return res.status(400).json({ error: 'Missing q' })

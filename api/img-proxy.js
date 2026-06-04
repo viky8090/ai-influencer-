@@ -22,7 +22,15 @@ function safeFilename(name) {
     .slice(0, 128)
 }
 
+import { rateLimit, clientIp } from '../lib/rateLimit.js'
+
 export default async function handler(req, res) {
+  const rl = rateLimit(clientIp(req.headers))
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfter))
+    res.status(429).send('Too many requests — slow down a moment and try again.'); return
+  }
+
   const { url, name } = req.query
   if (!url) { res.status(400).send('Missing url'); return }
   if (!isSafeUrl(url)) { res.status(403).send('URL not allowed'); return }

@@ -1,3 +1,5 @@
+import { rateLimit, clientIp } from '../lib/rateLimit.js'
+
 export const config = { runtime: 'edge' }
 
 // Only forward requests to known Higgsfield MCP paths
@@ -38,6 +40,14 @@ export default async function handler(req) {
   }
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
+  }
+
+  const rl = rateLimit(clientIp(req.headers))
+  if (!rl.ok) {
+    return new Response('Too many requests — slow down a moment and try again.', {
+      status: 429,
+      headers: { ...corsHeaders, 'Retry-After': String(rl.retryAfter) },
+    })
   }
 
   // Forward all request headers, drop 'host' so upstream doesn't reject it
