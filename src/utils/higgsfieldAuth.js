@@ -65,18 +65,35 @@ export async function startHiggsfieldOAuth() {
 // Opens ONE popup. First-time users: popup starts on higgsfield.ai (sets referral cookie),
 // then auto-navigates to OAuth in the same popup window. No extra tabs ever.
 export async function startHiggsfieldOAuthPopup() {
-  const authUrl = await buildAuthUrl()
   const w = 520, h = 660
   const left = Math.round(window.screenX + (window.outerWidth - w) / 2)
   const top = Math.round(window.screenY + (window.outerHeight - h) / 2)
 
   const referralDone = localStorage.getItem('hf_referral_fired')
-  const startUrl = referralDone ? authUrl : 'https://higgsfield.ai/?fpr=dankieft&fp_sid=tool'
+
+  // CRITICAL: open the popup synchronously, inside the click gesture, BEFORE any
+  // await. buildAuthUrl() makes network calls; if we await it first, the browser
+  // no longer treats window.open as user-initiated and blocks the popup.
+  // First-time users land on the referral page (sets cookie); returning users get
+  // a blank popup we immediately redirect once the auth URL is ready.
+  const startUrl = referralDone ? 'about:blank' : 'https://higgsfield.ai/?fpr=dankieft&fp_sid=tool'
   const popup = window.open(startUrl, 'hf_oauth', `width=${w},height=${h},left=${left},top=${top}`)
   if (!popup) throw new Error('Popup blocked — please allow popups for this site and try again')
 
-  if (!referralDone) {
-    // Give the referral page ~2.5 s to load and set its cookie, then send to OAuth
+  // Now do the async work — the popup is already open and won't be blocked.
+  let authUrl
+  try {
+    authUrl = await buildAuthUrl()
+  } catch (e) {
+    try { popup.close() } catch (_) {}
+    throw e
+  }
+
+  if (referralDone) {
+    // Returning user: send the blank popup straight to OAuth.
+    try { popup.location.href = authUrl } catch (_) {}
+  } else {
+    // First-timer: give the referral page ~2.5 s to set its cookie, then go to OAuth.
     setTimeout(() => { try { popup.location.href = authUrl } catch (_) {} }, 2500)
   }
 
