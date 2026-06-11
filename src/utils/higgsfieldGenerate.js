@@ -1,4 +1,4 @@
-import { getHFToken, refreshHFToken } from './higgsfieldAuth'
+import { getHFToken, refreshHFToken, disconnectHF } from './higgsfieldAuth'
 
 const MCP_URL = '/api/hf/mcp'
 const PENDING_KEY = 'hf_pending_gens'
@@ -92,42 +92,6 @@ export async function resumeVideoJob(jobIds, count, onProgress, onPartialResults
   return pollVideoJobs(jobIds, count, onProgress, onPartialResults, isCancelled)
 }
 
-// Direct-to-Higgsfield call — bypasses the Vercel proxy so Higgsfield sees the browser's real
-// IP instead of a Vercel datacenter IP. Used as fallback when the proxy call is IP-blocked.
-async function mcpPostDirect(body) {
-  const token = getHFToken()
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json, text/event-stream',
-    'Authorization': `Bearer ${token}`,
-  }
-  if (_sessionId) headers['Mcp-Session-Id'] = _sessionId
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30000)
-  try {
-    const res = await fetch('https://mcp.higgsfield.ai/mcp', {
-      method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal,
-    })
-    clearTimeout(timeout)
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '')
-      throw new Error(`Higgsfield direct error ${res.status}: ${errText}`)
-    }
-    const sid = res.headers.get('Mcp-Session-Id')
-    if (sid) _sessionId = sid
-    const ct = res.headers.get('content-type') || ''
-    if (ct.includes('text/event-stream')) return await parseSSEStream(res, controller.signal)
-    const rawText = await res.text()
-    if (rawText.trimStart().startsWith('data:')) return parseSSEText(rawText)
-    try { return JSON.parse(rawText) } catch { return rawText }
-  } catch (e) {
-    clearTimeout(timeout)
-    if (e.name === 'AbortError') throw new Error('Higgsfield direct call timed out')
-    throw e
-  }
-}
-
 async function mcpPost(body, isRetry = false) {
   const token = getHFToken()
   const headers = {
@@ -152,13 +116,11 @@ async function mcpPost(body, isRetry = false) {
   if (res.status === 401) {
     clearTimeout(timeout)
     if (isRetry) throw new Error('Higgsfield session expired — please reconnect in Settings')
-    try {
-      await refreshHFToken()
-      _sessionId = null // force new session with fresh token
-      return mcpPost(body, true)
-    } catch {
-      throw new Error('Higgsfield session expired — please reconnect in Settings')
-    }
+    // refreshHFToken throws a non-disconnecting "busy, try again" error on transient
+    // failures and disconnects only on a real auth rejection — let its message surface.
+    await refreshHFToken()
+    _sessionId = null // force new session with fresh token
+    return mcpPost(body, true)
   }
   if (!res.ok) {
     clearTimeout(timeout)
@@ -271,13 +233,34 @@ export async function initSession() {
   })
 }
 
-async function callTool(name, args) {
+function isTokenErrorBody(result) {
+  const str = typeof result === 'string' ? result : JSON.stringify(result ?? '')
+  return /invalid or expired token/i.test(str)
+}
+
+async function callTool(name, args, isRetry = false) {
   const res = await mcpPost({
     jsonrpc: '2.0', id: Date.now(), method: 'tools/call',
     params: { name, arguments: args },
   })
   const result = res?.result ?? res
   hflog(`[HF] callTool(${name}) =>`, JSON.stringify(result)?.slice(0, 500))
+
+  // Higgsfield sometimes returns 200 OK but embeds a token error in the body.
+  // The HTTP-level 401 handler in mcpPost won't catch this — detect and retry here.
+  if (isTokenErrorBody(result)) {
+    if (isRetry) {
+      disconnectHF()
+      throw new Error('Higgsfield session expired — please reconnect in Settings')
+    }
+    // refreshHFToken already disconnects on a genuine auth rejection (400/401). On a
+    // transient failure (rate limit / 5xx) it throws WITHOUT disconnecting — don't wipe
+    // the session here either; let its message surface so a retry can succeed.
+    await refreshHFToken()
+    _sessionId = null
+    return callTool(name, args, true)
+  }
+
   return result
 }
 
@@ -534,32 +517,25 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
   for (let i = 0; i < count; i++) {
     const callParams = i === 0 ? params : { ...params, prompt: params.prompt + '​'.repeat(i) }
     let res = await callTool('generate_video', { params: callParams })
-
     // Higgsfield sometimes returns a preset-match notice instead of a job.
+    // Extract the declined_preset_id and retry so the video actually generates.
     const presetNoticeId = (() => {
       const str = JSON.stringify(unwrapMCP(res) ?? '')
       const m = str.match(/declined_preset_id[^a-f0-9]*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
       return m ? m[1] : null
     })()
     if (presetNoticeId) {
-      // Decline the preset — generate literally with the original model (seedance).
-      // The proxy IP gets blocked by Higgsfield on this path, so fall back to a direct
-      // browser call (user's real IP) if the proxy attempt returns "IP detected".
-      console.log('[HF-VID] preset notice — declining, retrying literally:', presetNoticeId)
-      const declineParams = { ...params, declined_preset_id: presetNoticeId }
-      res = await callTool('generate_video', { params: declineParams })
-
-      const proxyRaw = JSON.stringify(unwrapMCP(res) ?? '')
-      if (proxyRaw.toLowerCase().includes('ip detected')) {
-        console.log('[HF-VID] proxy IP blocked — retrying via direct browser call')
-        try {
-          const directBody = { jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: 'generate_video', arguments: { params: declineParams } } }
-          const directRaw = await mcpPostDirect(directBody)
-          res = directRaw?.result ?? directRaw
-        } catch (corsErr) {
-          console.warn('[HF-VID] direct call failed:', corsErr.message)
-          // Keep the IP-detected result — the error check below will surface it clearly
-        }
+      // Log the full preset notice so we can see if it contains a usable job ID or URL
+      console.log('[HF-VID] preset notice full response:', JSON.stringify(unwrapMCP(res))?.slice(0, 800))
+      const presetDirectUrls = extractVideoUrls(res)
+      const presetJobIds = extractJobIds(res).filter(id => id !== presetNoticeId)
+      if (presetDirectUrls.length > 0 || presetJobIds.length > 0) {
+        // The preset notice itself has a usable video — use it, skip fresh generation
+        console.log('[HF-VID] preset has usable content, skipping fresh generation retry')
+      } else {
+        // No usable content in preset notice — decline and generate fresh
+        console.log('[HF-VID] preset notice, retrying with declined_preset_id:', presetNoticeId)
+        res = await callTool('generate_video', { params: { ...params, declined_preset_id: presetNoticeId } })
       }
     }
     results.push(res)
@@ -568,17 +544,12 @@ export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8
 
   console.log('[HF-VID] generate_video raw[0]:', JSON.stringify(unwrapMCP(results[0]))?.slice(0, 600))
 
-  // Check for hard error responses before treating response UUIDs as job IDs
-  for (const res of results) {
-    const raw = JSON.stringify(unwrapMCP(res) ?? '')
-    const errMatch = raw.match(/Error starting generation[^\\"]{0,120}/)
-    if (errMatch) {
-      const msg = errMatch[0].replace(/\\n/g, ' ').trim()
-      if (msg.toLowerCase().includes('ip detected')) {
-        throw new Error('Higgsfield blocked this request (IP/account restriction). Try reconnecting Higgsfield in Settings, or wait a few minutes before retrying.')
-      }
-      throw new Error(msg)
-    }
+  // Higgsfield returns "IP detected" when the reference images contain a protected or
+  // copyrighted likeness (e.g. a real person's face). Detect immediately so we throw a
+  // clear error instead of polling a request ID for 9 minutes.
+  const rawStr0 = JSON.stringify(unwrapMCP(results[0]) ?? '')
+  if (/ip detected|ip.block|vpn detected|blocked this request/i.test(rawStr0)) {
+    throw new Error('Generation blocked — Higgsfield detected copyrighted or protected likeness in your reference images. Try using different reference photos, or reconnect Higgsfield in Settings.')
   }
 
   const directUrls = results.flatMap(r => extractVideoUrls(r))
