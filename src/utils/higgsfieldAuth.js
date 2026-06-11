@@ -1,6 +1,45 @@
 const AUTH_PROXY = '/api/hf'           // fetch calls — goes through proxy, bypasses CORS
 const AUTH_DIRECT = 'https://mcp.higgsfield.ai' // browser redirect — must be real URL
 
+// Higgsfield rate-limits its OAuth endpoints by IP. Because every user's traffic
+// egresses through our shared Vercel edge IPs, concurrent connects collectively trip
+// a 429. These statuses are transient — retry with backoff instead of failing hard.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// Exponential backoff with jitter: ~0.5s, 1s, 2s, 4s (+ up to 0.4s jitter)
+function backoffMs(attempt) {
+  return 500 * Math.pow(2, attempt) + Math.floor(Math.random() * 400)
+}
+
+// fetch() that retries transient failures (rate limits, 5xx, network errors).
+// Honors a Retry-After header when present. Each attempt gets its own timeout so a
+// hung request doesn't stall the whole flow. The body must be a string or
+// URLSearchParams (both re-readable across attempts) — never a stream.
+async function fetchWithRetry(url, options, { attempts = 4, perAttemptTimeoutMs = 20000 } = {}) {
+  let lastRes = null
+  for (let i = 0; i < attempts; i++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), perAttemptTimeoutMs)
+    let res
+    try {
+      res = await fetch(url, { ...options, signal: controller.signal })
+    } catch (e) {
+      clearTimeout(timer)
+      if (i === attempts - 1) throw e   // network error / timeout — let caller decide
+      await sleep(backoffMs(i))
+      continue
+    }
+    clearTimeout(timer)
+    if (!RETRYABLE_STATUS.has(res.status) || i === attempts - 1) return res
+    lastRes = res
+    const ra = Number(res.headers.get('retry-after'))
+    const wait = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 8000) : backoffMs(i)
+    await sleep(wait)
+  }
+  return lastRes
+}
+
 async function sha256Base64Url(str) {
   const data = new TextEncoder().encode(str)
   const hash = await crypto.subtle.digest('SHA-256', data)
@@ -17,7 +56,7 @@ function randomString(n = 64) {
 async function ensureClientId() {
   const stored = localStorage.getItem('hf_client_id')
   if (stored) return stored
-  const res = await fetch(`${AUTH_PROXY}/oauth2/register`, {
+  const res = await fetchWithRetry(`${AUTH_PROXY}/oauth2/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify({
@@ -31,6 +70,8 @@ async function ensureClientId() {
   })
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
+    if (res.status === 429)
+      throw new Error('Higgsfield is busy right now — wait a few seconds and click Connect again.')
     throw new Error(`Failed to register OAuth client (${res.status})${detail ? ': ' + detail.slice(0, 200) : ''}`)
   }
   const d = await res.json()
@@ -133,7 +174,9 @@ export async function handleOAuthCallback(code, state) {
   const verifier = localStorage.getItem('hf_verifier')
   const clientId = localStorage.getItem('hf_client_id')
 
-  const res = await fetch(`${AUTH_PROXY}/oauth2/token`, {
+  // The auth code is single-use but is only consumed on a SUCCESSFUL exchange, so a
+  // transient 429/5xx leaves it valid — fetchWithRetry can safely retry the same code.
+  const res = await fetchWithRetry(`${AUTH_PROXY}/oauth2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -146,7 +189,9 @@ export async function handleOAuthCallback(code, state) {
   })
   if (!res.ok) {
     const e = await res.json().catch(() => ({}))
-    const reason = e.error_description || e.error || `Token exchange failed (${res.status})`
+    const reason = res.status === 429
+      ? 'Higgsfield is rate-limiting connections right now — wait a moment and click Connect again.'
+      : (e.error_description || e.error || `Token exchange failed (${res.status})`)
     // Stale PKCE/auth code — clear so the next Connect click starts a fresh flow
     localStorage.removeItem('hf_verifier')
     localStorage.removeItem('hf_state')
@@ -175,11 +220,9 @@ export async function refreshHFToken() {
   const clientId = localStorage.getItem('hf_client_id')
   if (!refreshToken || !clientId) throw new Error('No refresh token — please reconnect in Settings')
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 15000)
   let res
   try {
-    res = await fetch(`${AUTH_PROXY}/oauth2/token`, {
+    res = await fetchWithRetry(`${AUTH_PROXY}/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -187,19 +230,21 @@ export async function refreshHFToken() {
         refresh_token: refreshToken,
         client_id: clientId,
       }),
-      signal: controller.signal,
-    })
+    }, { attempts: 4, perAttemptTimeoutMs: 15000 })
   } catch (e) {
     // Network errors (timeout, connection failure) don't mean the session is invalid —
     // don't disconnect. The error will surface on the next actual API call.
     throw new Error('Network error during token refresh — please check your connection')
-  } finally {
-    clearTimeout(timeout)
   }
   if (!res.ok) {
-    // Auth rejection (401/400) means the session truly expired — disconnect
-    disconnectHF()
-    throw new Error('Session expired — please reconnect in Settings')
+    // CRITICAL: only a genuine auth rejection (400/401) means the session is truly dead.
+    // A 429 (rate limit) or 5xx is transient — disconnecting here would wipe the refresh
+    // token and lock the user out permanently for what is just a temporary blip.
+    if (res.status === 400 || res.status === 401) {
+      disconnectHF()
+      throw new Error('Session expired — please reconnect in Settings')
+    }
+    throw new Error('Higgsfield is busy — token refresh failed temporarily. Please try again in a moment.')
   }
   const tokens = await res.json()
   saveTokens(tokens)
