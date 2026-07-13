@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { generateSingleImage, initSession, pollAllJobs } from '../utils/higgsfieldGenerate'
 import { generateId } from '../store'
+import { glassInput } from '../ui/glass'
 
 export function buildWardrobePrompt(influencer, { outfit, hair, customText }) {
   const phys = influencer.physicalDesc ? `The subject: ${influencer.physicalDesc}. ` : ''
@@ -136,26 +137,29 @@ export default function WardrobeDrawer({ influencer, pendingResult, onResult, on
     setResult(null); setSaveName('Custom Look')
   }
 
-  const iS = { padding: '9px 12px', borderRadius: 8, fontSize: 13, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
+  const iS = { ...glassInput, padding: '9px 12px', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
   const lS = { fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'block' }
 
   return (
     <div ref={drawerRef} style={{
       position: 'fixed', top: 'var(--nav-h)', right: 0, bottom: 0,
       width: 400, zIndex: 400,
-      background: 'var(--surface)',
-      boxShadow: '-12px 0 48px rgba(0,0,0,0.12)',
-      borderLeft: '1px solid var(--border)',
-      animation: 'wardrobeDrawerIn 0.2s ease',
+      background: 'var(--glass-bg-strong)',
+      backdropFilter: 'blur(var(--blur-lg)) saturate(1.8)',
+      WebkitBackdropFilter: 'blur(var(--blur-lg)) saturate(1.8)',
+      boxShadow: 'inset 1px 1px 0 var(--glass-highlight), var(--shadow-lg)',
+      borderLeft: '1px solid var(--glass-border)',
+      borderTopLeftRadius: 'var(--radius-xl)',
+      animation: 'liquidDrawerIn 0.6s var(--ease-liquid)',
       display: 'flex', flexDirection: 'column',
     }}>
-      <style>{`@keyframes wardrobeDrawerIn{from{transform:translateX(32px);opacity:0}to{transform:translateX(0);opacity:1}}`}</style>
+      <style>{`@keyframes liquidDrawerIn{from{transform:translateX(48px) scale(0.98);opacity:0;filter:blur(10px)}to{transform:translateX(0) scale(1);opacity:1;filter:blur(0)}}`}</style>
 
       {/* Header */}
       <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Add Outfit</div>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>×</button>
+          <button onClick={onClose} className="liquid-press" style={{ width: 28, height: 28, borderRadius: 999, border: '1px solid var(--glass-border)', background: 'var(--bg-tertiary)', boxShadow: 'inset 0 1px 0 var(--glass-highlight)', color: 'var(--text-secondary)', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>×</button>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Uses character sheet as identity lock · 16:9 · 4K</div>
       </div>
@@ -165,14 +169,14 @@ export default function WardrobeDrawer({ influencer, pendingResult, onResult, on
 
         {result && (
           <>
-            <img src={result} alt="" style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)', display: 'block' }} />
+            <img src={result} alt="" style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'block' }} />
             <div>
               <span style={lS}>Name this look</span>
               <input value={saveName} onChange={e => setSaveName(e.target.value)} style={iS} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={save} style={{ flex: 1, padding: '11px', borderRadius: 10, fontSize: 14, fontWeight: 700, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 2px 10px rgba(139,92,246,0.3)', fontFamily: 'inherit' }}>Save to Wardrobe</button>
-              <button onClick={discard} style={{ padding: '11px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit' }}>Discard</button>
+              <button onClick={save} className="liquid-press" style={{ flex: 1, padding: '11px', borderRadius: 999, fontSize: 14, fontWeight: 800, background: 'var(--brand)', color: 'var(--brand-ink)', border: '1px solid rgba(255,255,255,0.35)', cursor: 'pointer', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), var(--glow-brand)', fontFamily: 'inherit' }}>Save to Wardrobe</button>
+              <button onClick={discard} className="liquid-press" style={{ padding: '11px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--glass-border)', boxShadow: 'inset 0 1px 0 var(--glass-highlight)', cursor: 'pointer', fontFamily: 'inherit' }}>Discard</button>
             </div>
           </>
         )}
@@ -186,8 +190,8 @@ export default function WardrobeDrawer({ influencer, pendingResult, onResult, on
                 <button onClick={cancelGeneration} style={{ padding: '3px 10px', borderRadius: 980, fontSize: 11, fontWeight: 600, background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
               </div>
             </div>
-            <div style={{ height: 6, borderRadius: 980, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.max(3, progress)}%`, background: 'linear-gradient(90deg,#EC4899,#8B5CF6)', borderRadius: 980, transition: 'width 0.5s ease', boxShadow: '0 0 10px rgba(139,92,246,0.5)' }} />
+            <div style={{ height: 6, borderRadius: 999, background: 'var(--bg-tertiary)', overflow: 'hidden', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)' }}>
+              <div style={{ height: '100%', width: `${Math.max(3, progress)}%`, background: 'linear-gradient(90deg, rgba(199,242,78,0.7), var(--brand))', borderRadius: 999, transition: 'width 0.7s var(--ease-liquid)', boxShadow: '0 0 12px rgba(199,242,78,0.55)' }} />
             </div>
           </div>
         )}
@@ -217,7 +221,7 @@ export default function WardrobeDrawer({ influencer, pendingResult, onResult, on
               <textarea value={customText} onChange={e => setCustomText(e.target.value)} placeholder="Describe the complete outfit — overrides the fields above…" rows={3} style={{ ...iS, resize: 'vertical', lineHeight: 1.5 }} />
             </div>
             {!refImage && (
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '9px 12px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '9px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)' }}>
                 No main image — add one to the profile first.
               </div>
             )}
@@ -228,13 +232,14 @@ export default function WardrobeDrawer({ influencer, pendingResult, onResult, on
 
       {!result && !generating && (
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-          <button onClick={generate} disabled={!canGenerate} style={{
-            width: '100%', padding: '13px', borderRadius: 11, fontSize: 14, fontWeight: 700,
-            background: canGenerate ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : 'var(--bg-tertiary)',
-            color: canGenerate ? '#fff' : 'var(--text-tertiary)',
-            border: 'none', cursor: canGenerate ? 'pointer' : 'not-allowed',
-            boxShadow: canGenerate ? '0 2px 12px rgba(139,92,246,0.32)' : 'none',
-            transition: 'all 0.15s', fontFamily: 'inherit',
+          <button onClick={generate} disabled={!canGenerate} className="liquid-press" style={{
+            width: '100%', padding: '13px', borderRadius: 999, fontSize: 14, fontWeight: 800,
+            background: canGenerate ? 'var(--brand)' : 'var(--bg-tertiary)',
+            color: canGenerate ? 'var(--brand-ink)' : 'var(--text-tertiary)',
+            border: canGenerate ? '1px solid rgba(255,255,255,0.35)' : '1px solid var(--glass-border)',
+            cursor: canGenerate ? 'pointer' : 'not-allowed',
+            boxShadow: canGenerate ? 'inset 0 1px 0 rgba(255,255,255,0.55), var(--glow-brand)' : 'inset 0 1px 0 var(--glass-highlight)',
+            transition: 'background 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid), transform 0.5s var(--ease-jelly)', fontFamily: 'inherit',
           }}>Generate Look</button>
         </div>
       )}

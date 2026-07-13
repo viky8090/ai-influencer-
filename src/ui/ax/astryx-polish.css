@@ -1,0 +1,111 @@
+/**
+ * Vymotion × Astryx polish layer.
+ * Unlayered so it wins over Astryx @layers without fighting app CSS.
+ * Keeps dialogs, popovers, and primary controls looking Editorial Studio.
+ */
+
+/* ── Dialogs / popovers: solid surface, soft elevation ── */
+[data-astryx-theme='vymotion'] dialog,
+[data-astryx-theme='vymotion'] [role='dialog'] {
+  font-family: var(--font-ui, Inter, system-ui, sans-serif) !important;
+}
+
+/* Primary buttons: crisp lime, no Meta-blue flash */
+[data-astryx-theme='vymotion'] button[data-variant='primary'],
+[data-astryx-theme='vymotion'] .astryx-button[data-variant='primary'],
+[data-astryx-theme='vymotion'] a.astryx-button[data-variant='primary'] {
+  background: var(--brand, #c7f24e) !important;
+  color: var(--brand-ink, #0a0a0b) !important;
+  border-color: transparent !important;
+  font-weight: 800 !important;
+}
+
+[data-astryx-theme='vymotion'] button[data-variant='primary']:hover:not(:disabled),
+[data-astryx-theme='vymotion'] .astryx-button[data-variant='primary']:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+/* Ghost / secondary: quieter editorial borders */
+[data-astryx-theme='vymotion'] button[data-variant='secondary'],
+[data-astryx-theme='vymotion'] .astryx-button[data-variant='secondary'] {
+  border-color: var(--border, rgba(255, 255, 255, 0.1)) !important;
+}
+
+/* Credit chip (Token) — brand-forward pill */
+.vy-credit-token {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.2px;
+}
+
+/* Nav CTAs: keep pill feel on marketing bar */
+.nav-root .astryx-button,
+.nav-root button[class*='astryx'] {
+  border-radius: 8px !important;
+}
+
+/* Popover content flush cards (CreditsPanel / ProfileMenu strip double border) */
+.vy-ax-popover-flush {
+  margin: -4px;
+}
+
+/* Segmented control — denser, matches editorial chips */
+[data-astryx-theme='vymotion'] [role='radiogroup'] {
+  border-radius: 999px !important;
+}
+
+/* Empty states: less gray, more Vymotion */
+[data-astryx-theme='vymotion'] .astryx-empty-state {
+  color: var(--text-secondary);
+}
+
+/* Progress bars use brand fill via accent token (theme handles it) */
+
+/* Page rhythm: consistent max-width headers */
+.vy-page-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+
+/* Toast-style floating badge (Publish) */
+.vy-toast-badge {
+  box-shadow: var(--shadow-md);
+  border-radius: 999px !important;
+  padding: 10px 18px !important;
+  font-size: 13.5px !important;
+}
+
+/* Dialog backdrop slightly stronger on dark */
+[data-theme='dark'] [data-astryx-theme='vymotion'] ::backdrop,
+[data-theme='dark'] dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* Selectable cards in paywall: clearer selection */
+[data-astryx-theme='vymotion'] [data-selected='true'] {
+  outline-color: var(--brand, #c7f24e);
+}
+
+/* Outline TOC (docs): brand active indicator */
+[data-astryx-theme='vymotion'] nav[aria-label*='contents'] a[aria-current],
+[data-astryx-theme='vymotion'] nav[aria-label*='Contents'] a[aria-current] {
+  color: var(--brand, #c7f24e);
+  font-weight: 700;
+}
+
+/* Text inputs: brand focus ring */
+[data-astryx-theme='vymotion'] input:focus,
+[data-astryx-theme='vymotion'] textarea:focus,
+[data-astryx-theme='vymotion'] [role='combobox']:focus {
+  outline-color: var(--brand, #c7f24e);
+}
+
+/* Reduce double-padding in Card-in-Popover panels */
+.vy-ax-panel {
+  background: transparent;
+  border: none !important;
+  box-shadow: none !important;
+}

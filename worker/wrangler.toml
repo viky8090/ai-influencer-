@@ -1,0 +1,101 @@
+#:schema node_modules/wrangler/config-schema.json
+# Vymotion — Cloudflare Worker (API gateway + business logic + the built React SPA).
+# `wrangler deploy` after `npm run build` in the repo root ships BOTH: static assets from
+# ../dist serve everything except the run_worker_first routes, with SPA fallback for
+# client-side React Router paths. Live on vymotion.org (custom domain) + workers.dev.
+# Secrets (Appendix C) are NOT here — use `wrangler secret put` / .dev.vars.
+#
+# PHASE 1 DEPLOY PROFILE: free Workers plan. Only the bindings the Clerk webhook + JWT auth
+# need are active (D1 + Durable Objects + cron). Queues, Analytics Engine, KV, and R2 are
+# commented out below and re-enabled in Phases 2–3 (Queues needs Workers Paid).
+
+name = "vymotion-api"
+main = "src/index.js"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Keep the workers.dev URL alive — Polar/Higgsfield/fal webhook endpoints are registered
+# against it (API_URL below) and the signed-out SPA default API base points there too.
+workers_dev = true
+
+# Serve on the apex + www of the production domain via ZONE ROUTES (not custom domains):
+# the zone already has user-created proxied A records for @ and www, which the custom-domain
+# API refuses to override (error 100117), while routes simply intercept the proxied traffic.
+routes = [
+  { pattern = "vymotion.org/*", zone_id = "aca03548e3b2f0ecc0c42fae8ed6eb36" },
+  { pattern = "www.vymotion.org/*", zone_id = "aca03548e3b2f0ecc0c42fae8ed6eb36" },
+]
+
+# ── Static SPA (Vite build output from the repo root) ──
+# Only these routes reach the Worker script; everything else is served from ../dist,
+# and unknown paths fall back to index.html so React Router owns deep links.
+[assets]
+directory = "../dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/webhooks/*", "/public/*", "/internal/*", "/health"]
+
+[observability]
+enabled = true
+
+[vars]
+ENVIRONMENT = "production"
+APP_URL = "https://vymotion.org"
+API_URL = "https://vymotion-api.vikranty301.workers.dev"
+# Polar.sh environment — PRODUCTION (org "Viky Ai" 9c32fb05-f159-4bf8-aff2-8886699a80f8;
+# products + webhook endpoint created 2026-07-04 via the Polar MCP). Sandbox would be
+# https://sandbox-api.polar.sh with its own token/products/webhook.
+POLAR_API_BASE = "https://api.polar.sh"
+# Self-hosted Postiz Public API (social publishing, PRD N13/§12.8). The POSTIZ_API_KEY
+# secret must also be set; /api/social returns 503 publishing_not_configured until both exist.
+POSTIZ_API_BASE = "https://postiz.vymotion.org/api/public/v1"
+
+# ── D1 (relational truth: users, ledger, subscriptions, generations) ──
+[[d1_databases]]
+binding = "DB"
+database_name = "vymotion"
+database_id = "2919b813-5242-4636-8f01-736903abea20"
+migrations_dir = "migrations"
+
+# ── Durable Objects (strongly-consistent per-user state; SQLite-backed = free-plan OK) ──
+[[durable_objects.bindings]]
+name = "CREDIT_ACCOUNT"      # one instance per user_id; serialises all balance mutations
+class_name = "CreditAccount"
+
+[[durable_objects.bindings]]
+name = "GENERATION_JOB"      # coordinates an in-flight generation's lifecycle
+class_name = "GenerationJob"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CreditAccount", "GenerationJob"]
+
+# ── Cron: reconciler — release orphaned holds + poll for missed webhooks (§10.3, §12.3) ──
+[triggers]
+crons = ["*/5 * * * *"]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Re-enable in Phase 2 (credits) — KV hot config + price-book mirror:
+# [[kv_namespaces]]
+# binding = "KV"
+# id = "REPLACE_WITH_KV_NAMESPACE_ID"
+#
+# ── R2 (owned asset storage: images / videos copied off Higgsfield's 7-day CDN) ──
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "vymotion-assets"
+#
+# Re-enable in Phase 3 (generation pipeline) — Queues (REQUIRES Workers Paid):
+# [[queues.producers]]
+# binding = "GENERATION_QUEUE"
+# queue = "vymotion-generation"
+# [[queues.consumers]]
+# queue = "vymotion-generation"
+# max_batch_size = 10
+# max_batch_timeout = 5
+# max_retries = 5
+# dead_letter_queue = "vymotion-generation-dlq"
+#
+# Re-enable when metrics land — Analytics Engine:
+# [[analytics_engine_datasets]]
+# binding = "ANALYTICS"
+# dataset = "vymotion_metrics"

@@ -1,10 +1,26 @@
 import { useState, useRef } from 'react'
+import {
+  Card,
+  Text,
+  Button,
+  TextInput,
+  Dialog,
+  DialogHeader,
+  Layout,
+  LayoutContent,
+  LayoutFooter,
+  EmptyState,
+  VStack,
+  HStack,
+} from '@astryxdesign/core'
 import { useBrandDeals, generateId } from '../store'
 import { compressImage, downloadImage } from '../utils/imageUtils'
 import { generateSingleImage } from '../utils/higgsfieldGenerate'
-import { isHFConnected } from '../utils/higgsfieldAuth'
+import { isVymotionSession, promptSignUp } from '../api/serverGenerate'
 import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/charSheetPrompt'
 import Lightbox from '../components/Lightbox'
+import { glassCard } from '../ui/glass'
+import AstryxScope from '../ui/ax/AstryxScope'
 
 function NewDealModal({ onClose, onSave }) {
   const [brand, setBrand] = useState('')
@@ -17,7 +33,7 @@ function NewDealModal({ onClose, onSave }) {
     const f = e.target.files[0]
     if (!f) return
     const r = new FileReader()
-    r.onload = ev => compressImage(ev.target.result).then(setImage)
+    r.onload = (ev) => compressImage(ev.target.result).then(setImage)
     r.readAsDataURL(f)
     e.target.value = ''
   }
@@ -28,90 +44,99 @@ function NewDealModal({ onClose, onSave }) {
     const f = e.dataTransfer.files[0]
     if (!f || !f.type.startsWith('image/')) return
     const r = new FileReader()
-    r.onload = ev => compressImage(ev.target.result).then(setImage)
+    r.onload = (ev) => compressImage(ev.target.result).then(setImage)
     r.readAsDataURL(f)
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 200,
-    }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--surface)', borderRadius: 20,
-        padding: 32, width: 380, boxShadow: 'var(--shadow-lg)',
-      }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px', marginBottom: 20 }}>New Brand Deal</h2>
-
-        <label style={{ display: 'block', marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>Brand Name</div>
-          <input
-            autoFocus
-            value={brand}
-            onChange={e => setBrand(e.target.value)}
-            placeholder="e.g. Nike"
-            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg)', fontSize: 14, color: 'var(--text-primary)' }}
+    <Dialog
+      isOpen
+      onOpenChange={(open) => { if (!open) onClose() }}
+      purpose="form"
+      width={400}
+      maxHeight="90vh"
+      padding={0}
+    >
+      <Layout
+        height="auto"
+        header={
+          <DialogHeader
+            title="New Brand Deal"
+            onOpenChange={(open) => { if (!open) onClose() }}
+            hasDivider
           />
-        </label>
-
-        <label style={{ display: 'block', marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>Category</div>
-          <input
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-            placeholder="e.g. Fitness, Beauty, Tech..."
-            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg)', fontSize: 14, color: 'var(--text-primary)' }}
-          />
-        </label>
-
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Brand Image</div>
-          <div
-            onClick={() => fileRef.current.click()}
-            onDragOver={e => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            style={{
-              width: '100%', aspectRatio: '16/9',
-              borderRadius: 10,
-              border: image ? 'none' : `1.5px dashed ${dragging ? '#8B5CF6' : 'var(--border)'}`,
-              background: image ? 'transparent' : dragging ? 'rgba(139,92,246,0.07)' : 'var(--bg-tertiary)',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', gap: 6,
-              transition: 'border-color 0.15s, background 0.15s',
-            }}
-          >
-            {image
-              ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <>
-                  <span style={{ fontSize: 22, opacity: dragging ? 0.6 : 0.25 }}>+</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{dragging ? 'Drop to upload' : 'Upload or drag & drop'}</span>
-                </>
-            }
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 14, fontWeight: 500, color: 'var(--text-secondary)', background: 'transparent' }}>Cancel</button>
-          <button
-            disabled={!brand.trim()}
-            onClick={() => onSave({ brand, category, image })}
-            style={{
-              flex: 1, padding: 10, borderRadius: 8, fontSize: 14, fontWeight: 600,
-              background: brand.trim() ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : 'var(--border)',
-              color: brand.trim() ? '#fff' : 'var(--text-tertiary)',
-              boxShadow: brand.trim() ? '0 2px 12px rgba(139,92,246,0.3)' : 'none',
-              transition: 'all 0.15s',
-            }}
-          >Add Deal</button>
-        </div>
-      </div>
-    </div>
+        }
+        content={
+          <LayoutContent padding={4} isScrollable={false}>
+            <VStack gap={3}>
+              <TextInput
+                label="Brand name"
+                value={brand}
+                onChange={setBrand}
+                placeholder="e.g. Nike"
+                hasAutoFocus
+                width="100%"
+              />
+              <TextInput
+                label="Category"
+                value={category}
+                onChange={setCategory}
+                placeholder="e.g. Fitness, Beauty, Tech..."
+                width="100%"
+              />
+              <VStack gap={1}>
+                <Text type="supporting" size="xsm" weight="bold" color="secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Brand image
+                </Text>
+                <div
+                  onClick={() => fileRef.current.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                  style={{
+                    width: '100%', aspectRatio: '16/9',
+                    borderRadius: 10,
+                    border: image ? 'none' : `1.5px dashed ${dragging ? 'var(--brand)' : 'var(--color-border, var(--border))'}`,
+                    background: image ? 'transparent' : dragging ? 'rgba(199,242,78,0.07)' : 'var(--color-background-muted, var(--bg-secondary))',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexDirection: 'column', gap: 6,
+                  }}
+                >
+                  {image
+                    ? <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : (
+                      <>
+                        <span style={{ fontSize: 22, opacity: dragging ? 0.6 : 0.25 }}>+</span>
+                        <Text type="supporting" size="xsm" color="secondary">
+                          {dragging ? 'Drop to upload' : 'Upload or drag & drop'}
+                        </Text>
+                      </>
+                    )}
+                </div>
+                <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+              </VStack>
+            </VStack>
+          </LayoutContent>
+        }
+        footer={
+          <LayoutFooter hasDivider padding={4}>
+            <HStack gap={2}>
+              <Button label="Cancel" variant="secondary" size="md" onClick={onClose} style={{ flex: 1 }} />
+              <Button
+                label="Add Deal"
+                variant="primary"
+                size="md"
+                isDisabled={!brand.trim()}
+                onClick={() => onSave({ brand, category, image })}
+                style={{ flex: 1 }}
+              />
+            </HStack>
+          </LayoutFooter>
+        }
+      />
+    </Dialog>
   )
 }
 
@@ -136,15 +161,13 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
   return (
     <div
       style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--radius-lg)',
+        ...glassCard,
         overflow: 'hidden',
-        boxShadow: 'var(--shadow-sm)',
-        border: hasSheet ? '1px solid rgba(139,92,246,0.25)' : '1px solid var(--border-subtle)',
-        transition: 'box-shadow 0.18s, transform 0.18s',
+        border: hasSheet ? '1px solid rgba(199,242,78,0.30)' : glassCard.border,
+        transition: 'border-color 0.15s var(--ease-out), background 0.15s var(--ease-out)',
       }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = 'translateY(0)' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface)' }}
     >
       {/* Image area */}
       <div
@@ -174,15 +197,12 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
         {generating && (
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'rgba(0,0,0,0.62)',
+            background: 'rgba(4,4,10,0.62)',
+            backdropFilter: 'blur(var(--blur-sm))',
+            WebkitBackdropFilter: 'blur(var(--blur-sm))',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              border: '2.5px solid rgba(255,255,255,0.2)',
-              borderTopColor: '#fff',
-              animation: 'spin 0.75s linear infinite',
-            }} />
+            <div className="blob-loader" style={{ width: 30, height: 30 }} />
             <div style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>
               {progress < 10 ? 'Asking Claude…' : progress < 25 ? 'Uploading…' : 'Generating…'}
             </div>
@@ -196,7 +216,7 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
             onClick={e => { e.stopPropagation(); setShowSheet(v => !v) }}
             style={{
               position: 'absolute', top: 8, left: 8,
-              display: 'flex', borderRadius: 8, overflow: 'hidden',
+              display: 'flex', borderRadius: 'var(--radius-sm)', overflow: 'hidden',
               border: '1px solid rgba(255,255,255,0.2)',
               backdropFilter: 'blur(6px)',
               cursor: 'pointer',
@@ -207,10 +227,10 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
               return (
                 <div key={label} style={{
                   padding: '3px 9px', fontSize: 10, fontWeight: 700,
-                  background: active ? 'rgba(139,92,246,0.9)' : 'rgba(0,0,0,0.45)',
-                  color: active ? '#fff' : 'rgba(255,255,255,0.6)',
+                  background: active ? 'rgba(199,242,78,0.9)' : 'rgba(0,0,0,0.45)',
+                  color: active ? 'var(--brand-ink)' : 'rgba(255,255,255,0.6)',
                   letterSpacing: '0.3px',
-                  transition: 'background 0.15s',
+                  transition: 'background 0.4s var(--ease-liquid)',
                 }}>{label}</div>
               )
             })}
@@ -263,11 +283,13 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
             ) : (
               <button
                 onClick={() => onGenerate(deal)}
+                className="liquid-press"
                 style={{
-                  padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                  background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-                  color: '#fff',
-                  boxShadow: '0 1px 8px rgba(139,92,246,0.3)',
+                  padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 800,
+                  background: 'var(--brand)',
+                  color: 'var(--brand-ink)',
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), 0 0 14px rgba(199,242,78,0.3)',
                   whiteSpace: 'nowrap',
                 }}
               >Generate</button>
@@ -282,8 +304,6 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
           >×</button>
         </div>
       </div>
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
@@ -313,7 +333,7 @@ export default function BrandDeals() {
   }
 
   async function handleGenerate(deal) {
-    if (!isHFConnected()) { alert('Connect Higgsfield in Settings first'); return }
+    if (!isVymotionSession()) { promptSignUp(); return }
 
     setGenerating(g => ({ ...g, [deal.id]: true }))
     setGenProgress(p => ({ ...p, [deal.id]: 0 }))
@@ -321,14 +341,10 @@ export default function BrandDeals() {
     try {
       // Step 1 — Claude studies the image and writes the full Higgsfield prompt
       let imagePrompt = null
-      const claudeKey = localStorage.getItem('claude_api_key')
-      console.log('[BrandDeals] claudeKey found:', !!claudeKey, '| deal.image exists:', !!deal.image)
-      if (claudeKey && deal.image) {
+      if (deal.image) {
         try {
           setGenProgress(p => ({ ...p, [deal.id]: 5 }))
-          console.log('[BrandDeals] Calling Claude...')
-          imagePrompt = await buildCharSheetPromptWithClaude(deal.image, deal.brand, deal.category, claudeKey)
-          console.log('[BrandDeals] Claude returned prompt:', imagePrompt?.slice(0, 120))
+          imagePrompt = await buildCharSheetPromptWithClaude(deal.image, deal.brand, deal.category)
         } catch (e) {
           console.error('[BrandDeals] Claude failed:', e.message)
         }
@@ -361,59 +377,64 @@ export default function BrandDeals() {
   }
 
   return (
-    <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: 'var(--bg)' }}>
-      {showNew && <NewDealModal onClose={() => setShowNew(false)} onSave={addDeal} />}
+    <AstryxScope>
+      <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: 'transparent' }}>
+        {showNew && <NewDealModal onClose={() => setShowNew(false)} onSave={addDeal} />}
 
-      {lightboxDeal && (
-        <Lightbox
-          images={[lightboxDeal.characterSheet || lightboxDeal.image]}
-          startIndex={0}
-          onClose={() => setLightboxDeal(null)}
-        />
-      )}
-
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-          <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.6px' }}>Brand Deals</h1>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 4 }}>
-              {deals.length} deal{deals.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowNew(true)}
-            style={{
-              padding: '9px 20px', borderRadius: 980,
-              background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff',
-              fontSize: 14, fontWeight: 600,
-              boxShadow: '0 2px 12px rgba(139,92,246,0.3)',
-            }}
-          >+ New Deal</button>
-        </div>
-
-        {deals.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--text-tertiary)' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✦</div>
-            <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>No brand deals yet</p>
-            <p style={{ fontSize: 13 }}>Add brands you want to promote with your influencers</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
-            {deals.map(deal => (
-              <DealCard
-                key={deal.id}
-                deal={deal}
-                generating={!!generating[deal.id]}
-                progress={genProgress[deal.id] || 0}
-                onDelete={deleteDeal}
-                onRename={renameDeal}
-                onOpen={() => setLightboxDeal(deal)}
-                onGenerate={handleGenerate}
-              />
-            ))}
-          </div>
+        {lightboxDeal && (
+          <Lightbox
+            images={[lightboxDeal.characterSheet || lightboxDeal.image]}
+            startIndex={0}
+            onClose={() => setLightboxDeal(null)}
+          />
         )}
+
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 24px 70px' }}>
+          <div className="reveal" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 30 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <Text
+                type="supporting"
+                size="xsm"
+                weight="bold"
+                color="secondary"
+                display="block"
+                style={{ textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}
+              >
+                Partnerships · {deals.length} deal{deals.length !== 1 ? 's' : ''}
+              </Text>
+              <Text type="display-2" weight="bold" display="block" style={{ letterSpacing: '-1.2px', lineHeight: 1 }}>
+                Brand Deals
+              </Text>
+            </div>
+            <Button label="+ New Deal" variant="primary" size="md" onClick={() => setShowNew(true)} />
+          </div>
+
+          {deals.length === 0 ? (
+            <div className="reveal-1" style={{ padding: '60px 0' }}>
+              <EmptyState
+                title="No brand deals yet"
+                description="Add brands you want to promote with your influencers"
+                actions={<Button label="+ New Deal" variant="primary" size="md" onClick={() => setShowNew(true)} />}
+              />
+            </div>
+          ) : (
+            <div className="reveal-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
+              {deals.map((deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  generating={!!generating[deal.id]}
+                  progress={genProgress[deal.id] || 0}
+                  onDelete={deleteDeal}
+                  onRename={renameDeal}
+                  onOpen={() => setLightboxDeal(deal)}
+                  onGenerate={handleGenerate}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </AstryxScope>
   )
 }

@@ -3,11 +3,50 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="alternate icon" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Influencer Studio</title>
+    <meta name="theme-color" content="#0A0A0B" />
+    <!-- Apply the saved theme before first paint. :root tokens are light-first,
+         so without this every dark-mode load flashes light until React mounts. -->
+    <script>
+      try {
+        document.documentElement.setAttribute(
+          'data-theme',
+          localStorage.getItem('theme') === 'light' ? 'light' : 'dark'
+        )
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark')
+      }
+    </script>
+    <title>Vymotion — Create AI Influencers That Earn</title>
+    <meta name="description" content="Vymotion is the all-in-one studio to create, grow, and monetize hyper-realistic AI influencers. Generate on-brand photos and video, land brand deals, and sell creator services across the US and Europe — no camera, no crew." />
+    <meta name="keywords" content="AI influencer, virtual influencer, AI model generator, AI content creation, influencer marketing, brand deals, creator economy, monetize AI influencer, AI UGC" />
+    <link rel="canonical" href="https://vymotion.org/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Vymotion" />
+    <meta property="og:title" content="Vymotion — Create AI Influencers That Earn" />
+    <meta property="og:description" content="Create, grow, and monetize hyper-realistic AI influencers. Photos, video, brand deals, and creator services for the US & Europe." />
+    <meta property="og:url" content="https://vymotion.org/" />
+    <meta property="og:image" content="https://vymotion.org/og.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Vymotion — Create AI Influencers That Earn" />
+    <meta name="twitter:description" content="Create, grow, and monetize hyper-realistic AI influencers. Photos, video, brand deals, and creator services for the US & Europe." />
+    <meta name="twitter:image" content="https://vymotion.org/og.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Warm the connections the app hits right after boot: the Vymotion API Worker
+         (credits/plan/data sync) and Clerk's frontend API (session + clerk-js). Saves a
+         DNS+TLS round trip (~100-300ms) on the first authenticated fetch. -->
+    <link rel="preconnect" href="https://vymotion-api.vikranty301.workers.dev" crossorigin />
+    <link rel="preconnect" href="https://calm-gopher-2.clerk.accounts.dev" crossorigin />
   </head>
   <body>
     <div id="root"></div>

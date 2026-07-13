@@ -3,24 +3,6 @@ import { flushSync } from 'react-dom'
 
 const ThemeContext = createContext()
 
-// Ink-splash shape: 4 outward spikes with deep concavities between them.
-// Deliberately asymmetric so it reads as organic paint, not a circle.
-// Returns raw SVG path data (no path() wrapper) so it can be set as the `d` attribute.
-function splatD(cx, cy, r) {
-  const p = (x, y) => `${Math.round(x)} ${Math.round(y)}`
-  return [
-    `M ${p(cx + r*0.08,  cy - r*1.35)}`,
-    `C ${p(cx + r*0.50,  cy - r*1.20)} ${p(cx + r*0.28,  cy - r*0.42)} ${p(cx + r*0.52,  cy - r*0.32)}`,
-    `C ${p(cx + r*0.76,  cy - r*0.22)} ${p(cx + r*1.68,  cy + r*0.02)} ${p(cx + r*1.48,  cy + r*0.38)}`,
-    `C ${p(cx + r*1.28,  cy + r*0.74)} ${p(cx + r*0.42,  cy + r*0.48)} ${p(cx + r*0.32,  cy + r*0.72)}`,
-    `C ${p(cx + r*0.22,  cy + r*0.96)} ${p(cx + r*0.12,  cy + r*1.58)} ${p(cx - r*0.12,  cy + r*1.38)}`,
-    `C ${p(cx - r*0.36,  cy + r*1.18)} ${p(cx - r*0.48,  cy + r*0.52)} ${p(cx - r*0.64,  cy + r*0.46)}`,
-    `C ${p(cx - r*0.80,  cy + r*0.40)} ${p(cx - r*1.62,  cy + r*0.12)} ${p(cx - r*1.42,  cy - r*0.22)}`,
-    `C ${p(cx - r*1.22,  cy - r*0.56)} ${p(cx - r*0.34,  cy - r*0.68)} ${p(cx - r*0.18,  cy - r*1.02)}`,
-    `C ${p(cx - r*0.02,  cy - r*1.36)} ${p(cx + r*0.04,  cy - r*1.38)} ${p(cx + r*0.08,  cy - r*1.35)} Z`,
-  ].join(' ')
-}
-
 let busy = false
 
 export function ThemeProvider({ children }) {
@@ -38,6 +20,9 @@ export function ThemeProvider({ children }) {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  // Liquid droplet reveal: the new theme spreads from the click point as a
+  // growing droplet — swelling past its final size and settling back like
+  // liquid finding its level, while the old theme blurs away underneath.
   function toggle(x, y) {
     if (busy) return
     const next = theme === 'light' ? 'dark' : 'light'
@@ -45,54 +30,47 @@ export function ThemeProvider({ children }) {
 
     busy = true
 
-    // Remove any stale elements from an interrupted previous transition
-    document.getElementById('theme-splat-svg')?.remove()
-    document.getElementById('theme-splat-style')?.remove()
+    document.getElementById('theme-droplet-style')?.remove()
 
-    const cx  = x  ?? window.innerWidth  - 46
-    const cy  = y  ?? window.innerHeight - 46
+    const cx = x ?? window.innerWidth - 46
+    const cy = y ?? window.innerHeight - 46
     const endR = Math.hypot(
-      Math.max(cx, window.innerWidth  - cx),
+      Math.max(cx, window.innerWidth - cx),
       Math.max(cy, window.innerHeight - cy)
-    ) * 1.15
-
-    const NS      = 'http://www.w3.org/2000/svg'
-    const svgEl   = document.createElementNS(NS, 'svg')
-    const defsEl  = document.createElementNS(NS, 'defs')
-    const clipEl  = document.createElementNS(NS, 'clipPath')
-    const pathEl  = document.createElementNS(NS, 'path')
-
-    svgEl.id = 'theme-splat-svg'
-    svgEl.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:visible;pointer-events:none;z-index:99999'
-    clipEl.id = 'theme-splat'
-    clipEl.setAttribute('clipPathUnits', 'userSpaceOnUse')
-    pathEl.setAttribute('d', splatD(cx, cy, 1))
-    clipEl.appendChild(pathEl)
-    defsEl.appendChild(clipEl)
-    svgEl.appendChild(defsEl)
-    document.body.appendChild(svgEl)
+    )
 
     const styleEl = document.createElement('style')
-    styleEl.id = 'theme-splat-style'
+    styleEl.id = 'theme-droplet-style'
     styleEl.textContent = `
       ::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
-      ::view-transition-new(root){clip-path:url(#theme-splat)}
+      ::view-transition-new(root){z-index:1}
+      ::view-transition-old(root){z-index:0}
     `
     document.head.appendChild(styleEl)
 
-    function cleanup() { svgEl.remove(); styleEl.remove(); busy = false }
+    function cleanup() { styleEl.remove(); busy = false }
 
     const vt = document.startViewTransition(() => { flushSync(() => setTheme(next)) })
 
     vt.ready.then(() => {
+      // Old view slowly loses focus — like condensation fogging a pane.
       document.documentElement.animate(
-        { opacity: [1, 0] },
-        { duration: 420, easing: 'ease-in', fill: 'forwards', pseudoElement: '::view-transition-old(root)' }
+        { opacity: [1, 0.6], filter: ['blur(0px)', 'blur(18px)'] },
+        { duration: 620, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards', pseudoElement: '::view-transition-old(root)' }
       )
 
-      const anim = pathEl.animate(
-        { d: [`path("${splatD(cx, cy, 1)}")`, `path("${splatD(cx, cy, endR)}")`] },
-        { duration: 950, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
+      // New view: droplet grows with a liquid overshoot, then settles.
+      const anim = document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${cx}px ${cy}px)`,
+            `circle(${Math.round(endR * 0.72)}px at ${cx}px ${cy}px)`,
+            `circle(${Math.round(endR * 1.12)}px at ${cx}px ${cy}px)`,
+            `circle(${Math.round(endR)}px at ${cx}px ${cy}px)`,
+          ],
+          offset: [0, 0.42, 0.78, 1],
+        },
+        { duration: 820, easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards', pseudoElement: '::view-transition-new(root)' }
       )
       anim.onfinish = cleanup
       anim.oncancel = cleanup

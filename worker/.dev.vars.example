@@ -1,0 +1,21 @@
+# Vymotion Worker — local dev secrets.
+# Copy to `.dev.vars` and fill in. NEVER commit the real .dev.vars (it's gitignored).
+# In production these are set with `wrangler secret put <NAME>`.
+# Full list mirrors PRD Appendix C.
+
+# ── Higgsfield Platform API (image/video) — server-side only ──
+HF_API_KEY=""
+HF_API_SECRET=""
+HF_WEBHOOK_SECRET=""
+
+# ── Anthropic Claude (prompt intelligence) ──
+ANTHROPIC_API_KEY=""
+
+# ── Polar.sh (Merchant of Record: billing + webhooks) ──
+POLAR_ACCESS_TOKEN=""
+POLAR_WEBHOOK_SECRET=""
+
+# ── Clerk (identity/sessions/social login) ──
+CLERK_SECRET_KEY=""
+CLERK_PUBLISHABLE_KEY=""
+CLERK_WEBHOOK_SECRET=""
