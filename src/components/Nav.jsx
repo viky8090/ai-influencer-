@@ -15,13 +15,12 @@ import RouterLink from '../ui/ax/RouterLink'
 import ProfileMenu from './ProfileMenu'
 import CreditChip from './CreditChip'
 
+// Docs, How it works, and Earn intentionally live in the footer only (Footer.jsx COLUMNS) —
+// they're reference/marketing pages, kept out of the header to keep the app nav uncluttered.
 const links = [
   { to: '/dashboard', label: 'Home' },
   { to: '/influencers', label: 'Influencers' },
   { to: '/publish', label: 'Publish' },
-  { to: '/docs', label: 'Docs' },
-  { to: '/how-it-works', label: 'How it works' },
-  { to: '/earnings', label: 'Earn' },
   { to: '/pricing', label: 'Pricing' },
 ]
 
@@ -193,7 +192,7 @@ export default function Nav() {
           </div>
 
           {/* Right actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
             <Button
               label="Create"
               variant="primary"

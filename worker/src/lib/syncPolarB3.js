@@ -88,7 +88,10 @@ export async function syncPolarB3(env) {
           ? `${item.grantVc.toLocaleString('en-US')} credits per billing cycle.`
           : `${item.grantVc.toLocaleString('en-US')} top-up credits (valid 12 months).`,
         recurring_interval: item.interval || undefined,
-        prices: [{ amount_type: 'fixed', price_amount: item.cents, price_currency: 'usd' }],
+        // tax_behavior 'location' → Polar (Merchant of Record) charges the customer tax on
+        // top per their region; the price_amount stays the net Vymotion receives. Without this
+        // the price would inherit the org default (which may be 'inclusive' = tax eats revenue).
+        prices: [{ amount_type: 'fixed', price_amount: item.cents, price_currency: 'usd', tax_behavior: 'location' }],
         metadata: {
           vy_kind: item.kind,
           vy_key: item.key,

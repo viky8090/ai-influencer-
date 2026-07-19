@@ -10,7 +10,7 @@ import { generateSingleImage, generateThreeImages, generateVideo, initSession, p
 import { buildThreeVariationPrompts } from '../utils/systemPrompt'
 import { gColor, pLabel } from '../utils/influencerUtils'
 import { useTheme } from '../context/theme'
-import { isVymotionSession, promptSignUp } from '../api/serverGenerate'
+import { isVymotionSession, promptSignUp, thumbUrl } from '../api/serverGenerate'
 import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/charSheetPrompt'
 import PhotoStudioPanel from './PhotoStudio'
 import WardrobeDrawer from '../components/WardrobeDrawer'
@@ -1345,7 +1345,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
                         onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setHoveredRef({ref,rect:r})}}
                         onMouseLeave={()=>setHoveredRef(null)}>
                         <div style={{width:54,height:70,borderRadius:9,overflow:'hidden',border:`1.5px solid ${hoveredRef?.ref===ref?'var(--accent,var(--brand))':'var(--border)'}`,background:'var(--bg-tertiary)',transition:'border-color 0.15s',cursor:'pointer'}}>
-                          <img src={ref.url} alt={ref.label} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',display:'block'}}/>
+                          <img src={thumbUrl(ref.url, 160)} alt={ref.label} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',display:'block'}}/>
                         </div>
                         <span style={{fontSize:9,fontWeight:600,color:'var(--text-tertiary)',textAlign:'center',maxWidth:54,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ref.label}</span>
                       </div>
@@ -1804,7 +1804,7 @@ function WardrobeGenerator({ influencer, onAdd }) {
           onMouseEnter={e => { e.currentTarget.querySelector('img').style.transform = 'scale(1.03)' }}
           onMouseLeave={e => { e.currentTarget.querySelector('img').style.transform = 'scale(1)' }}
         >
-          <img src={result.url} alt="" style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover', transition: 'transform 0.3s ease' }} />
+          <img src={thumbUrl(result.url, 800)} alt="" style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover', transition: 'transform 0.3s ease' }} />
           <button
             onClick={e => { e.stopPropagation(); downloadImage(result.url, `${(result.name || 'look').replace(/\s+/g, '-')}.jpg`) }}
             style={{
@@ -3373,7 +3373,7 @@ function HistoryCard({ entry, onDelete, onDownload, isSelected, onSelect, showSe
           {isVideo
             ? <video ref={videoRef} src={entry.url} preload="metadata" muted playsInline
                 style={{width:'100%', height:'100%', objectFit:'cover', display:'block'}}/>
-            : <img src={entry.url} alt={entry.label}
+            : <img src={thumbUrl(entry.url, 600)} alt={entry.label}
                 style={{width:'100%', height:'100%', objectFit:'cover', display:'block'}}/>
           }
           {isVideo && !hovered && (
@@ -4586,7 +4586,7 @@ ${shotsWithBeats.join('\n\n')}`
         }}>
           <div style={{display:'flex'}}>
             {allImages.slice(0,3).map((img,i)=>(
-              <img key={img.key} src={img.url} style={{
+              <img key={img.key} src={thumbUrl(img.url, 80)} style={{
                 width:26,height:26,borderRadius:'50%',objectFit:'cover',
                 border:'2px solid var(--glass-bg-strong)',marginLeft:i>0?-8:0,flexShrink:0,
               }}/>
@@ -4622,7 +4622,7 @@ ${shotsWithBeats.join('\n\n')}`
                       {key:'closeUpImage2',      label:'Feature Sheet',   url:influencer.closeUpImage2},
                     ].filter(img=>img.url).map(img=>(
                       <div key={img.key} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
-                        <img src={img.url} alt={img.label} style={{
+                        <img src={thumbUrl(img.url, 160)} alt={img.label} style={{
                           width:54,height:76,objectFit:'cover',objectPosition:'top',
                           borderRadius:7,border:'1px solid var(--border)',flexShrink:0,
                         }}/>

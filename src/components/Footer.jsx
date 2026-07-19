@@ -52,15 +52,17 @@ const COLUMNS = [
     links: [
       ['About Vymotion', '/how-it-works'],
       ['Pricing & plans', '/pricing'],
-      ['Contact', 'mailto:hello@vymotion.org'],
+      ['Contact', '/contact'],
     ],
   },
 ]
 
 const LEGAL = [
-  ['Terms', '/how-it-works#terms'],
-  ['Privacy', '/how-it-works#privacy'],
-  ['Responsible AI & likeness', '/how-it-works#policy'],
+  ['Terms', '/terms'],
+  ['Privacy', '/privacy'],
+  ['Cookies', '/cookies'],
+  ['DMCA', '/dmca'],
+  ['Responsible AI & likeness', '/terms#likeness'],
 ]
 
 function isExternal(href) {

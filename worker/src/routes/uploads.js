@@ -5,6 +5,7 @@
 // auth middleware; only kind='ref' assets are ever exposed there — generations stay private).
 import { Hono } from 'hono'
 import { ulid, nowMs } from '../lib/ids.js'
+import { serveR2Media } from '../lib/serveMedia.js'
 
 const uploads = new Hono()
 
@@ -28,6 +29,14 @@ uploads.post('/', async (c) => {
     }
     const r = await fetch(u).catch(() => null)
     if (!r || !r.ok) return c.json({ error: 'fetch_failed' }, 502)
+    // Redirect guard: fetch follows redirects, so an allowlisted host could bounce us
+    // anywhere. Re-validate the FINAL url against the same allowlist.
+    try {
+      const fin = new URL(r.url || u)
+      if (fin.protocol !== 'https:' || !REMOTE_ALLOW.some((re) => re.test(fin.hostname))) {
+        return c.json({ error: 'host_not_allowed' }, 403)
+      }
+    } catch { return c.json({ error: 'bad_url' }, 400) }
     const contentType = (r.headers.get('content-type') || '').split(';')[0]
     if (!EXT[contentType]) return c.json({ error: 'unsupported_type', contentType }, 400)
     const buf = new Uint8Array(await r.arrayBuffer())
@@ -81,14 +90,10 @@ publicRefs.get('/:id', async (c) => {
   const row = await c.env.DB.prepare("SELECT r2_key, content_type FROM assets WHERE id = ? AND kind = 'ref'")
     .bind(c.req.param('id')).first()
   if (!row) return c.json({ error: 'not_found' }, 404)
-  const obj = await c.env.ASSETS.get(row.r2_key)
-  if (!obj) return c.json({ error: 'gone' }, 404)
-  return new Response(obj.body, {
-    headers: {
-      'Content-Type': row.content_type || 'image/png',
-      'Cache-Control': 'public, max-age=86400',
-      'Access-Control-Allow-Origin': '*', // lets the SPA canvas-process refs without taint
-    },
+  return serveR2Media(c, row.r2_key, row.content_type || 'image/png', {
+    cacheControl: 'public, max-age=86400',
+    edgeCache: true,
+    cors: true, // lets the SPA canvas-process refs without taint
   })
 })
 
@@ -111,14 +116,9 @@ publicAssets.get('/:id', async (c) => {
   if (!ct.startsWith('image/') && !ct.startsWith('video/')) {
     return c.json({ error: 'not_found' }, 404)
   }
-  const obj = await c.env.ASSETS.get(row.r2_key)
-  if (!obj) return c.json({ error: 'gone' }, 404)
-  return new Response(obj.body, {
-    headers: {
-      'Content-Type': ct,
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'X-Content-Type-Options': 'nosniff',
-      'Access-Control-Allow-Origin': '*', // canvas reuse for wardrobe/ref pipeline
-    },
+  return serveR2Media(c, row.r2_key, ct, {
+    cacheControl: 'public, max-age=31536000, immutable',
+    edgeCache: true,
+    cors: true, // canvas reuse for wardrobe/ref pipeline
   })
 })

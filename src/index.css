@@ -1,7 +1,15 @@
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Layer order: the universal reset lives in `vy-reset`, declared BEFORE Astryx's
+   `astryx-base` layer (declaration order = priority order, later wins). Keeping the
+   reset layered lets Astryx component padding/margin/gap apply; an unlayered
+   `* { padding: 0 }` would silently strip spacing from every Astryx component. */
+@layer vy-reset, astryx-base;
+
+@layer vy-reset {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 :root {

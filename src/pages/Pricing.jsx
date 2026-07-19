@@ -299,16 +299,22 @@ function PlanCard({ pl, annual, busy, onChoose }) {
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column',
         backgroundImage: tint,
+        overflow: 'visible',
         ...(isPopular ? { border: '1px solid rgba(199,242,78,0.5)' } : {}),
         ...(isBest ? { border: '1px solid rgba(255,61,139,0.45)' } : {}),
       }}
     >
+      {/* Featured pill — floats on the top border so the name row never wraps */}
+      {(isPopular || isBest) && (
+        <span style={{ position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', zIndex: 1, whiteSpace: 'nowrap' }}>
+          {isPopular ? <MiniChip text="MOST POPULAR" color="brand" /> : <Badge label="⭐ BEST VALUE" variant="blue" />}
+        </span>
+      )}
+
       {/* Name + badges */}
       <HStack gap={2} align="center" style={{ flexWrap: 'wrap' }}>
         <Text type="body" weight="bold" size="lg" style={{ letterSpacing: '0.4px', textTransform: 'uppercase' }}>{pl.name}</Text>
         {annual && pl.key !== 'starter' && <MiniChip text="17% OFF" color="pink" />}
-        {isPopular && <MiniChip text="MOST POPULAR" color="brand" />}
-        {isBest && <Badge label="⭐ BEST VALUE" variant="blue" />}
       </HStack>
       <Text type="supporting" size="xsm" color="secondary" display="block" style={{ margin: '5px 0 12px', lineHeight: 1.4 }}>{pl.blurb}</Text>
 

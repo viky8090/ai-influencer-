@@ -42,10 +42,12 @@ export default async function handler(req) {
     return new Response('Forbidden', { status: 403, headers: corsHeaders })
   }
 
-  // Forward all request headers, drop 'host' so upstream doesn't reject it
+  // Forward request headers, minus 'host' (upstream would reject it) and 'cookie' —
+  // same-origin fetches attach the Clerk __session cookie, which must never reach a
+  // third party. Higgsfield auth travels in the Authorization header, not cookies.
   const forward = new Headers()
   for (const [k, v] of req.headers.entries()) {
-    if (k === 'host') continue
+    if (k === 'host' || k === 'cookie') continue
     forward.set(k, v)
   }
 

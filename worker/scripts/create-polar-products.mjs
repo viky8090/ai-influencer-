@@ -76,7 +76,7 @@ for (const item of CATALOG) {
           ? `${item.grantVc.toLocaleString('en-US')} credits per billing cycle.`
           : `${item.grantVc.toLocaleString('en-US')} top-up credits (valid 12 months).`,
         recurring_interval: item.interval,
-        prices: [{ amount_type: 'fixed', price_amount: item.cents, price_currency: 'usd' }],
+        prices: [{ amount_type: 'fixed', price_amount: item.cents, price_currency: 'usd', tax_behavior: 'location' }],
         metadata: {
           vy_kind: item.kind, vy_key: item.key, vy_grant_vc: String(item.grantVc),
           vy_pricing: 'b3',

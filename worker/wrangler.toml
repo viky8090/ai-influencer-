@@ -41,9 +41,10 @@ enabled = true
 ENVIRONMENT = "production"
 APP_URL = "https://vymotion.org"
 API_URL = "https://vymotion-api.vikranty301.workers.dev"
-# Polar.sh environment — PRODUCTION (org "Viky Ai" 9c32fb05-f159-4bf8-aff2-8886699a80f8;
-# products + webhook endpoint created 2026-07-04 via the Polar MCP). Sandbox would be
-# https://sandbox-api.polar.sh with its own token/products/webhook.
+# Polar.sh environment — PRODUCTION (org "Vymotion"; migrated from the old "Viky Ai" org
+# 2026-07-14 — POLAR_ACCESS_TOKEN + POLAR_WEBHOOK_SECRET secrets select the org, products
+# recreated via POST /internal/sync-b3-pricing which also rewrites D1 polar_products).
+# Sandbox would be https://sandbox-api.polar.sh with its own token/products/webhook.
 POLAR_API_BASE = "https://api.polar.sh"
 # Self-hosted Postiz Public API (social publishing, PRD N13/§12.8). The POSTIZ_API_KEY
 # secret must also be set; /api/social returns 503 publishing_not_configured until both exist.

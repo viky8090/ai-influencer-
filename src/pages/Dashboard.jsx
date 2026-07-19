@@ -18,6 +18,7 @@ import { useCredits } from '../api/creditsStore'
 import { isTourDone } from '../components/OnboardingTour'
 import AstryxScope from '../ui/ax/AstryxScope'
 import RouterLink from '../ui/ax/RouterLink'
+import { thumbUrl } from '../api/serverGenerate'
 
 // Speaker icons for the video mute toggle.
 const IconMuted = () => (
@@ -56,7 +57,7 @@ function RecentTile({ m, navigate }) {
     >
       {isVideo
         ? <video ref={vidRef} src={m.url} muted={muted} loop playsInline preload="metadata" style={{ width: '100%', display: 'block' }} />
-        : <img src={m.url} alt="" loading="lazy" style={{ width: '100%', display: 'block' }} />}
+        : <img src={thumbUrl(m.url, 800)} alt="" loading="lazy" style={{ width: '100%', display: 'block' }} />}
 
       {isVideo && (
         <>
@@ -88,7 +89,7 @@ function RecentTile({ m, navigate }) {
 
 function Stat({ label, big, meta, link, onLink, children }) {
   return (
-    <Card padding={4} style={{ display: 'flex', flexDirection: 'column' }}>
+    <Card padding={5} style={{ display: 'flex', flexDirection: 'column', borderRadius: 12 }}>
       <Text
         type="supporting"
         size="xsm"
@@ -98,15 +99,13 @@ function Stat({ label, big, meta, link, onLink, children }) {
       >
         {label}
       </Text>
-      <Text type="display-3" weight="bold" display="block" style={{ letterSpacing: '-0.5px', margin: '8px 0 2px' }}>
+      <Text type="display-3" weight="bold" display="block" style={{ letterSpacing: '-0.5px', margin: '10px 0 4px' }}>
         {big}
       </Text>
-      {meta && (
-        <Text type="supporting" size="sm" color="secondary" display="block">{meta}</Text>
-      )}
+      <Text type="supporting" size="sm" color="secondary" display="block" style={{ minHeight: 20 }}>{meta || ' '}</Text>
       {children}
       {link && (
-        <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+        <div style={{ marginTop: 'auto', paddingTop: 12 }}>
           <Button
             label={`${link} →`}
             variant="ghost"
@@ -174,7 +173,7 @@ export default function Dashboard() {
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 70px' }}>
 
           {/* Header */}
-          <div className="reveal" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
+          <div className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
             <div style={{ minWidth: 0, flex: 1 }}>
               <Text
                 type="supporting"
@@ -206,7 +205,7 @@ export default function Dashboard() {
 
           {/* First-time checklist */}
           {(firstVisit || onlyExample) && (
-            <Card className="reveal-1" padding={4} style={{ marginBottom: 18 }}>
+            <Card className="reveal-1" padding={5} style={{ marginBottom: 20, borderRadius: 12 }}>
               <HStack justify="between" align="center" gap={3} style={{ flexWrap: 'wrap' }}>
                 <VStack gap={0.5} style={{ flex: 1, minWidth: 200 }}>
                   <Text type="body" size="sm" weight="bold">Getting started</Text>
@@ -214,7 +213,7 @@ export default function Dashboard() {
                     1) Open Camila · 2) Try Photo Studio · 3) Create your influencer
                   </Text>
                 </VStack>
-                <HStack gap={2}>
+                <HStack gap={3}>
                   <Button label="Open Camila" variant="primary" size="sm" href="/influencers" as={RouterLink} />
                   <Button label="Create yours" variant="secondary" size="sm" href="/create" as={RouterLink} />
                 </HStack>
@@ -237,7 +236,7 @@ export default function Dashboard() {
           )}
 
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }} className="dash-stats reveal-2">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }} className="dash-stats reveal-2">
             <Stat
               label="Credit balance"
               big={total != null ? total.toLocaleString() : '…'}
@@ -262,32 +261,33 @@ export default function Dashboard() {
           </div>
 
           {/* Quick actions */}
-          <div style={{ margin: '26px 0 12px' }}>
+          <div style={{ margin: '30px 0 14px' }}>
             <Text type="body" weight="bold" size="sm">Quick actions</Text>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }} className="dash-actions reveal-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }} className="dash-actions reveal-3">
             {QUICK.map((a) => (
               <ClickableCard
                 key={a.title}
                 label={a.title}
                 onClick={() => navigate(a.to)}
-                padding={4}
+                padding={5}
+                style={{ borderRadius: 12 }}
               >
                 <div style={{
                   width: 36, height: 36, borderRadius: 9,
                   background: 'rgba(199,242,78,0.12)', color: 'var(--brand)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14,
                 }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{a.icon}</svg>
                 </div>
                 <Text type="body" size="sm" weight="bold" display="block">{a.title}</Text>
-                <Text type="supporting" size="xsm" color="secondary" display="block" style={{ marginTop: 3 }}>{a.cost}</Text>
+                <Text type="supporting" size="sm" color="secondary" display="block" style={{ marginTop: 6 }}>{a.cost}</Text>
               </ClickableCard>
             ))}
           </div>
 
           {/* Recent generations */}
-          <HStack justify="between" align="center" style={{ margin: '26px 0 12px' }}>
+          <HStack justify="between" align="center" style={{ margin: '30px 0 14px' }}>
             <Text type="body" weight="bold" size="sm">Recent generations</Text>
             <Button label="View all →" variant="ghost" size="sm" href="/influencers" as={RouterLink} />
           </HStack>
@@ -313,11 +313,11 @@ export default function Dashboard() {
           )}
 
           {/* Your influencers */}
-          <HStack justify="between" align="center" style={{ margin: '26px 0 12px' }}>
+          <HStack justify="between" align="center" style={{ margin: '30px 0 14px' }}>
             <Text type="body" weight="bold" size="sm">Your influencers</Text>
             <Button label="Manage →" variant="ghost" size="sm" href="/influencers" as={RouterLink} />
           </HStack>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }} className="dash-inf">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }} className="dash-inf">
             {(influencers || []).slice(0, 5).map((inf) => (
               <ClickableCard
                 key={inf.id}

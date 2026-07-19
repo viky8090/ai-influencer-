@@ -24,6 +24,23 @@ export function publicAssetUrl(assetId) {
   return `${API_BASE}/public/assets/${assetId}`
 }
 
+// Cloudflare Image Resizing thumbnail. GATED by TRANSFORMATIONS_ENABLED: the zone's
+// Transformations feature (Cloudflare dash → Images → Transformations → enable for
+// vymotion.org) must be ON, otherwise /cdn-cgi/image/ 404s and every gated <img> breaks.
+// Flip this to true ONLY after confirming a /cdn-cgi/image/ request returns 200.
+// Even when true it no-ops on localhost and for non-public URLs (data:, blob:, localStorage
+// refs), so it's safe to call unconditionally.
+const TRANSFORMATIONS_ENABLED = true // verified live 2026-07-14: cf-resized 200, webp, 22x smaller
+
+const _IS_CF_ZONE = typeof window !== 'undefined' &&
+  (window.location.hostname === 'vymotion.org' || window.location.hostname === 'www.vymotion.org')
+
+export function thumbUrl(url, width = 600) {
+  if (!TRANSFORMATIONS_ENABLED || !_IS_CF_ZONE || typeof url !== 'string') return url
+  if (!url.includes('/public/assets/') && !url.includes('/public/refs/')) return url
+  return `/cdn-cgi/image/width=${width},format=auto,quality=85/${url}`
+}
+
 // R2 assets are private (header-auth), so <img>/<video> tags can't load them directly.
 // Fetch with the Clerk token and hand back an object URL. Callers may revoke when done.
 export async function fetchAssetBlobUrl(assetId) {

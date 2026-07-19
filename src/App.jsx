@@ -28,6 +28,11 @@ const Publish = lazy(() => import('./pages/Publish'))
 const Usage = lazy(() => import('./pages/Usage'))
 const Settings = lazy(() => import('./pages/Settings'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
+const Contact = lazy(() => import('./pages/Contact'))
+const Terms = lazy(() => import('./pages/legal/Terms'))
+const Privacy = lazy(() => import('./pages/legal/Privacy'))
+const Dmca = lazy(() => import('./pages/legal/Dmca'))
+const Cookies = lazy(() => import('./pages/legal/Cookies'))
 
 // Warm the most likely next chunks while the browser is idle, so in-app navigation never
 // waits on the network. Failures are fine — the route's own lazy() retries on navigation.
@@ -100,6 +105,11 @@ export default function App() {
         <Route path="/usage" element={<Usage />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/dmca" element={<Dmca />} />
+        <Route path="/cookies" element={<Cookies />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
