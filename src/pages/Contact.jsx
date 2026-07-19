@@ -5,7 +5,7 @@ import { M, Section, Eyebrow, Lead, Reveal, mCard } from '../ui/marketing'
 import { useSEO } from '../ui/seo'
 import Footer from '../components/Footer'
 
-const EMAIL = 'hello@vymotion.org'
+const EMAIL = 'contact@vymotion.org'
 
 const CHANNELS = [
   {

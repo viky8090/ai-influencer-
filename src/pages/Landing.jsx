@@ -509,7 +509,7 @@ export default function Landing() {
           <div>
             <Reveal><Eyebrow>FAQ</Eyebrow></Reveal>
             <Reveal delay={0.05}><H2>Questions, answered</H2></Reveal>
-            <Reveal delay={0.1}><Lead>Everything you need to know before you start. Still curious? <a href="mailto:hello@vymotion.org" style={{ color: M.brand, textDecoration: 'none' }}>Email us</a>.</Lead></Reveal>
+            <Reveal delay={0.1}><Lead>Everything you need to know before you start. Still curious? <a href="mailto:contact@vymotion.org" style={{ color: M.brand, textDecoration: 'none' }}>Email us</a>.</Lead></Reveal>
           </div>
           <Reveal delay={0.06}>
             {FAQ.map((f, i) => (

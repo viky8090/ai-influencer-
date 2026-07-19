@@ -8,7 +8,7 @@ import { M } from '../../ui/marketing'
 import { useSEO } from '../../ui/seo'
 import Footer from '../../components/Footer'
 
-export const LEGAL_EMAIL = 'hello@vymotion.org'
+export const LEGAL_EMAIL = 'contact@vymotion.org'
 
 export function Mail({ subject }) {
   const href = subject ? `mailto:${LEGAL_EMAIL}?subject=${encodeURIComponent(subject)}` : `mailto:${LEGAL_EMAIL}`

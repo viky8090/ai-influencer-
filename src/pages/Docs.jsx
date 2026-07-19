@@ -829,7 +829,7 @@ export default function Docs() {
                 <LinkBtn to="/how-it-works#privacy">Privacy</LinkBtn>
                 {' · '}
                 <LinkBtn to="/how-it-works#terms">Terms</LinkBtn>.
-                Contact: hello@vymotion.org
+                Contact: contact@vymotion.org
               </P>
             </Section>
 
