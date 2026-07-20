@@ -40,7 +40,9 @@ export default function AIAssist({ purpose, context, draft = '', onAccept, image
       setResult(text)
     } catch (e) {
       if (e?.code === 'SIGN_IN_REQUIRED') setError({ kind: 'signin', msg: 'Sign in to use AI assist.' })
-      else if (e?.status === 402 || /credit/i.test(e?.message || '')) setError({ kind: 'credits', msg: 'You’re out of credits.' })
+      // ONLY a true 402 means out of credits — matching /credit/i on the message turned
+      // every failure (401 bad Clerk secret, 502 provider error, network) into this popup.
+      else if (e?.status === 402) setError({ kind: 'credits', msg: 'You’re out of credits.' })
       else setError({ kind: 'error', msg: e?.message || 'Couldn’t write that — try again.' })
     } finally {
       setLoading(false)

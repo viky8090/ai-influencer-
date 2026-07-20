@@ -98,7 +98,7 @@ async function resolveOneRef(ref) {
       return ref // last resort — pass the original through and let the provider try
     }
   }
-  // Site-relative (seed images like /kayla/main.jpg) — the app origin is localhost during
+  // Site-relative (seed images like /camila/main.jpg) — the app origin is localhost during
   // dev, so fetch in-browser, downscale, and upload to R2.
   if (ref.startsWith('/')) return uploadFromUrl(ref)
   return null
@@ -209,7 +209,13 @@ export async function serverGenerate({ kind, model, params = {}, count = 1, infl
       err.status = 402
       throw err
     }
-    throw new Error('Generation failed — no credits were charged.')
+    // Keep the real failure visible and machine-readable. The word "credit" must NOT
+    // appear here: only a true 402 may read as out-of-credits in the UI.
+    const code = e.body?.error || (e.status ? `HTTP ${e.status}` : 'network')
+    const err = new Error(`Generation failed (${code}) — nothing was charged.`)
+    err.status = e.status
+    err.body = e.body
+    throw err
   }
 
   // Claude prompt calls return synchronously.
