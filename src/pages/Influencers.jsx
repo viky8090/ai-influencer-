@@ -2589,39 +2589,29 @@ function Sec({ children, style }) {
 
 // ─────────────────────────────────────────────
 // Detail tabs with palette-tinted active state
-const DETAIL_TABS = ['Overview','Scripts','Wardrobe','Home','Brand Deals','History']
+/**
+ * The studio's navigation, flat and in work order.
+ *
+ * Replaces DETAIL_TABS + the studioTab pill group. The old shape was a three-item pill row
+ * (Profile / Photos / Videos) where only Profile had children - six underline sub-tabs - so
+ * one branch carried six destinations and the other two carried none. It also buried the
+ * library (then "History") at the last position of the nested level, which meant the work
+ * you actually came to look at was the hardest thing on the page to reach.
+ *
+ * Order here is the real workflow: see what you have, make more, then dress/stage/sell it.
+ * `count` surfaces how much exists behind each view so the nav doubles as a status readout.
+ */
+const VIEWS = [
+  { key:'library',  label:'Library',  count: i => (i?.generationHistory||[]).length },
+  { key:'photos',   label:'Photos' },
+  { key:'videos',   label:'Videos' },
+  { key:'wardrobe', label:'Wardrobe', count: i => (i?.wardrobeSlots||[]).filter(s=>s?.image).length },
+  { key:'spaces',   label:'Spaces',   count: i => (i?.homeSlots||[]).filter(s=>s?.image).length },
+  { key:'deals',    label:'Deals',    count: i => (i?.brandDeals||[]).length },
+  { key:'scripts',  label:'Scripts',  count: i => (i?.scripts||[]).length },
+  { key:'identity', label:'Identity' },
+]
 
-// Phase 10 remix: underline segment tabs on a shared baseline rule — replaces the
-// ancestor repo's pill-chip tab row. Active tab = accent underline bar + glow.
-function Tabs({ active, onChange, ac }) {
-  return (
-    <div style={{display:'flex',gap:2,marginBottom:20,flexWrap:'wrap',borderBottom:'1px solid var(--glass-border)'}}>
-      {DETAIL_TABS.map(tab=>{
-        const on = active===tab
-        return (
-          <button key={tab} onClick={()=>onChange(tab)} style={{
-            padding:'8px 14px 11px',fontSize:13,fontWeight:on?800:500,
-            background:'transparent',border:'none',cursor:'pointer',
-            color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
-            position:'relative',whiteSpace:'nowrap',
-            transition:'color 0.35s var(--ease-liquid)',
-          }}
-            onMouseEnter={e=>{ if(!on) e.currentTarget.style.color='var(--text-primary)' }}
-            onMouseLeave={e=>{ if(!on) e.currentTarget.style.color='var(--text-secondary)' }}
-          >
-            {tab}
-            <span aria-hidden="true" style={{
-              position:'absolute',left:10,right:10,bottom:-1,height:2.5,borderRadius:2,
-              background: on ? ac : 'transparent',
-              boxShadow: on ? `0 0 12px ${ac}77` : 'none',
-              transition:'background 0.35s var(--ease-liquid), box-shadow 0.35s var(--ease-liquid)',
-            }}/>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────
 // Content Studio helpers
@@ -5846,8 +5836,12 @@ export default function Influencers() {
   const location = useLocation()
   const navigate = useNavigate()
   const [selectedId,setSelectedId]=useState(()=>localStorage.getItem('inf_last_selected')||null)
-  const [studioTab,setStudioTab]=useState('influencer')
-  const [activeTab,setActiveTab]=useState('Overview')
+  // Single flat view instead of the old two-level tab system (a `studioTab` pill group of
+  // Profile/Photos/Videos, where only Profile had six underline sub-tabs). That hierarchy was
+  // asymmetric - one branch carried six destinations and the other two carried none - and it
+  // buried the library, the actual output, six tabs deep. VIEWS is now flat and output-first.
+  const [view,setView]=useState(()=>localStorage.getItem('inf_view')||'library')
+  const goView=(v)=>{ setView(v); localStorage.setItem('inf_view', v) }
   const [videoRestoreKey, setVideoRestoreKey] = useState(0)
   const [photoRestoreKey, setPhotoRestoreKey] = useState(0)
   const [pendingStartFrame, setPendingStartFrame] = useState(null)
@@ -5865,12 +5859,11 @@ export default function Influencers() {
   const dragStartX=useRef(0)
   const dragStartW=useRef(0)
   const isMobile=useMobile()
-  const tabSecRef=useRef()
   const mainPaneRef=useRef()
   const [scriptsHighlightId,setScriptsHighlightId]=useState(null)
   const hasNavigatedToScripts=useRef(false)
   const prevInfIdRef=useRef(null)
-  const currentTabsRef=useRef({ studioTab, activeTab })
+  const currentTabsRef=useRef({ view })
   const [infOrder,setInfOrder]=useState(()=>{try{return JSON.parse(localStorage.getItem('inf_order')||'null')}catch{return null}})
   const [dragState,setDragState]=useState(null) // {srcId, overId, above}
   const orderedRef=useRef([])
@@ -5916,13 +5909,12 @@ export default function Influencers() {
   const pct=influencer?completeness(influencer):0
 
   // Keep currentTabsRef current so the switch useEffect can read tabs before restoring
-  currentTabsRef.current = { studioTab, activeTab }
+  currentTabsRef.current = { view }
 
   // Reset to profile tab on every influencer switch
   useEffect(() => {
     prevInfIdRef.current = influencer?.id
-    setStudioTab('influencer')
-    setActiveTab('Overview')
+    goView('library')
     setScriptsHighlightId(null)
     hasNavigatedToScripts.current = false
   }, [influencer?.id]) // eslint-disable-line
@@ -5961,11 +5953,8 @@ export default function Influencers() {
   function handleSaveToScripts(scriptId) {
     if (hasNavigatedToScripts.current) return
     hasNavigatedToScripts.current = true
-    setStudioTab('influencer')
-    localStorage.setItem('inf_studio_tab','influencer')
-    setActiveTab('Scripts')
+    goView('scripts')
     setScriptsHighlightId(scriptId)
-    setTimeout(() => tabSecRef.current?.scrollIntoView({ behavior:'smooth', block:'start' }), 120)
   }
 
   function dup(id) {
@@ -6226,49 +6215,48 @@ export default function Influencers() {
             }}>← All Influencers</button>
           )}
 
-          {/* ── Studio tab switcher + sidebar toggle */}
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            {/* Expand sidebar button — only when collapsed */}
+          {/* ── Flat view nav ───────────────────────────────────────────────────
+              Replaces a pill group (Profile/Photos/Videos) stacked on top of a six-item
+              underline tab row that only existed under Profile. One level, seven peers,
+              library first: the work you made is the page, not a tab six deep. */}
+          <nav style={{display:'flex',alignItems:'center',gap:2,flexWrap:'wrap',borderBottom:`1px solid ${SD.border}`,marginBottom:4}}>
             {sidebarCollapsed && !isMobile && (
-              <button onClick={()=>{setSidebarCollapsed(false);localStorage.setItem('inf_sidebar_collapsed','0')}} title="Show sidebar" className="liquid-press" style={{
-                width:34,height:34,borderRadius:'var(--radius-sm)',border:'1px solid var(--glass-border)',
-                background:'var(--glass-bg)',color:'var(--text-secondary)',fontSize:15,
-                boxShadow:'inset 0 1px 0 var(--glass-highlight)',
+              <button onClick={()=>{setSidebarCollapsed(false);localStorage.setItem('inf_sidebar_collapsed','0')}} title="Show influencers" style={{
+                width:30,height:30,borderRadius:8,border:`1px solid ${SD.border}`,background:'transparent',
+                color:'var(--text-secondary)',fontSize:15,cursor:'pointer',marginRight:8,
                 display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,
-                transition:'background 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid)',
-              }}
-                onMouseEnter={e=>{e.currentTarget.style.background='var(--glass-bg-strong)'}}
-                onMouseLeave={e=>{e.currentTarget.style.background='var(--glass-bg)'}}
-              >›</button>
+              }}>›</button>
             )}
-            <div style={{display:'flex',gap:4,padding:4,borderRadius:999,background:'var(--glass-bg)',backdropFilter:'blur(var(--blur-md))',WebkitBackdropFilter:'blur(var(--blur-md))',border:'1px solid var(--glass-border)',boxShadow:'inset 0 1px 0 var(--glass-highlight)',alignSelf:'flex-start'}}>
-              <button onClick={()=>{ setStudioTab('influencer'); localStorage.setItem('inf_studio_tab','influencer') }} className="liquid-press" style={{
-                padding:'9px 22px',borderRadius:999,fontSize:13,fontWeight:studioTab==='influencer'?700:600,border:'none',
-                background: studioTab==='influencer' ? 'var(--surface-hover)' : 'transparent',
-                color: studioTab==='influencer' ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                boxShadow: studioTab==='influencer' ? 'inset 0 1px 0 var(--glass-highlight), 0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                transition:'background 0.45s var(--ease-liquid), color 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid), transform 0.5s var(--ease-jelly)',
-              }}>Profile</button>
-              <button onClick={()=>{ setStudioTab('photo'); localStorage.setItem('inf_studio_tab','photo') }} className="liquid-press" style={{
-                padding:'9px 22px',borderRadius:999,fontSize:13,fontWeight:studioTab==='photo'?700:600,border:'none',
-                background: studioTab==='photo' ? 'var(--surface-hover)' : 'transparent',
-                color: studioTab==='photo' ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                boxShadow: studioTab==='photo' ? 'inset 0 1px 0 var(--glass-highlight), 0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                transition:'background 0.45s var(--ease-liquid), color 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid), transform 0.5s var(--ease-jelly)',
-              }}>Photos</button>
-              <button onClick={()=>{ setStudioTab('content'); localStorage.setItem('inf_studio_tab','content') }} className="liquid-press" style={{
-                padding:'9px 22px',borderRadius:999,fontSize:13,fontWeight:studioTab==='content'?800:600,border:'none',
-                background: studioTab==='content' ? 'var(--brand)' : 'transparent',
-                color: studioTab==='content' ? 'var(--brand-ink)' : 'var(--text-tertiary)',
-                boxShadow: studioTab==='content' ? 'inset 0 1px 0 rgba(255,255,255,0.5), var(--glow-brand)' : 'none',
-                transition:'background 0.45s var(--ease-liquid), color 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid), transform 0.5s var(--ease-jelly)',
-              }}>Videos</button>
-            </div>
-          </div>
+            {VIEWS.map(v=>{
+              const on = view===v.key
+              const count = v.count ? v.count(influencer) : 0
+              return (
+                <button key={v.key} onClick={()=>goView(v.key)} style={{
+                  position:'relative',padding:'10px 14px 11px',background:'none',border:'none',cursor:'pointer',
+                  fontSize:13.5,fontWeight:on?700:550,letterSpacing:'-0.1px',
+                  color:on?'var(--text-primary)':'var(--text-tertiary)',
+                  display:'flex',alignItems:'center',gap:7,
+                  transition:'color 0.16s ease',
+                }}>
+                  {v.label}
+                  {count>0 && (
+                    <span style={{
+                      fontSize:10.5,fontWeight:700,padding:'1.5px 6px',borderRadius:999,
+                      background:on?ac:'var(--bg-tertiary)',
+                      color:on?accentText(ac):'var(--text-tertiary)',
+                      fontVariantNumeric:'tabular-nums',
+                    }}>{count}</span>
+                  )}
+                  {on && <span style={{position:'absolute',left:10,right:10,bottom:-1,height:2,borderRadius:2,background:ac}}/>}
+                </button>
+              )
+            })}
+          </nav>
 
-
-
-          <div style={{ display: studioTab==='content' ? 'block' : 'none' }}>
+          {/* Generators stay MOUNTED and hidden rather than unmounted: each owns a large
+              amount of in-flight state (prompt, model, queued jobs, polling) and remounting
+              on a view switch would silently discard a running generation. */}
+          <div style={{ display: view==='videos' ? 'block' : 'none' }}>
             <ContentStudio key={influencer.id} influencer={influencer} onUpdate={v=>upd(influencer.id,v)} onSaveToScripts={handleSaveToScripts} restoreKey={videoRestoreKey}
               pendingStartFrame={pendingStartFrame} onStartFrameConsumed={()=>setPendingStartFrame(null)}
               onGenerated={(urls, settings)=>{
@@ -6287,142 +6275,121 @@ export default function Influencers() {
               }}/>
           </div>
 
-          <div style={{ display: studioTab==='photo' ? 'block' : 'none' }}>
-            <PhotoStudioPanel influencer={influencer} restoreKey={photoRestoreKey} onGoToWardrobe={() => {
-              setStudioTab('influencer')
-              localStorage.setItem('inf_studio_tab', 'influencer')
-              setActiveTab('Wardrobe')
-              setTimeout(() => tabSecRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
-            }} onUseAsStartFrame={url => {
-              setPendingStartFrame(url)
-              setStudioTab('content')
-              localStorage.setItem('inf_studio_tab', 'content')
-              setTimeout(() => mainPaneRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50)
-            }} />
+          <div style={{ display: view==='photos' ? 'block' : 'none' }}>
+            <PhotoStudioPanel influencer={influencer} restoreKey={photoRestoreKey}
+              onGoToWardrobe={() => goView('wardrobe')}
+              onUseAsStartFrame={url => {
+                setPendingStartFrame(url)
+                goView('videos')
+                setTimeout(() => mainPaneRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50)
+              }} />
           </div>
 
-          {studioTab==='influencer' && <>
-
-          {/* ── Empty state CTA — shown when influencer has no main image yet */}
-          {!influencer.mainImage && (
-            <div style={{
-              borderRadius:18,padding:'36px 28px',textAlign:'center',
-              background:'linear-gradient(135deg,rgba(199,242,78,0.06),rgba(199,242,78,0.08))',
-              border:'1.5px dashed rgba(199,242,78,0.3)',
-            }}>
-              <div style={{fontSize:38,marginBottom:12,lineHeight:1}}>✦</div>
-              <div style={{fontSize:20,fontWeight:700,color:'var(--text-primary)',marginBottom:6,letterSpacing:'-0.3px'}}>
-                {influencer.name} has no images yet
-              </div>
-              <div style={{fontSize:14,color:'var(--text-tertiary)',marginBottom:24,lineHeight:1.6}}>
-                Go through the creation flow to generate photos, set their appearance, and build their identity.
-              </div>
-              <button
-                className="liquid-press"
-                onClick={() => navigate('/create', { state: { replaceId: influencer.id, prefillName: influencer.name, prefillGender: influencer.gender } })}
-                style={{
-                  display:'inline-flex',alignItems:'center',gap:10,
-                  padding:'13px 28px',borderRadius:999,fontSize:15,fontWeight:800,
-                  background:'var(--brand)',color:'var(--brand-ink)',
-                  border:'1px solid rgba(255,255,255,0.35)',cursor:'pointer',
-                  boxShadow:'inset 0 1px 0 rgba(255,255,255,0.55), var(--glow-brand)',
-                  transition:'box-shadow 0.45s var(--ease-liquid)',
-                }}
-                onMouseEnter={e=>{e.currentTarget.style.boxShadow='inset 0 1px 0 rgba(255,255,255,0.6), 0 6px 30px rgba(199,242,78,0.55)'}}
-                onMouseLeave={e=>{e.currentTarget.style.boxShadow='inset 0 1px 0 rgba(255,255,255,0.55), var(--glow-brand)'}}
-              >
-                ✦ Generate your influencer
-              </button>
-            </div>
+          {/* Library is the default landing view: the generated work, not a config form. */}
+          {view==='library' && (
+            <HistoryTab influencer={influencer} onUpdate={v=>upd(influencer.id,v)}
+              onReuseSettings={(seg)=>{ if (seg === 'videos') { goView('videos'); setVideoRestoreKey(k => k+1) } else { goView('photos'); setPhotoRestoreKey(k => k+1) } }}/>
           )}
 
-          {/* Hero banner */}
-          <HeroBanner influencer={influencer} pct={pct} onDelete={()=>del(influencer.id)} onUpdate={v=>upd(influencer.id,v)}/>
+          {view==='wardrobe' && (<>
+            <WardrobeGenerator
+              influencer={influencer}
+              onAdd={slot => {
+                upd(influencer.id, { wardrobeSlots: [...(influencer.wardrobeSlots??[]), slot] })
+                if (slot.image) addToHistory(influencer.id, { type: 'image', label: `Wardrobe – ${slot.name}`, url: slot.image, date: Date.now() })
+              }}
+            />
+            <WorldDropSection drops={influencer.wardrobeSlots??[]} onChange={slots=>upd(influencer.id,{wardrobeSlots:slots})}/>
+          </>)}
 
-          {/* Three image sections */}
-          <Sec>
-            <div className="inf-img-grid">
-              <div>
-                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Image</div>
-                <MainImageSlot key={influencer.id} influencer={influencer} onChange={v=>upd(influencer.id,{mainImage:v})}
-                  onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.mainImage)})}/>
+          {view==='spaces' && (
+            <HomeSection slots={influencer.homeSlots??[]} onChange={slots=>upd(influencer.id,{homeSlots:slots})}/>
+          )}
+
+          <div style={{ display: view==='deals' ? 'block' : 'none' }}>
+            <BrandDealSection deals={influencer.brandDeals??[]} onChange={deals=>upd(influencer.id,{brandDeals:deals})}/>
+          </div>
+
+          {view==='scripts' && (
+            <ScriptsSection
+              scripts={influencer.scripts??[]}
+              influencerPrompt={influencer.prompt}
+              onChange={s=>upd(influencer.id,{scripts:s})}
+              initialExpanded={scriptsHighlightId}
+            />
+          )}
+
+          {view==='identity' && (<>
+            {!influencer.mainImage && (
+              <div style={{
+                borderRadius:14,padding:'32px 26px',textAlign:'center',
+                background:'var(--bg-tertiary)', border:`1px dashed ${ac}`,
+              }}>
+                <div style={{fontSize:19,fontWeight:700,color:'var(--text-primary)',marginBottom:6,letterSpacing:'-0.3px'}}>
+                  {influencer.name} has no images yet
+                </div>
+                <div style={{fontSize:14,color:'var(--text-tertiary)',marginBottom:22,lineHeight:1.6}}>
+                  Run the creation flow to generate photos and lock in their appearance.
+                </div>
+                <button
+                  onClick={() => navigate('/create', { state: { replaceId: influencer.id, prefillName: influencer.name, prefillGender: influencer.gender } })}
+                  style={{
+                    display:'inline-flex',alignItems:'center',gap:8,
+                    padding:'12px 26px',borderRadius:10,fontSize:14.5,fontWeight:700,
+                    background:'var(--brand)',color:'var(--brand-ink)',
+                    border:'none',cursor:'pointer',
+                  }}
+                >Generate your influencer</button>
               </div>
-              <div>
-                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Character Sheet</div>
-                <CharacterSheetSlot
-                  key={influencer.id}
-                  influencer={influencer}
-                  onSave={v=>{upd(influencer.id,{characterSheetImage:v});if(v){addToHistory(influencer.id,{type:'image',label:'Character Sheet',url:v,date:Date.now()})}}}
-                  onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.characterSheetImage)})}
-                />
-              </div>
-              <div>
-                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Close Ups</div>
-                <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  <CloseUpSlot
-                    key={`${influencer.id}-cu1`}
-                    influencer={influencer} imageKey="closeUpImage1" label="Close up 1"
-                    onSave={v=>{upd(influencer.id,{closeUpImage1:v});if(v)addToHistory(influencer.id,{type:'image',label:'Close Up',url:v,date:Date.now()})}}
-                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage1)})}
-                  />
-                  <CloseUpSlot
-                    key={`${influencer.id}-cu2`}
-                    influencer={influencer} imageKey="closeUpImage2" label="Feature sheet"
-                    onSave={v=>{upd(influencer.id,{closeUpImage2:v});if(v)addToHistory(influencer.id,{type:'image',label:'Feature Sheet',url:v,date:Date.now()})}}
-                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage2)})}
-                    promptFn={buildFeatureSheetPrompt}
-                    genAspectRatio="2:3"
-                    fit="contain"
+            )}
+            <Sec>
+              <div className="inf-img-grid">
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Image</div>
+                  <MainImageSlot key={influencer.id} influencer={influencer} onChange={v=>upd(influencer.id,{mainImage:v})}
+                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.mainImage)})}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Character Sheet</div>
+                  <CharacterSheetSlot
+                    key={influencer.id}
+                    influencer={influencer}
+                    onSave={v=>{upd(influencer.id,{characterSheetImage:v});if(v){addToHistory(influencer.id,{type:'image',label:'Character Sheet',url:v,date:Date.now()})}}}
+                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.characterSheetImage)})}
                   />
                 </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Close Ups</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    <CloseUpSlot
+                      key={`${influencer.id}-cu1`}
+                      influencer={influencer} imageKey="closeUpImage1" label="Close up 1"
+                      onSave={v=>{upd(influencer.id,{closeUpImage1:v});if(v)addToHistory(influencer.id,{type:'image',label:'Close Up',url:v,date:Date.now()})}}
+                      onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage1)})}
+                    />
+                    <CloseUpSlot
+                      key={`${influencer.id}-cu2`}
+                      influencer={influencer} imageKey="closeUpImage2" label="Feature sheet"
+                      onSave={v=>{upd(influencer.id,{closeUpImage2:v});if(v)addToHistory(influencer.id,{type:'image',label:'Feature Sheet',url:v,date:Date.now()})}}
+                      onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage2)})}
+                      promptFn={buildFeatureSheetPrompt}
+                      genAspectRatio="2:3"
+                      fit="contain"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </Sec>
-
-          {/* Prompt */}
-          <Sec>
-            <div style={{fontSize:11,fontWeight:700,color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:10}}>Prompt</div>
-            <textarea value={influencer.prompt} onChange={e=>upd(influencer.id,{prompt:e.target.value})}
-              placeholder="Paste your prompt here" rows={3}
-              style={{width:'100%',padding:'10px 14px',borderRadius:'var(--radius-sm)',border:'1.5px solid var(--border)',background:'var(--bg)',fontSize:14,color:'var(--text-primary)',resize:'vertical',lineHeight:1.6}}/>
-          </Sec>
-
-          {/* Detail tabs */}
-          <div ref={tabSecRef}><Sec style={{marginBottom:20}}>
-            <Tabs active={activeTab} onChange={tab=>{setActiveTab(tab);requestAnimationFrame(()=>tabSecRef.current?.scrollIntoView({behavior:'smooth',block:'start'}))}} ac={ac}/>
-
-            {activeTab==='Overview' && <DescriptionForm influencer={influencer} onUpdate={upd}/>}
-            {activeTab==='Scripts' && (
-              <ScriptsSection
-                scripts={influencer.scripts??[]}
-                influencerPrompt={influencer.prompt}
-                onChange={s=>upd(influencer.id,{scripts:s})}
-                initialExpanded={scriptsHighlightId}
-              />
-            )}
-            {activeTab==='Wardrobe' && (<>
-              <WardrobeGenerator
-                influencer={influencer}
-                onAdd={slot => {
-                  upd(influencer.id, { wardrobeSlots: [...(influencer.wardrobeSlots??[]), slot] })
-                  if (slot.image) addToHistory(influencer.id, { type: 'image', label: `Wardrobe – ${slot.name}`, url: slot.image, date: Date.now() })
-                }}
-              />
-              <WorldDropSection drops={influencer.wardrobeSlots??[]} onChange={slots=>upd(influencer.id,{wardrobeSlots:slots})}/>
-            </>)}
-            {activeTab==='Home' && (
-              <HomeSection slots={influencer.homeSlots??[]} onChange={slots=>upd(influencer.id,{homeSlots:slots})}/>
-            )}
-            <div style={{ display: activeTab==='Brand Deals' ? 'block' : 'none' }}>
-              <BrandDealSection deals={influencer.brandDeals??[]} onChange={deals=>upd(influencer.id,{brandDeals:deals})}/>
-            </div>
-            {activeTab==='History' && (
-              <HistoryTab influencer={influencer} onUpdate={v=>upd(influencer.id,v)}
-                onReuseSettings={(seg)=>{ if (seg === 'videos') { setStudioTab('content'); localStorage.setItem('inf_studio_tab','content'); setVideoRestoreKey(k => k+1) } else { setStudioTab('photo'); localStorage.setItem('inf_studio_tab','photo'); setPhotoRestoreKey(k => k+1) } }}/>
-            )}
-
-          </Sec></div>
-          </>}
+            </Sec>
+            <Sec>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:10}}>Prompt</div>
+              <textarea value={influencer.prompt} onChange={e=>upd(influencer.id,{prompt:e.target.value})}
+                placeholder="Paste your prompt here" rows={3}
+                style={{width:'100%',padding:'10px 14px',borderRadius:'var(--radius-sm)',border:'1.5px solid var(--border)',background:'var(--bg)',fontSize:14,color:'var(--text-primary)',resize:'vertical',lineHeight:1.6}}/>
+            </Sec>
+            <Sec style={{marginBottom:20}}>
+              <DescriptionForm influencer={influencer} onUpdate={upd}/>
+            </Sec>
+          </>)}
         </main>
       ) : isDark ? (
         <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',background:'transparent'}}>
