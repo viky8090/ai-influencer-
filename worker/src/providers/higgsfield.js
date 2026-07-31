@@ -20,7 +20,9 @@ function authHeader(env) {
 // soul family + popcorn/auto + DoP video are provisioned; nano-banana / gpt-image are NOT (404).
 // popcorn/auto takes `image_urls[]` → the multi-reference model matching the app's @image_1..4
 // character-consistency workflow. References are passed as URLs, not upload handles.
-function mapImageRes(r) { return String(r || '').toLowerCase().includes('4') ? '4K' : '2K' }
+// Live soul/standard resolution enum is ["720p","1080p"] (422 literal_error on "2K"/"4K"
+// as of 2026-07-22, even though docs.higgsfield.ai's OpenAPI still advertises 2K/4K).
+function mapImageRes(r) { return String(r || '').toLowerCase().includes('720') ? '720p' : '1080p' }
 // popcorn/auto: resolution enum ["720p","1600p"]; aspect enum lacks 4:5/5:4/21:9 → map to nearest.
 function mapPopcornRes(r) {
   const s = String(r || '').toLowerCase()

@@ -15,6 +15,7 @@ import {
 import { api } from '../api/client'
 import { glassCard, glassBtnPrimary, glassBtnGhost, glassModal, glassOverlay } from '../ui/glass'
 import AstryxScope from '../ui/ax/AstryxScope'
+import { useSEO, SITE_URL } from '../ui/seo'
 
 // Pricing v2 — reference-style plan cards with per-plan CREDIT TIER sliders.
 // Each slider step is a real Polar product (worker/src/lib/polarCatalog.js) selected at
@@ -30,7 +31,7 @@ const PLANS = [
   {
     name: 'Starter', key: 'starter', featured: null,
     blurb: 'For trying your first AI influencer.',
-    tiers: [{ c: 200, m: 5 }],
+    tiers: [{ c: 200, m: 5.99 }],
     fixedNote: 'Fixed amount of 200 credits/mo',
     feats: [
       ['1 influencer', 1],
@@ -47,7 +48,7 @@ const PLANS = [
   {
     name: 'Creator', key: 'creator', featured: 'popular',
     blurb: 'For consistent, easy AI content creation.',
-    tiers: [{ c: 600, m: 29 }, { c: 900, m: 42 }],
+    tiers: [{ c: 600, m: 31.99 }, { c: 900, m: 45.99 }],
     feats: [
       ['5 influencers', 1],
       ['All image models', 1, { chip: 'GPT · NANO PRO', color: 'brand' }],
@@ -63,7 +64,7 @@ const PLANS = [
   {
     name: 'Pro', key: 'pro', featured: null,
     blurb: 'For agencies and high-volume creators.',
-    tiers: [{ c: 1800, m: 69 }, { c: 2700, m: 99 }, { c: 3600, m: 126 }],
+    tiers: [{ c: 1800, m: 74.99 }, { c: 2700, m: 106.99 }, { c: 3600, m: 135.99 }],
     feats: [
       ['25 influencers', 1],
       ['All models + premium video', 1, { chip: 'PREMIUM', color: 'brand' }],
@@ -79,7 +80,7 @@ const PLANS = [
   {
     name: 'Studio', key: 'studio', featured: 'best',
     blurb: 'For teams shipping many personas.',
-    tiers: [{ c: 5500, m: 179 }, { c: 8000, m: 249 }, { c: 11000, m: 329 }],
+    tiers: [{ c: 5500, m: 191.99 }, { c: 8000, m: 266.99 }, { c: 11000, m: 352.99 }],
     feats: [
       ['Unlimited influencers', 1],
       ['All models + premium video', 1, { chip: 'PREMIUM', color: 'brand' }],
@@ -88,17 +89,17 @@ const PLANS = [
       ['Commercial license', 1],
       ['2-month credit rollover', 1],
       ['Priority onboarding', 1],
-      ['Lowest cost per credit', 1, { chip: '38% CHEAPER', color: 'brand' }],
+      ['Lowest cost per credit', 1, { chip: '40% CHEAPER', color: 'brand' }],
     ],
     access: { premium: true, res: '4K' },
   },
 ]
 
 const PACKS = [
-  { key: 'small', c: '500', p: '$20', e: '$0.040 / credit' },
-  { key: 'medium', c: '1,500', p: '$55', e: '$0.037 / credit' },
-  { key: 'large', c: '5,000', p: '$160', e: '$0.032 / credit' },
-  { key: 'mega', c: '15,000', p: '$450', e: '$0.030 / credit' },
+  { key: 'small', c: '500', p: '$21.99', e: '$0.044 / credit' },
+  { key: 'medium', c: '1,500', p: '$59.99', e: '$0.040 / credit' },
+  { key: 'large', c: '5,000', p: '$171.99', e: '$0.034 / credit' },
+  { key: 'mega', c: '15,000', p: '$481.99', e: '$0.032 / credit' },
 ]
 
 const MATRIX = [
@@ -282,9 +283,9 @@ function PlanCard({ pl, annual, busy, onChoose }) {
   const isPopular = pl.featured === 'popular'
   const accent = isBest ? 'var(--accent-2)' : 'var(--brand)'
 
-  // Starter's $5 entry gets NO annual discount (annual = flat 12×); paid tiers get 17% off.
+  // Starter's entry plan gets NO annual discount (annual = flat 12×); paid tiers get 17% off.
   const discounted = pl.key !== 'starter'
-  const monthlyEq = annual && discounted ? Math.round((tier.m * 10) / 12) : tier.m
+  const monthlyEq = annual && discounted ? Math.round(((tier.m * 10) / 12) * 100) / 100 : tier.m
   const savings = discounted ? tier.m * 2 : 0
 
   const tint = isPopular
@@ -486,7 +487,7 @@ function PlanFinder({ onClose, onChoose, busy }) {
   const usagePct = Math.min(100, Math.round((rec.needVc / tier.c) * 100))
   // Starter carries no annual discount (flat 12× monthly) — see polarCatalog.js.
   const recDiscounted = rec.plan.key !== 'starter'
-  const monthlyEq = annual && recDiscounted ? Math.round((tier.m * 10) / 12) : tier.m
+  const monthlyEq = annual && recDiscounted ? Math.round(((tier.m * 10) / 12) * 100) / 100 : tier.m
   const isBest = rec.plan.featured === 'best'
   const accent = isBest ? 'var(--accent-2)' : 'var(--brand)'
 
@@ -662,6 +663,44 @@ export default function Pricing() {
   const [busy, setBusy] = useState(false)
   const [finderOpen, setFinderOpen] = useState(false)
 
+  // Plan prices are published as schema.org Offers so Google can show a price range in the
+  // SERP. Prices come straight from PLANS, so they can't go stale relative to the page.
+  useSEO({
+    path: '/pricing',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'Vymotion',
+      applicationCategory: 'MultimediaApplication',
+      applicationSubCategory: 'AI influencer studio',
+      operatingSystem: 'Web',
+      url: `${SITE_URL}/pricing`,
+      offers: [
+        {
+          '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD',
+          description: 'Explore the studio — no card required.',
+          url: `${SITE_URL}/pricing`, availability: 'https://schema.org/InStock',
+        },
+        ...PLANS.map((pl) => ({
+          '@type': 'Offer',
+          name: `${pl.name} plan`,
+          description: pl.blurb,
+          price: pl.tiers[0].m.toFixed(2),
+          priceCurrency: 'USD',
+          url: `${SITE_URL}/pricing`,
+          availability: 'https://schema.org/InStock',
+          priceSpecification: {
+            '@type': 'UnitPriceSpecification',
+            price: pl.tiers[0].m.toFixed(2),
+            priceCurrency: 'USD',
+            billingIncrement: 1,
+            unitText: 'MONTH',
+          },
+        })),
+      ],
+    },
+  })
+
   const choose = async (key, interval, credits) => {
     if (!isSignedIn) return clerk.openSignUp?.()
     if (!key) return navigate('/dashboard')
@@ -681,9 +720,15 @@ export default function Pricing() {
     <AstryxScope>
     <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: 'var(--bg)' }}>
       <div className="reveal" style={{ textAlign: 'center', padding: '44px 20px 8px' }}>
-        <Text type="display-2" weight="bold" display="block" style={{ letterSpacing: '-0.8px' }}>
-          Plans that match how you ship
-        </Text>
+        {/* Semantic <h1> wrapper around the display Text: the page had no h1 at all, and
+            Astryx's <Heading type="display-2"> renders a different (smaller) scale than
+            <Text type="display-2">, so wrapping keeps the visual identical. `font: inherit`
+            stops the UA h1 defaults leaking in. */}
+        <h1 style={{ font: 'inherit', margin: 0 }}>
+          <Text type="display-2" weight="bold" display="block" style={{ letterSpacing: '-0.8px' }}>
+            AI influencer pricing that matches how you ship
+          </Text>
+        </h1>
         <Text type="body" color="secondary" display="block" style={{ margin: '10px auto 0', maxWidth: 560, lineHeight: 1.55 }}>
           Pick a plan, slide to the credit volume you need. Higher tiers unlock premium video, commercial rights and a lower cost per credit.
           Failed generations are never charged.

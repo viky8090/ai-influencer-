@@ -19,6 +19,7 @@ import { isTourDone } from '../components/OnboardingTour'
 import AstryxScope from '../ui/ax/AstryxScope'
 import RouterLink from '../ui/ax/RouterLink'
 import { thumbUrl } from '../api/serverGenerate'
+import { useSEO } from '../ui/seo'
 
 // Speaker icons for the video mute toggle.
 const IconMuted = () => (
@@ -126,6 +127,8 @@ const QUICK = [
 ]
 
 export default function Dashboard() {
+  useSEO({ path: '/dashboard' })
+
   const navigate = useNavigate()
   const { isLoaded, isSignedIn, user } = useUser()
   const [influencers] = useInfluencers()
@@ -190,7 +193,7 @@ export default function Dashboard() {
               </Text>
               <Text type="body" size="sm" color="secondary" display="block" style={{ marginTop: 7 }}>
                 {firstVisit || onlyExample
-                  ? 'Camila is your example influencer — explore her studio, then create your own.'
+                  ? 'Create your first influencer. A sample persona is loaded so you can see the studio working before you commit.'
                   : "Here's where you left off."}
               </Text>
             </div>
@@ -210,12 +213,18 @@ export default function Dashboard() {
                 <VStack gap={0.5} style={{ flex: 1, minWidth: 200 }}>
                   <Text type="body" size="sm" weight="bold">Getting started</Text>
                   <Text type="supporting" size="sm" color="secondary">
-                    1) Open Camila · 2) Try Photo Studio · 3) Create your influencer
+                    1) Design your persona · 2) Generate a photo set · 3) Publish or pitch it
                   </Text>
                 </VStack>
+                {/* The user's own influencer is the primary action. This used to lead with
+                    "Open Camila" as the primary button, which made the bundled sample the
+                    protagonist of the product's own dashboard - the single loudest reason
+                    the first run reads as generic demo-ware rather than someone's workspace.
+                    Sample content is still the right call (an empty dashboard converts worse),
+                    it just has to sit behind the real job and stay explicitly labelled. */}
                 <HStack gap={3}>
-                  <Button label="Open Camila" variant="primary" size="sm" href="/influencers" as={RouterLink} />
-                  <Button label="Create yours" variant="secondary" size="sm" href="/create" as={RouterLink} />
+                  <Button label="Create your influencer" variant="primary" size="sm" href="/create" as={RouterLink} />
+                  <Button label="Explore the sample" variant="secondary" size="sm" href="/influencers" as={RouterLink} />
                 </HStack>
               </HStack>
             </Card>

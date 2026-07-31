@@ -22,7 +22,7 @@ function useInView(threshold = 0.3) {
 const fmtUsd = (n) => '$' + Math.round(n).toLocaleString('en-US')
 
 // ── Growth area chart — e.g. market size by year ─────────────────────────────
-export function GrowthChart({ data, valueFormat = (v) => `$${v}B`, height = 260, accent = M.brand }) {
+export function GrowthChart({ data, valueFormat = (v) => `$${v}B`, height = 260, accent = M.brandText }) {
   const [ref, inView] = useInView(0.25)
   const W = 640, H = height, padL = 44, padR = 20, padT = 26, padB = 34
   const max = Math.max(...data.map((d) => d.value)) * 1.08
@@ -75,7 +75,7 @@ export function GrowthChart({ data, valueFormat = (v) => `$${v}B`, height = 260,
 }
 
 // ── Horizontal tier bars — e.g. sponsored-post rate by follower tier ─────────
-export function TierBars({ data, accent = M.brand }) {
+export function TierBars({ data, accent = M.brandText }) {
   const [ref, inView] = useInView(0.3)
   const max = Math.max(...data.map((d) => d.bar))
   return (
@@ -86,7 +86,7 @@ export function TierBars({ data, accent = M.brand }) {
             <span style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{d.label}</span>
             <span style={{ fontSize: 13, fontWeight: 800, color: accent }}>{d.value}</span>
           </div>
-          <div style={{ height: 12, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div style={{ height: 12, borderRadius: 999, background: 'var(--m-line-soft)', overflow: 'hidden' }}>
             <div style={{
               height: '100%', borderRadius: 999,
               width: inView ? `${(d.bar / max) * 100}%` : '0%',
@@ -103,7 +103,7 @@ export function TierBars({ data, accent = M.brand }) {
 }
 
 // ── Donut / progress ring ────────────────────────────────────────────────────
-export function Donut({ pct, label, sub, size = 132, accent = M.brand }) {
+export function Donut({ pct, label, sub, size = 132, accent = M.brandText }) {
   const [ref, inView] = useInView(0.4)
   const r = size / 2 - 12
   const circ = 2 * Math.PI * r
@@ -111,7 +111,7 @@ export function Donut({ pct, label, sub, size = 132, accent = M.brand }) {
     <div ref={ref} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
       <div style={{ position: 'relative', width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--m-line)" strokeWidth="10" />
           <circle
             cx={size / 2} cy={size / 2} r={r} fill="none" stroke={accent} strokeWidth="10" strokeLinecap="round"
             strokeDasharray={circ}
@@ -148,10 +148,10 @@ export function LiveTicker({ base, ratePerSec, label, format = fmtUsd }) {
   return (
     <div ref={ref}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: M.brand, boxShadow: `0 0 10px ${M.brand}`, animation: 'pulse-dot 1.6s ease-in-out infinite' }} />
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: M.brandText, boxShadow: `0 0 10px ${M.brandText}`, animation: 'pulse-dot 1.6s ease-in-out infinite' }} />
         <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase', color: M.faint }}>{label}</span>
       </div>
-      <div style={{ fontSize: 'clamp(30px, 5vw, 44px)', fontWeight: 800, letterSpacing: '-1.5px', color: M.brand, fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ fontSize: 'clamp(30px, 5vw, 44px)', fontWeight: 800, letterSpacing: '-1.5px', color: M.brandText, fontVariantNumeric: 'tabular-nums' }}>
         {format(val)}
       </div>
       <style>{`@keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }`}</style>
@@ -160,7 +160,7 @@ export function LiveTicker({ base, ratePerSec, label, format = fmtUsd }) {
 }
 
 // ── Compact stat pill ────────────────────────────────────────────────────────
-export function StatPill({ value, label, accent = M.brand }) {
+export function StatPill({ value, label, accent = M.brandText }) {
   return (
     <div style={{ textAlign: 'center', padding: '4px 10px' }}>
       <div style={{ fontSize: 'clamp(26px, 4vw, 38px)', fontWeight: 800, letterSpacing: '-1.2px', color: accent }}>{value}</div>

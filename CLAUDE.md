@@ -21,11 +21,19 @@ account (OAuth, PKCE).
 - **No build-time API keys** — Higgsfield is OAuthed per-user; the optional
   Claude features call through a serverless proxy that expects an
   `x-api-key` header from the browser.
-- **Vercel** is the intended host: `api/*.js` are Vercel serverless
-  functions, and `vite.config.js` mirrors them as local dev proxies so
-  the dev server behaves the same as production.
-- **Cloudflare Worker** (`worker/`) is the production API (credits, Polar,
-  Postiz, fal generation). Frontend talks to it via `src/api/client.js`.
+- **PRODUCTION IS CLOUDFLARE, NOT VERCEL.** vymotion.org is served by the
+  `vymotion-api` Worker (`worker/wrangler.toml`), which serves the built SPA
+  from `../dist` via `[assets]` *and* runs the API. Deploy = `npm run build`
+  in the repo root, then `wrangler deploy` from `worker/`.
+  **`vercel.json` at the repo root is dead code** — a curl against the live
+  site shows none of its headers are applied. Production headers and caching
+  come from the generated `dist/_headers` file. Don't "fix" hosting behaviour
+  by editing `vercel.json`; edit `worker/wrangler.toml` or `scripts/seo-build.js`.
+- `api/*.js` are leftover Vercel serverless functions; `vite.config.js` mirrors
+  them as local dev proxies. In production `/api/*` is handled by the Worker
+  (`run_worker_first`), not by these files.
+- The Worker (`worker/`) is also the API (credits, Polar, Postiz, fal
+  generation). Frontend talks to it via `src/api/client.js`.
 
 ## Key files to know
 
@@ -40,6 +48,36 @@ account (OAuth, PKCE).
 | `src/pages/Influencers.jsx` | Influencer profile + Content Studio + Video Studio (very large — known structural debt) |
 | `api/hf/[...path].js` | Edge function that proxies all Higgsfield MCP traffic and forwards SSE streams |
 | `api/claude.js` | Anthropic API proxy — caller supplies their own `x-api-key` |
+| `src/ui/seoRoutes.js` | **Route SEO manifest** — title/description/h1/index flag per route. Single source of truth |
+| `src/ui/seo.js` | `useSEO()` — keeps `<head>` correct across client-side navigation |
+| `scripts/seo-build.js` | Vite plugin: per-route prerendered HTML + `sitemap.xml` + `robots.txt` + `_headers` |
+
+## SEO
+
+The app is client-rendered, so every URL used to serve the same `index.html` — identical
+title, description and canonical on every page. `scripts/seo-build.js` fixes that at build
+time by writing `dist/<route>.html` for **every** route in the manifest, with a route-correct
+`<head>` and a `<noscript>` content fallback. Cloudflare serves those files straight from the
+filesystem, so they are what non-rendering crawlers (Bing, Slack, X, LinkedIn, GPTBot)
+actually read.
+
+Rules:
+
+- **Add route copy in `src/ui/seoRoutes.js`, never in `index.html`.** Everything between
+  the `<!--SEO:START-->` / `<!--SEO:END-->` markers is overwritten at build time.
+- **Every route in `App.jsx` must exist in the manifest.** The build fails otherwise —
+  `not_found_handling = "404-page"` means a missing entry would 404 in production while
+  working fine in `vite dev`. Signed-in screens get `index: false`.
+- **Emit `dist/<route>.html`, never `dist/<route>/index.html`.** Cloudflare's default
+  `html_handling` ("auto-trailing-slash") 307-redirects `/pricing` → `/pricing/` when only
+  the directory form exists, which fights our own trailing-slash-free canonical and adds a
+  round trip to every page. The flat form serves a direct 200.
+- `sitemap.xml`, `robots.txt` and `_headers` are generated. Don't re-add them to `public/`.
+- Each page calls `useSEO({ path })`; pass `jsonLd` only for schema that can't be derived
+  from static data (plan Offers, HowTo steps).
+- **Verify hosting behaviour with `wrangler dev`, not `vite preview`.** Only wrangler runs
+  the real Cloudflare asset router (trailing slashes, 404 status, `_headers`):
+  `cd worker && npx wrangler dev --port 8788 --local`
 
 ## Conventions
 
@@ -66,6 +104,10 @@ account (OAuth, PKCE).
 - Don't refactor `Influencers.jsx` casually. It's 4,700+ lines and the
   state is tangled; any split needs its own dedicated session with
   in-browser verification of every flow.
+- Astryx's `<Heading level={1} type="display-2">` does **not** render at the same scale as
+  `<Text type="display-2">` (24px/600 vs 35px/700). To add an `h1` to a page that uses the
+  display Text, wrap it in a plain `<h1 style={{ font: 'inherit', margin: 0 }}>` rather than
+  swapping the component, or the heading visibly shrinks.
 
 ## Dev workflow
 

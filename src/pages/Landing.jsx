@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { glassBtnPrimary, pressHandlers } from '../ui/glass'
+import { useTheme } from '../context/theme'
 import { M, Section, Eyebrow, H2, Lead, CTA, Reveal, mCard } from '../ui/marketing'
 import { GrowthChart, TierBars, LiveTicker, StatPill } from '../ui/charts'
 import { useSEO, SITE_URL } from '../ui/seo'
 import Footer from '../components/Footer'
+import MouseDotField from '../components/MouseDotField'
 import {
   MARKET_GROWTH, TIER_EARNINGS, CREATOR_SPEND_PER_SEC, FAQ,
 } from '../ui/marketData'
@@ -26,19 +28,6 @@ function useWordMorph() {
   return { word: WORDS[wordIdx], out }
 }
 
-const ALL_IMGS = [
-  '/inf/i1.png', '/inf/i2.png', '/inf/i3.jpg', '/inf/i4.jpg', '/inf/i5.png',
-  '/inf/i6.jpg', '/inf/i7.png', '/inf/i8.png', '/inf/i9.png', '/inf/i10.png',
-  '/inf/i11.png', '/inf/i12.png', '/inf/i13.png', '/inf/i14.png', '/inf/i15.png',
-  '/inf/i16.png', '/inf/i17.png', '/inf/i18.png', '/inf/i19.png', '/inf/i20.png',
-  '/inf/i21.png', '/inf/i22.png', '/inf/i23.png', '/inf/i24.png', '/inf/i25.png',
-  '/inf/i26.png', '/inf/i27.png', '/inf/i28.png', '/inf/i29.png',
-  '/inf/i30.png', '/inf/i31.png', '/inf/i32.png', '/inf/i33.png', '/inf/i34.png',
-  '/inf/i35.png', '/inf/i36.png', '/inf/i37.png', '/inf/i38.png', '/inf/i39.png',
-  '/inf/i40.png', '/inf/i41.png', '/inf/i42.png', '/inf/i43.png', '/inf/i44.png',
-  '/inf/i45.png', '/inf/i46.png',
-]
-
 // React doesn't reflect the `muted` prop as a DOM attribute, which can make browsers
 // veto `autoPlay` on mount — force-mute and kick playback from a ref instead. Chrome also
 // pauses video-only media while a tab is hidden, so resume when the page becomes visible.
@@ -52,68 +41,12 @@ const autoplayRef = (el) => {
   })
 }
 
-const CARDS = [
-  { left: '-28px', top: '6%', w: 158, rot: '-9deg', opacity: 0.52, depth: 0.9 },
-  { left: '28px', top: '43%', w: 138, rot: '5deg', opacity: 0.40, depth: 0.45 },
-  { left: '-14px', top: '74%', w: 146, rot: '-5deg', opacity: 0.44, depth: 0.65 },
-  // The most prominent card plays a real generated video loop instead of rotating stills
-  // (v2 is the smallest clip — keeps the above-the-fold payload sane).
-  { right: '-28px', top: '4%', w: 160, rot: '10deg', opacity: 0.58, depth: 1.0, video: '/camila/videos/v2.mp4' },
-  { right: '24px', top: '42%', w: 140, rot: '-7deg', opacity: 0.40, depth: 0.4 },
-  { right: '-16px', top: '72%', w: 148, rot: '6deg', opacity: 0.46, depth: 0.7 },
-]
-
 // ── Hero (the signature dark hero, preserved) ────────────────────────────────
 function Hero() {
   const navigate = useNavigate()
   const { word, out } = useWordMorph()
   const press = pressHandlers(0.95)
-  const [cardSrcs, setCardSrcs] = useState(() => ALL_IMGS.slice(0, CARDS.length))
-  const [cardFade, setCardFade] = useState(() => CARDS.map(() => false))
-  const cardRefs = useRef([])
-
-  useEffect(() => {
-    let raf = 0, tx = 0, ty = 0, cx = 0, cy = 0
-    function onMove(e) {
-      tx = (e.clientX / window.innerWidth - 0.5) * 2
-      ty = (e.clientY / window.innerHeight - 0.5) * 2
-      if (!raf) raf = requestAnimationFrame(step)
-    }
-    function step() {
-      raf = 0
-      cx += (tx - cx) * 0.06; cy += (ty - cy) * 0.06
-      CARDS.forEach((card, i) => {
-        const el = cardRefs.current[i]
-        if (!el) return
-        const drift = 10 + card.depth * 22
-        el.style.transform = `rotate(${card.rot}) translate(${(-cx * drift).toFixed(1)}px, ${(-cy * drift).toFixed(1)}px)`
-      })
-      if (Math.abs(tx - cx) > 0.002 || Math.abs(ty - cy) > 0.002) raf = requestAnimationFrame(step)
-    }
-    window.addEventListener('mousemove', onMove)
-    return () => { window.removeEventListener('mousemove', onMove); if (raf) cancelAnimationFrame(raf) }
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    // Only image cards rotate — video cards keep their loop playing.
-    const imgIdxs = CARDS.map((c, i) => (c.video ? null : i)).filter((i) => i !== null)
-    function tick() {
-      if (!alive) return
-      const i = imgIdxs[Math.floor(Math.random() * imgIdxs.length)]
-      setCardFade((prev) => { const n = [...prev]; n[i] = true; return n })
-      setTimeout(() => {
-        if (!alive) return
-        setCardSrcs((prev) => {
-          const options = ALL_IMGS.filter((s) => s !== prev[i])
-          const next = [...prev]; next[i] = options[Math.floor(Math.random() * options.length)]; return next
-        })
-        setCardFade((prev) => { const n = [...prev]; n[i] = false; return n })
-      }, 750)
-    }
-    const id = setInterval(tick, 2800)
-    return () => { alive = false; clearInterval(id) }
-  }, [])
+  const { isDark } = useTheme()
 
   return (
     <section style={{
@@ -122,42 +55,40 @@ function Hero() {
       background: M.bg,
       padding: 'calc(var(--nav-h) + 40px) 24px 80px', textAlign: 'center',
     }}>
-      {CARDS.map((card, i) => {
-        const pos = {}
-        if (card.left !== undefined) pos.left = card.left
-        if (card.right !== undefined) pos.right = card.right
-        return (
-          <div key={i} className="landing-card reveal" style={{ position: 'absolute', top: card.top, ...pos, width: card.w, opacity: card.opacity, animationDelay: `${0.1 + i * 0.05}s`, pointerEvents: 'none', zIndex: 0 }}>
-            <div ref={(el) => { cardRefs.current[i] = el }} style={{ transform: `rotate(${card.rot})`, willChange: 'transform' }}>
-              <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 16px 40px rgba(0,0,0,0.55)', opacity: cardFade[i] ? 0 : 1, transition: 'opacity 0.5s var(--ease-out)' }}>
-                {card.video
-                  ? <video ref={autoplayRef} src={card.video} muted autoPlay loop playsInline style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }} />
-                  : <img src={cardSrcs[i]} alt="" style={{ width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block' }} />}
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(10,10,11,0.5) 0%, transparent 55%)' }} />
-              </div>
-            </div>
-          </div>
-        )
-      })}
+      {/* Veil that fades the photo collage out toward the edges so the headline stays
+          readable. Tokenised because it has to invert with the theme — a near-black veil
+          on a white canvas would black out the hero. */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 50%, transparent 28%, var(--m-hero-veil) 100%)', pointerEvents: 'none', zIndex: 1 }} />
 
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 50%, transparent 28%, rgba(10,10,11,0.88) 100%)', pointerEvents: 'none', zIndex: 1 }} />
+      {/* Above the vignette on purpose: at the edges the vignette is ~88% opaque, so a dot
+          drawn under it would vanish. On top, the whole field stays evenly visible.
+          The colour has to be passed explicitly: the dots are painted into a canvas, which
+          can't read a CSS variable, so the default white was invisible against the light
+          theme's white hero. Changing the prop re-runs the effect and rebuilds the sprite. */}
+      <MouseDotField color={isDark ? '#FFFFFF' : '#0A0A0B'} />
 
-      <div style={{ maxWidth: 720, position: 'relative', zIndex: 2 }}>
+      <div style={{ maxWidth: 720, position: 'relative', zIndex: 3 }}>
         <div className="reveal-1" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: M.card, color: M.sub, padding: '6px 14px 6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, letterSpacing: '0.3px', marginBottom: 36, border: `1px solid ${M.line}` }}>
-          <span style={{ width: 7, height: 7, background: 'var(--brand)', borderRadius: 2, flexShrink: 0 }} />
+          <span style={{ width: 7, height: 7, background: M.brand, borderRadius: 2, flexShrink: 0 }} />
           The AI influencer studio
         </div>
 
-        <h1 className="reveal-2" style={{ fontSize: 'clamp(52px,9vw,92px)', fontWeight: 800, letterSpacing: '-3px', lineHeight: 1.0, color: '#fff', marginBottom: 2 }}>
-          Create Your
-        </h1>
-        <div className="reveal-3" style={{ fontSize: 'clamp(52px,9vw,92px)', fontWeight: 800, letterSpacing: '-3px', lineHeight: 1.1, minHeight: '1.15em', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 28 }}>
-          <span style={{ color: 'var(--brand)', display: 'inline-block', opacity: out ? 0 : 1, transform: out ? 'translateY(6px)' : 'translateY(0)', transition: `opacity ${MORPH_OUT_MS}ms var(--ease-out), transform ${MORPH_OUT_MS}ms var(--ease-out)` }}>
-            {word}
+        {/* Both lines live inside the <h1> so the heading is a complete phrase — "Create
+            Your AI Influencer". Previously the element contained only "Create Your" and the
+            morphing word sat in a sibling div, so crawlers read a truncated, keyword-free
+            heading. Layout is unchanged: the spans are still two centred blocks. */}
+        <h1 style={{ fontSize: 'clamp(52px,9vw,92px)', fontWeight: 800, letterSpacing: '-3px', color: M.ink, margin: '0 0 28px' }}>
+          <span className="reveal-2" style={{ display: 'block', lineHeight: 1.0, marginBottom: 2 }}>
+            Create Your AI
           </span>
-        </div>
+          <span className="reveal-3" style={{ display: 'flex', lineHeight: 1.1, minHeight: '1.15em', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: M.brandText, display: 'inline-block', opacity: out ? 0 : 1, transform: out ? 'translateY(6px)' : 'translateY(0)', transition: `opacity ${MORPH_OUT_MS}ms var(--ease-out), transform ${MORPH_OUT_MS}ms var(--ease-out)` }}>
+              {word}
+            </span>
+          </span>
+        </h1>
 
-        <p className="reveal-4" style={{ fontSize: 20, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, margin: '0 auto 44px', maxWidth: 540, fontWeight: 400, letterSpacing: '-0.1px' }}>
+        <p className="reveal-4" style={{ fontSize: 20, color: M.sub, lineHeight: 1.6, margin: '0 auto 44px', maxWidth: 540, fontWeight: 400, letterSpacing: '-0.1px' }}>
           Design a hyper-realistic AI influencer, generate on-brand photos and video, and turn the audience into income — no camera, no crew.
         </p>
 
@@ -169,61 +100,55 @@ function Hero() {
             Get started free →
           </button>
           <button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })}
-            style={{ padding: '14px 28px', fontSize: 16, fontWeight: 700, borderRadius: 10, cursor: 'pointer', background: M.card, color: '#fff', border: `1px solid ${M.line}` }}>
+            style={{ padding: '14px 28px', fontSize: 16, fontWeight: 700, borderRadius: 10, cursor: 'pointer', background: M.card, color: M.ink, border: `1px solid ${M.line}` }}>
             See how it works
           </button>
         </div>
 
-        <div className="reveal-6" style={{ display: 'flex', gap: 22, justifyContent: 'center', flexWrap: 'wrap', marginTop: 34, fontSize: 13, color: 'rgba(255,255,255,0.42)' }}>
+        <div className="reveal-6" style={{ display: 'flex', gap: 22, justifyContent: 'center', flexWrap: 'wrap', marginTop: 34, fontSize: 13, color: M.faint }}>
           {['Free credits on sign-up', 'No card required', 'Ready in 5 minutes'].map((t) => (
             <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>{t}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={M.brandText} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>{t}
             </span>
           ))}
         </div>
       </div>
-
-      <style>{`
-        .landing-card { display: block; }
-        @media (max-width: 860px) { .landing-card { display: none; } }
-      `}</style>
     </section>
   )
 }
 
-// ── "Made with Vymotion" showcase — real seed-influencer photos + video loops ─
-// Two rows that scroll in opposite directions so the whole roster is always in motion.
-// Camila carries the most assets on purpose — it shows the same face holding across dozens
-// of shots (the hard part of AI characters, and the thing worth showing off).
+// ── "Made with Vymotion" showcase — Camila photos + video loops ──────────────
+// Two rows that scroll in opposite directions. Ship version is Camila-only: one
+// persona, the same face holding across dozens of shots (the hard part of AI
+// characters, and the thing worth showing off).
 const ROW_A = [
   { src: '/camila/main.jpg', name: 'Camila', tag: 'Signature look' },
   { src: '/camila/videos/v1.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/kayla/main.jpg', name: 'Kayla', tag: 'Signature look' },
-  { src: '/inf/i10.png', name: 'Nina', tag: 'Editorial' },
-  { src: '/camila/photos/p2.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/marcus/video1.mp4', video: true, name: 'Marcus', tag: 'Video Studio' },
-  { src: '/marcus/main.png', name: 'Marcus', tag: 'Signature look' },
-  { src: '/inf/i1.png', name: 'Sofia', tag: 'Street style' },
+  { src: '/camila/photos/p1.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p3.png', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/wardrobe/sporty_fit.png', name: 'Camila', tag: 'Wardrobe' },
   { src: '/camila/videos/v3.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/jake/main.jpeg', name: 'Jake', tag: 'Signature look' },
-  { src: '/camila/photos/p4.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/inf/i20.png', name: 'Aria', tag: 'Golden hour' },
+  { src: '/camila/photos/p5.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/closeup1.png', name: 'Camila', tag: 'Close-up' },
+  { src: '/camila/photos/p7.png', name: 'Camila', tag: 'Photo Studio' },
   { src: '/camila/videos/v4.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
+  { src: '/camila/photos/p9.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p11.png', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/brand_deals/swatch_original.png', name: 'Camila', tag: 'Brand deal' },
 ]
 const ROW_B = [
-  { src: '/camila/photos/p6.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p2.png', name: 'Camila', tag: 'Photo Studio' },
   { src: '/camila/videos/v2.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/brad/brand_deals/deal1.jpeg', name: 'Brad', tag: 'Brand deal' },
-  { src: '/inf/i7.png', name: 'Elena', tag: 'Signature look' },
-  { src: '/camila/photos/p8.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/marcus/video1.mp4', video: true, name: 'Marcus', tag: 'Video Studio' },
-  { src: '/inf/i33.png', name: 'Maya', tag: 'Editorial' },
-  { src: '/camila/photos/p10.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p4.png', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/wardrobe/yoga_fit.png', name: 'Camila', tag: 'Wardrobe' },
+  { src: '/camila/photos/p6.png', name: 'Camila', tag: 'Photo Studio' },
   { src: '/camila/videos/v1.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/inf/i25.png', name: 'Chloe', tag: 'Street style' },
+  { src: '/camila/closeup2.png', name: 'Camila', tag: 'Close-up' },
+  { src: '/camila/photos/p8.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p10.png', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/videos/v3.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
   { src: '/camila/photos/p12.png', name: 'Camila', tag: 'Photo Studio' },
   { src: '/camila/photos/p13.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/videos/v3.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
 ]
 
 // Videos only start downloading once the strip is near the viewport — the clips are
@@ -253,7 +178,7 @@ function LazyVideo({ src, style }) {
 function ShowcaseCard({ m }) {
   const media = { width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block', background: '#0D0D14' }
   return (
-    <div style={{ position: 'relative', width: 214, flexShrink: 0, marginRight: 16, borderRadius: 18, overflow: 'hidden', border: `1px solid ${M.line}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10), 0 18px 44px rgba(0,0,0,0.5)' }}>
+    <div style={{ position: 'relative', width: 214, flexShrink: 0, marginRight: 16, borderRadius: 18, overflow: 'hidden', border: `1px solid ${M.mediaBorder}`, boxShadow: M.mediaShadow }}>
       {m.video
         ? <LazyVideo src={m.src} style={media} />
         : <img src={m.src} alt={`${m.name} — AI influencer made with Vymotion`} loading="lazy" style={media} />}
@@ -271,8 +196,8 @@ function ShowcaseSection() {
     <section style={{ padding: '92px 0', overflow: 'hidden', position: 'relative' }}>
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px' }}>
         <Reveal><Eyebrow>Made with Vymotion</Eyebrow></Reveal>
-        <Reveal delay={0.05}><H2>Real personas, straight out of the studio</H2></Reveal>
-        <Reveal delay={0.1}><Lead>Every still and every looping clip below was generated here — the same face, wardrobe, and vibe across every shot. Hover to pause.</Lead></Reveal>
+        <Reveal delay={0.05}><H2>Meet Camila — straight out of the studio</H2></Reveal>
+        <Reveal delay={0.1}><Lead>Every still and every looping clip below is one persona, generated here — the same face, wardrobe, and vibe holding across every shot. Hover to pause.</Lead></Reveal>
       </div>
       <Reveal delay={0.12} style={{ marginTop: 44, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="vy-marquee-mask">
@@ -296,7 +221,7 @@ function StepCard({ n, title, body, icon }) {
   return (
     <Reveal delay={n * 0.05} style={{ ...mCard, padding: 26 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(199,242,78,0.12)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: M.accentSoft, color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
         </div>
         <span style={{ fontSize: 13, fontWeight: 800, color: M.faint, letterSpacing: '1px' }}>STEP {n}</span>
@@ -310,7 +235,7 @@ function StepCard({ n, title, body, icon }) {
 function FeatureCard({ title, body, icon }) {
   return (
     <Reveal style={{ ...mCard, padding: 24 }}>
-      <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(255,255,255,0.05)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+      <div style={{ width: 42, height: 42, borderRadius: 12, background: M.surfaceSoft, color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
       </div>
       <h3 style={{ fontSize: 16.5, fontWeight: 800, color: M.ink, margin: '0 0 7px', letterSpacing: '-0.3px' }}>{title}</h3>
@@ -324,7 +249,7 @@ function FaqItem({ q, a, open, onToggle }) {
     <div style={{ borderBottom: `1px solid ${M.lineSoft}` }}>
       <button onClick={onToggle} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '20px 4px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <span style={{ fontSize: 16.5, fontWeight: 700, color: M.ink }}>{q}</span>
-        <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, border: `1px solid ${M.line}`, color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: open ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s var(--ease-liquid)' }}>
+        <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, border: `1px solid ${M.line}`, color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: open ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s var(--ease-liquid)' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         </span>
       </button>
@@ -340,17 +265,21 @@ export default function Landing() {
   const navigate = useNavigate()
   const [faqOpen, setFaqOpen] = useState(0)
 
+  // Title/description live in the route manifest (src/ui/seoRoutes.js) so the prerendered
+  // shell and this runtime pass can't disagree. Organization + WebSite come from baseGraph().
   useSEO({
-    title: 'Create AI Influencers That Earn',
-    description: 'Vymotion is the all-in-one studio to create, grow, and monetize hyper-realistic AI influencers. Generate on-brand photos and video, land brand deals, and sell creator services across the US and Europe.',
     path: '/',
     jsonLd: [
-      { '@context': 'https://schema.org', '@type': 'Organization', name: 'Vymotion', url: SITE_URL, logo: `${SITE_URL}/icon.svg` },
-      { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Vymotion', url: SITE_URL },
       {
         '@context': 'https://schema.org', '@type': 'SoftwareApplication', name: 'Vymotion',
         applicationCategory: 'MultimediaApplication', operatingSystem: 'Web',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        url: SITE_URL,
+        description: 'Studio for creating, growing and monetizing hyper-realistic AI influencers.',
+        offers: {
+          '@type': 'Offer', price: '0', priceCurrency: 'USD',
+          description: 'Free plan — explore the studio with no card required.',
+          url: `${SITE_URL}/pricing`,
+        },
       },
       {
         '@context': 'https://schema.org', '@type': 'FAQPage',
@@ -364,7 +293,7 @@ export default function Landing() {
       <Hero />
 
       {/* Operational trust bar */}
-      <div style={{ borderTop: `1px solid ${M.line}`, borderBottom: `1px solid ${M.line}`, background: 'rgba(255,255,255,0.015)' }}>
+      <div style={{ borderTop: `1px solid ${M.line}`, borderBottom: `1px solid ${M.line}`, background: 'var(--m-trustbar)' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '26px 24px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18 }} className="trust-bar">
           {[['5 min', 'to your first post'], ['6 AI models', 'best-in-class engines'], ['40+', 'countries creating'], ['24/7', 'never books a shoot']].map(([v, l]) => (
             <div key={l} style={{ textAlign: 'center' }}>
@@ -465,7 +394,7 @@ export default function Landing() {
             ['Brands', 'Launch a branded virtual spokesperson that’s always on-message, on-budget, and on-brand.', <><path d="M6 7h12l1 13H5z" /><path d="M9 7a3 3 0 0 1 6 0" /></>],
           ].map(([t, b, icon], i) => (
             <Reveal key={t} delay={i * 0.05} style={{ ...mCard, padding: 24 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(199,242,78,0.12)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: M.accentSoft, color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                 <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
               </div>
               <h3 style={{ fontSize: 17, fontWeight: 800, color: M.ink, margin: '0 0 7px' }}>{t}</h3>
@@ -477,19 +406,19 @@ export default function Landing() {
         <Reveal delay={0.1} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 26, alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: M.faint, marginRight: 4 }}>Selling in</span>
           {['🇺🇸 United States', '🇬🇧 United Kingdom', '🇪🇺 European Union', '🇨🇦 Canada', '🌍 Worldwide'].map((r) => (
-            <span key={r} style={{ fontSize: 13, fontWeight: 600, color: M.ink, padding: '7px 14px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border: `1px solid ${M.line}` }}>{r}</span>
+            <span key={r} style={{ fontSize: 13, fontWeight: 600, color: M.ink, padding: '7px 14px', borderRadius: 999, background: M.surfaceSoft, border: `1px solid ${M.line}` }}>{r}</span>
           ))}
         </Reveal>
       </Section>
 
       {/* Pricing teaser */}
       <Section style={{ borderTop: `1px solid ${M.line}` }}>
-        <div style={{ ...mCard, padding: 'clamp(28px, 5vw, 52px)', textAlign: 'center', background: 'linear-gradient(180deg, rgba(199,242,78,0.06), rgba(255,255,255,0.02))' }}>
+        <div style={{ ...mCard, padding: 'clamp(28px, 5vw, 52px)', textAlign: 'center', background: `linear-gradient(180deg, ${M.accentSoft}, ${M.surfaceSoft})` }}>
           <Reveal><Eyebrow>Simple pricing</Eyebrow></Reveal>
           <Reveal delay={0.05}><H2 style={{ margin: '0 auto' }}>Start free. Scale when you grow.</H2></Reveal>
           <Reveal delay={0.1}><Lead style={{ margin: '16px auto 0', textAlign: 'center' }}>Credits power everything — images, video, and prompts. You’re only charged for delivered generations; failed ones are always refunded.</Lead></Reveal>
           <Reveal delay={0.14} style={{ display: 'flex', gap: 26, justifyContent: 'center', flexWrap: 'wrap', margin: '30px 0' }}>
-            {[['Free', 'Explore only'], ['Starter', '$5/mo'], ['Creator', '$29/mo'], ['Pro', '$69/mo'], ['Studio', '$179/mo']].map(([p, v]) => (
+            {[['Free', 'Explore only'], ['Starter', '$5.99/mo'], ['Creator', '$31.99/mo'], ['Pro', '$74.99/mo'], ['Studio', '$191.99/mo']].map(([p, v]) => (
               <div key={p} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: M.faint }}>{p}</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: M.ink, marginTop: 2 }}>{v}</div>
@@ -509,7 +438,7 @@ export default function Landing() {
           <div>
             <Reveal><Eyebrow>FAQ</Eyebrow></Reveal>
             <Reveal delay={0.05}><H2>Questions, answered</H2></Reveal>
-            <Reveal delay={0.1}><Lead>Everything you need to know before you start. Still curious? <a href="mailto:contact@vymotion.org" style={{ color: M.brand, textDecoration: 'none' }}>Email us</a>.</Lead></Reveal>
+            <Reveal delay={0.1}><Lead>Everything you need to know before you start. Still curious? <a href="mailto:contact@vymotion.org" style={{ color: M.brandText, textDecoration: 'none' }}>Email us</a>.</Lead></Reveal>
           </div>
           <Reveal delay={0.06}>
             {FAQ.map((f, i) => (

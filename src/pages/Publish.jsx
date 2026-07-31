@@ -21,6 +21,7 @@ import { glassCard, glassPanel, glassModal, glassOverlay, glassBtnPrimary, glass
 import AIAssist from '../components/AIAssist'
 import AstryxScope from '../ui/ax/AstryxScope'
 import RouterLink from '../ui/ax/RouterLink'
+import { useSEO } from '../ui/seo'
 
 // Publish — social scheduling calendar + composer (PRD N13, §12.8).
 // Postiz runs invisibly behind the Worker's /api/social; this page only ever
@@ -81,6 +82,8 @@ function PlatformBadge({ platform, size = 30 }) {
 }
 
 export default function Publish() {
+  useSEO({ path: '/publish' })
+
   const navigate = useNavigate()
   const { isLoaded, isSignedIn } = useUser()
   const [params] = useSearchParams()
@@ -248,7 +251,7 @@ export default function Publish() {
           <div className="reveal-1" style={{ maxWidth: 620, margin: '40px auto' }}>
             <EmptyState
               title="Publishing starts on Starter"
-              description="Connect social accounts and schedule posts from Vymotion on Starter ($5), Creator, Pro, or Studio. Free accounts can explore the app but not publish."
+              description="Connect social accounts and schedule posts from Vymotion on Starter ($5.99), Creator, Pro, or Studio. Free accounts can explore the app but not publish."
               icon={<span style={{ fontSize: 38 }}>📅</span>}
               actions={<Button label="See plans" variant="primary" size="md" href="/pricing" as={RouterLink} />}
             />

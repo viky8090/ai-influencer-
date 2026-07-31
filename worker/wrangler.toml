@@ -27,11 +27,20 @@ routes = [
 ]
 
 # ── Static SPA (Vite build output from the repo root) ──
-# Only these routes reach the Worker script; everything else is served from ../dist,
-# and unknown paths fall back to index.html so React Router owns deep links.
+# Only these routes reach the Worker script; everything else is served from ../dist.
+#
+# not_found_handling is "404-page", not "single-page-application", because scripts/seo-build.js
+# now emits a real dist/<route>.html for EVERY route in src/ui/seoRoutes.js — so genuine deep
+# links are served straight from the filesystem and never need the SPA fallback. That leaves
+# the fallback free to do its actual job: unknown URLs get dist/404.html with a real 404
+# status. Under "single-page-application" they returned 200 + homepage HTML, which Google
+# classifies as a soft 404 and which let typo'd links dilute the homepage's own signals.
+#
+# The tradeoff: a route in App.jsx that is missing from the manifest would 404 in production
+# while working fine in `vite dev`. scripts/seo-build.js fails the build if that ever happens.
 [assets]
 directory = "../dist"
-not_found_handling = "single-page-application"
+not_found_handling = "404-page"
 run_worker_first = ["/api/*", "/webhooks/*", "/public/*", "/internal/*", "/health"]
 
 [observability]

@@ -14,7 +14,9 @@ import AstryxScope from '../ui/ax/AstryxScope'
 // Rich marketing footer — shared across the always-dark marketing surface (Landing, How it
 // works, Earnings). Internal links use the SPA router; anchors within a page use hashes.
 //
-// UI: Astryx Text / Button / Link / Grid (pilot 3). Forced dark mode via AstryxScope.
+// UI: Astryx Text / Button / Link / Grid (pilot 3). Follows the app theme — it used to
+// force mode="dark", which only overrides Astryx component tokens and not the --m-* CSS
+// vars, so in light mode it rendered white component text on a white footer.
 
 const COLUMNS = [
   {
@@ -72,7 +74,7 @@ function isExternal(href) {
 function LogoMark() {
   return (
     <svg width="26" height="26" viewBox="0 0 28 28" fill="none" style={{ display: 'block' }} aria-hidden="true">
-      <rect width="28" height="28" rx="9" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.16)" />
+      <rect width="28" height="28" rx="9" fill="var(--m-surface-soft)" stroke="var(--m-line)" />
       <g stroke="#C7F24E" strokeWidth="3.05" strokeLinecap="round">
         <line x1="8.1" y1="7.4" x2="12.9" y2="20.4" />
         <line x1="12.9" y1="7.4" x2="17.7" y2="20.4" />
@@ -99,7 +101,7 @@ export default function Footer() {
   }
 
   return (
-    <AstryxScope mode="dark">
+    <AstryxScope>
       <footer style={{ background: M.bg, borderTop: `1px solid ${M.line}`, color: M.ink }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '64px 24px 40px' }}>
 
@@ -118,7 +120,7 @@ export default function Footer() {
               <HStack gap={2} align="center">
                 <LogoMark />
                 <Text type="body" weight="bold" size="lg" color="primary">
-                  vy<span style={{ color: M.brand }}>motion</span>
+                  vy<span style={{ color: M.brandText }}>motion</span>
                 </Text>
               </HStack>
               <Text type="body" size="sm" color="secondary" display="block">
@@ -136,8 +138,8 @@ export default function Footer() {
                   borderRadius: 999,
                   background: M.brand,
                   color: M.brandInk,
-                  border: '1px solid rgba(255,255,255,0.35)',
-                  boxShadow: '0 0 26px rgba(199,242,78,0.28)',
+                  border: '1px solid var(--m-cta-border)',
+                  boxShadow: 'var(--m-cta-glow)',
                   fontWeight: 800,
                 }}
               />

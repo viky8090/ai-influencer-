@@ -15,6 +15,7 @@ import { api } from '../api/client'
 import { describeEntry, fmtWhen, collapseResolvedHolds } from '../ui/ledgerLabels'
 import AstryxScope from '../ui/ax/AstryxScope'
 import RouterLink from '../ui/ax/RouterLink'
+import { useSEO } from '../ui/seo'
 
 // Usage & credit history (PRD §15, FR-C11). Money truth stays server-side — this page only reads.
 // UI: Astryx Card / Banner / SegmentedControl (pilot 6).
@@ -40,6 +41,8 @@ const FILTERS = [
 ]
 
 export default function Usage() {
+  useSEO({ path: '/usage' })
+
   const { isLoaded, isSignedIn } = useUser()
   const clerk = useClerk()
   const [balance, setBalance] = useState(null)

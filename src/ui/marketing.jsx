@@ -1,21 +1,39 @@
-// Shared building blocks for the always-dark marketing surface (Landing, How it works,
-// Earnings, Footer). Editorial Studio: solid near-black canvas, lime CTAs, no glass glow.
+// Shared building blocks for the marketing surface (Landing, How it works, Earnings,
+// Contact, legal, 404, Footer). Editorial Studio: lime CTAs, no glass glow.
+//
+// Every value is a CSS custom property, not a literal. These used to be hardcoded near-black
+// hex, which is why the marketing pages stayed dark no matter what the theme was set to —
+// they were the one surface in the app that didn't read `data-theme`. The tokens live in
+// src/index.css under ":root" (light) and "[data-theme=dark]"; the dark values there are the
+// exact hex these constants used to hold, so dark mode is unchanged.
+//
+// `var()` resolves in SVG presentation attributes too (verified in-browser), so
+// `stroke={M.brand}` in charts.jsx and HowItWorks keeps working.
 import { useEffect, useRef, useState } from 'react'
 
 export const M = {
-  bg: '#0A0A0B',
-  bgTop: '#0A0A0B',
-  ink: '#F4F4F5',
-  sub: 'rgba(255,255,255,0.58)',
-  faint: 'rgba(255,255,255,0.40)',
-  line: 'rgba(255,255,255,0.10)',
-  lineSoft: 'rgba(255,255,255,0.06)',
-  card: '#151517',
-  cardHi: '#1C1C1F',
-  brand: '#C7F24E',
-  brandInk: '#0A0A0B',
-  pink: '#FF3D8B',
-  teal: '#38C7B6',
+  bg: 'var(--m-bg)',
+  bgTop: 'var(--m-bg-top)',
+  ink: 'var(--m-ink)',
+  sub: 'var(--m-sub)',
+  faint: 'var(--m-faint)',
+  line: 'var(--m-line)',
+  lineSoft: 'var(--m-line-soft)',
+  card: 'var(--m-card)',
+  cardHi: 'var(--m-card-hi)',
+  // Lime FILL (CTA background, dots) — always lime, always carries dark ink.
+  brand: 'var(--m-brand)',
+  // Same hue, darkened in light mode so it's legible as TEXT/strokes on a light canvas.
+  brandText: 'var(--m-brand-text)',
+  brandInk: 'var(--m-brand-ink)',
+  pink: 'var(--m-pink)',
+  teal: 'var(--m-teal)',
+  // Structural washes.
+  tint: 'var(--m-tint)',
+  accentSoft: 'var(--m-accent-soft)',
+  surfaceSoft: 'var(--m-surface-soft)',
+  mediaBorder: 'var(--m-media-border)',
+  mediaShadow: 'var(--m-media-shadow)',
 }
 
 export const mCard = {
@@ -60,7 +78,7 @@ export function Section({ children, id, tint = false, style }) {
       {tint && (
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'rgba(199,242,78,0.03)',
+          background: M.tint,
         }} />
       )}
       <div style={{ maxWidth: 1120, margin: '0 auto', position: 'relative' }}>{children}</div>
@@ -68,7 +86,9 @@ export function Section({ children, id, tint = false, style }) {
   )
 }
 
-export function Eyebrow({ children, color = M.brand }) {
+// Defaults to brandText, not brand: the eyebrow renders as small uppercase TEXT, and raw
+// lime on a white canvas is unreadable. Callers passing M.pink/M.teal are unaffected.
+export function Eyebrow({ children, color = M.brandText }) {
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 16,

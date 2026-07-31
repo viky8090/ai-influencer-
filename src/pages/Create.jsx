@@ -12,6 +12,7 @@ import { gColor } from '../utils/influencerUtils'
 import { glassPanel, glassInput, glassBtnPrimary, pressHandlers } from '../ui/glass'
 import AIAssist from '../components/AIAssist'
 import AstryxScope from '../ui/ax/AstryxScope'
+import { useSEO } from '../ui/seo'
 
 const NICHES = ['Fashion', 'Beauty', 'Lifestyle', 'Fitness', 'Travel', 'Food & Dining', 'Tech', 'Gaming', 'Finance', 'Entertainment', 'Wellness', 'Sports', 'Other']
 const VIBE_OPTIONS = [
@@ -1582,6 +1583,8 @@ function Step5({ data, onFinish, onReset, isSignedIn }) {
 
 // ── Main wizard ───────────────────────────────────────────────
 export default function Create() {
+  useSEO({ path: '/create' })
+
   const navigate = useNavigate()
   const location = useLocation()
   const [, setInfluencers] = useInfluencers()

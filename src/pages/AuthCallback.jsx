@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { handleOAuthCallback } from '../utils/higgsfieldAuth'
 import { glassBtnPrimary } from '../ui/glass'
+import { useSEO } from '../ui/seo'
 
 export default function AuthCallback() {
+  useSEO({ path: '/auth/callback' })
+
   const navigate = useNavigate()
   const [error, setError] = useState(null)
   const ran = useRef(false)

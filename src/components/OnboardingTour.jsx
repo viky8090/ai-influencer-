@@ -16,29 +16,33 @@ const STEPS = [
     cta: 'Show me around',
   },
   {
+    // Framed as "here is what finished work looks like", not "meet this person". The sample
+    // is a reference exhibit, not a character the product wants you to bond with - leading
+    // with her name made the first run read as a demo someone else built rather than your
+    // own workspace. The persona is still named on her own card, where the label belongs.
     id: 'camila',
-    title: 'Meet Camila — your example',
-    body: 'Camila is a fully built sample influencer. Open her profile to explore character sheets, wardrobe, Photo Studio, and Video Studio before you create your own.',
-    cta: 'Open Camila',
+    title: 'Start from a finished example',
+    body: 'A fully built sample influencer is already in your library. Open it to see character sheets, wardrobe, Photo Studio and Video Studio working end to end, so you know what finished output looks like before you build your own.',
+    cta: 'Open the sample',
     action: 'camila',
   },
   {
     id: 'create',
     title: 'Create your own influencer',
-    body: 'When you’re ready, use Create to design a new persona — face references, vibe, and look — then generate your first images.',
+    body: 'When you’re ready, use Create to design a new persona: face references, vibe, and look. Then generate your first images.',
     cta: 'Go to Create',
     action: 'create',
   },
   {
     id: 'credits',
     title: 'Credits power generations',
-    body: 'Every image, video, and AI prompt uses credits. Free accounts explore only — start Starter ($5) or higher to generate. Your balance lives in the top bar. Failed generations are never charged.',
+    body: 'Every image, video, and AI prompt uses credits. Free accounts explore only — start Starter ($5.99) or higher to generate. Your balance lives in the top bar. Failed generations are never charged.',
     cta: 'Got it',
   },
   {
     id: 'done',
     title: 'You’re ready',
-    body: 'Explore Camila, create your first influencer, or jump into Photo Studio. You can restart this tour anytime from Settings.',
+    body: 'Create your first influencer, explore the sample, or jump straight into Photo Studio. You can restart this tour anytime from Settings.',
     cta: 'Start creating',
     action: 'finish',
   },
@@ -176,10 +180,23 @@ export default function OnboardingTour() {
 
         {step === 1 && (
           <div style={{
+            position: 'relative',
             width: '100%', aspectRatio: '16/10', borderRadius: 10, overflow: 'hidden',
             border: '1px solid var(--border)', marginBottom: 16, background: 'var(--bg-tertiary)',
           }}>
-            <img src="/camila/main.jpg" alt="Camila" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
+            <img src="/camila/main.jpg" alt="Sample influencer generated in Vymotion" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 15%' }} />
+            {/* Demo content has to be unmistakably labelled where it is shown, not only in
+                prose. Unlabelled sample imagery is what makes a first run feel like a canned
+                demo instead of a workspace. */}
+            <span style={{
+              position: 'absolute', top: 10, left: 10,
+              padding: '4px 9px', borderRadius: 6,
+              background: 'rgba(10,10,11,0.72)', color: '#F4F4F5',
+              fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+              backdropFilter: 'blur(4px)',
+            }}>
+              Sample
+            </span>
           </div>
         )}
 
@@ -203,7 +220,7 @@ export default function OnboardingTour() {
 
         {pathname === '/dashboard' && step === 0 && (
           <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text-tertiary)', textAlign: 'center' }}>
-            Tip: Camila is already in your Influencers list as a working example.
+            Tip: a sample influencer is already in your library, labelled as an example.
           </p>
         )}
       </div>

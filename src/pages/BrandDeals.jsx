@@ -13,6 +13,7 @@ import {
   VStack,
   HStack,
 } from '@astryxdesign/core'
+import { useSEO } from '../ui/seo'
 import { useBrandDeals, generateId } from '../store'
 import { compressImage, downloadImage } from '../utils/imageUtils'
 import { generateSingleImage } from '../utils/higgsfieldGenerate'
@@ -309,6 +310,8 @@ function DealCard({ deal, generating, progress, onDelete, onOpen, onRename, onGe
 }
 
 export default function BrandDeals() {
+  useSEO({ path: '/brand-deals' })
+
   const [deals, setDeals] = useBrandDeals()
   const [showNew, setShowNew] = useState(false)
   const [lightboxDeal, setLightboxDeal] = useState(null)
@@ -402,9 +405,11 @@ export default function BrandDeals() {
               >
                 Partnerships · {deals.length} deal{deals.length !== 1 ? 's' : ''}
               </Text>
-              <Text type="display-2" weight="bold" display="block" style={{ letterSpacing: '-1.2px', lineHeight: 1 }}>
-                Brand Deals
-              </Text>
+              <h1 style={{ font: 'inherit', margin: 0 }}>
+                <Text type="display-2" weight="bold" display="block" style={{ letterSpacing: '-1.2px', lineHeight: 1 }}>
+                  AI influencer brand deals
+                </Text>
+              </h1>
             </div>
             <Button label="+ New Deal" variant="primary" size="md" onClick={() => setShowNew(true)} />
           </div>

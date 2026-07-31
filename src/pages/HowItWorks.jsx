@@ -48,12 +48,16 @@ const CHECKLIST = [
 export default function HowItWorks() {
   const navigate = useNavigate()
   useSEO({
-    title: 'How It Works — Create an AI Influencer Step by Step',
-    description: 'A step-by-step guide to building and monetizing an AI influencer with Vymotion: design a consistent persona, shoot photos and video, grow an audience, and land brand deals.',
     path: '/how-it-works',
     jsonLd: {
-      '@context': 'https://schema.org', '@type': 'HowTo', name: 'How to create an AI influencer with Vymotion',
-      step: STEPS.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.k, text: s.d })),
+      '@context': 'https://schema.org', '@type': 'HowTo',
+      name: 'How to create an AI influencer with Vymotion',
+      description: 'Design a consistent AI persona, generate photos and video, grow an audience, and monetize it through brand deals.',
+      totalTime: 'PT10M',
+      step: STEPS.map((s, i) => ({
+        '@type': 'HowToStep', position: i + 1, name: s.k, text: s.d,
+        url: `${SITE_URL}/how-it-works#step-${i + 1}`,
+      })),
     },
   })
 
@@ -61,7 +65,7 @@ export default function HowItWorks() {
     <div style={{ background: M.bg, color: M.ink }}>
       {/* Header band */}
       <div style={{ position: 'relative', overflow: 'hidden', padding: 'calc(var(--nav-h) + 70px) 24px 70px', textAlign: 'center', background: M.bgTop, borderBottom: `1px solid ${M.line}` }}>
-        <div style={{ position: 'absolute', width: '50vmax', height: '50vmax', top: '-30%', left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, rgba(199,242,78,0.10) 0%, transparent 62%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', width: '50vmax', height: '50vmax', top: '-30%', left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, var(--m-accent-soft) 0%, transparent 62%)', pointerEvents: 'none' }} />
         <div style={{ maxWidth: 760, margin: '0 auto', position: 'relative' }}>
           <Reveal><Eyebrow>How it works</Eyebrow></Reveal>
           <Reveal delay={0.05}><h1 style={{ fontSize: 'clamp(38px, 6vw, 62px)', fontWeight: 800, letterSpacing: '-2px', lineHeight: 1.05, margin: 0 }}>From blank canvas to a paid AI influencer</h1></Reveal>
@@ -74,20 +78,20 @@ export default function HowItWorks() {
       <Section>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {STEPS.map((s, i) => (
-            <Reveal key={s.k} style={{ ...mCard, padding: 'clamp(22px, 3vw, 34px)', display: 'grid', gridTemplateColumns: '64px 1fr', gap: 22, alignItems: 'start' }} className="how-step">
+            <Reveal key={s.k} id={`step-${i + 1}`} style={{ ...mCard, padding: 'clamp(22px, 3vw, 34px)', display: 'grid', gridTemplateColumns: '64px 1fr', gap: 22, alignItems: 'start', scrollMarginTop: 90 }} className="how-step">
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 52, height: 52, borderRadius: 15, background: 'rgba(199,242,78,0.12)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 52, height: 52, borderRadius: 15, background: 'var(--m-accent-soft)', color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{s.icon}</svg>
                 </div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: 'rgba(255,255,255,0.16)', letterSpacing: '-1px' }}>{String(i + 1).padStart(2, '0')}</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--m-ghost)', letterSpacing: '-1px' }}>{String(i + 1).padStart(2, '0')}</div>
               </div>
               <div>
                 <h2 style={{ fontSize: 'clamp(21px, 2.6vw, 27px)', fontWeight: 800, letterSpacing: '-0.6px', margin: '2px 0 10px', color: M.ink }}>{s.k}</h2>
                 <p style={{ fontSize: 15.5, lineHeight: 1.7, color: M.sub, margin: '0 0 16px', maxWidth: 640 }}>{s.d}</p>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {s.bullets.map((b) => (
-                    <span key={b} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: M.ink, padding: '7px 13px', borderRadius: 999, background: 'rgba(255,255,255,0.04)', border: `1px solid ${M.line}` }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={M.brand} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>{b}
+                    <span key={b} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: M.ink, padding: '7px 13px', borderRadius: 999, background: 'var(--m-surface-soft)', border: `1px solid ${M.line}` }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={M.brandText} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>{b}
                     </span>
                   ))}
                 </div>
@@ -109,7 +113,7 @@ export default function HowItWorks() {
           <Reveal delay={0.06} style={{ ...mCard, padding: 26 }}>
             {CHECKLIST.map((c, i) => (
               <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderTop: i === 0 ? 'none' : `1px solid ${M.lineSoft}` }}>
-                <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, background: 'rgba(199,242,78,0.12)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>{i + 1}</span>
+                <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, background: 'var(--m-accent-soft)', color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>{i + 1}</span>
                 <span style={{ fontSize: 14.5, color: M.ink, fontWeight: 500 }}>{c}</span>
               </div>
             ))}

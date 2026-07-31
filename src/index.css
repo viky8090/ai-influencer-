@@ -20,7 +20,14 @@
   --accent-2: #FF3D8B;
   --radius: 10px;
   --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif;
+  /* Headings run on Bricolage Grotesque, body/UI stays Inter.
+     Inter-everywhere is the most-cited "this was AI-generated" tell in current design
+     criticism (alongside blue-purple gradients and vague hero headlines) precisely because
+     it is the neutral default every generator reaches for. Bricolage is the opposite bet:
+     an intentionally non-neutral grotesque with real character in the counters and
+     terminals, which is what "Editorial Studio" was always claiming to be.
+     This token existed before but pointed back at Inter, so nothing ever used it. */
+  --font-display: 'Bricolage Grotesque', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif;
 
   /* Motion — functional, not liquid theatre */
   --ease-liquid: cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -61,6 +68,48 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
   --nav-h: 56px;
+
+  /* ── Marketing surface (LIGHT) ──────────────────────────────────────────────
+     Consumed via the `M` object in src/ui/marketing.jsx, which is spread into
+     inline styles across Landing / HowItWorks / Earnings / Contact / legal /
+     404 / Footer / charts. Those used to be hardcoded near-black hex, which is
+     why the marketing pages ignored the theme entirely.
+
+     Two brand tokens, deliberately: --m-brand is the lime FILL (CTA background,
+     dots) and always stays lime because it carries dark ink on top. --m-brand-text
+     is the same hue pushed dark enough to read as TEXT on a light canvas — lime
+     text on white is ~1.4:1 and effectively invisible. */
+  --m-bg: #FFFFFF;
+  --m-bg-top: #FAFAFA;
+  --m-ink: #0A0A0B;
+  --m-sub: rgba(10, 10, 11, 0.66);
+  /* 0.45 (the mirror of the dark value) only reaches ~3.1:1 on the light card colour, which
+     fails WCAG AA for body text. 0.55 lands at ~4.7:1. */
+  --m-faint: rgba(10, 10, 11, 0.58);
+  --m-line: rgba(10, 10, 11, 0.12);
+  --m-line-soft: rgba(10, 10, 11, 0.07);
+  --m-card: #FAFAFA;
+  --m-card-hi: #F1F1F2;
+  --m-brand: #C7F24E;
+  --m-brand-text: #4D7C0F;
+  --m-brand-ink: #0A0A0B;
+  --m-pink: #DB2777;
+  --m-teal: #0D9488;
+  /* Structural washes used by the Landing hero and section tints. */
+  --m-tint: rgba(10, 10, 11, 0.025);
+  --m-hero-veil: rgba(255, 255, 255, 0.82);
+  --m-accent-soft: rgba(77, 124, 15, 0.10);
+  --m-surface-soft: rgba(10, 10, 11, 0.04);
+  --m-trustbar: rgba(10, 10, 11, 0.02);
+  --m-media-border: rgba(10, 10, 11, 0.10);
+  --m-media-shadow: 0 16px 40px rgba(10, 10, 11, 0.14);
+  --m-ghost: rgba(10, 10, 11, 0.14);
+  --m-brand-border: rgba(77, 124, 15, 0.45);
+  --m-pink-soft: rgba(219, 39, 119, 0.08);
+  /* Lime CTA sits on a light canvas: a white hairline vanishes, so use a dark one and
+     swap the neon glow for a plain elevation shadow. */
+  --m-cta-border: rgba(10, 10, 11, 0.16);
+  --m-cta-glow: 0 6px 18px rgba(10, 10, 11, 0.10);
 }
 
 /* ── Dark theme — primary Editorial Studio expression ── */
@@ -86,6 +135,52 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.50);
+
+  /* ── Marketing surface (DARK) ───────────────────────────────────────────────
+     These are the literal values the `M` object hardcoded before it was
+     tokenised, so dark mode renders exactly as it always has. */
+  --m-bg: #0A0A0B;
+  --m-bg-top: #0A0A0B;
+  --m-ink: #F4F4F5;
+  --m-sub: rgba(255, 255, 255, 0.58);
+  --m-faint: rgba(255, 255, 255, 0.40);
+  --m-line: rgba(255, 255, 255, 0.10);
+  --m-line-soft: rgba(255, 255, 255, 0.06);
+  --m-card: #151517;
+  --m-card-hi: #1C1C1F;
+  --m-brand: #C7F24E;
+  --m-brand-text: #C7F24E;
+  --m-brand-ink: #0A0A0B;
+  --m-pink: #FF3D8B;
+  --m-teal: #38C7B6;
+  --m-tint: rgba(199, 242, 78, 0.03);
+  --m-hero-veil: rgba(10, 10, 11, 0.88);
+  --m-accent-soft: rgba(199, 242, 78, 0.12);
+  --m-surface-soft: rgba(255, 255, 255, 0.05);
+  --m-trustbar: rgba(255, 255, 255, 0.015);
+  --m-media-border: rgba(255, 255, 255, 0.12);
+  --m-media-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --m-ghost: rgba(255, 255, 255, 0.16);
+  --m-brand-border: rgba(199, 242, 78, 0.45);
+  --m-pink-soft: rgba(255, 61, 139, 0.08);
+  --m-cta-border: rgba(255, 255, 255, 0.35);
+  --m-cta-glow: 0 0 26px rgba(199, 242, 78, 0.28);
+}
+
+/* ── Display type ────────────────────────────────────────────────────────────
+   Route every heading through --font-display. Deliberately UNLAYERED so it wins
+   over Astryx's own layered component typography - Astryx sets the size, weight
+   and rhythm (which we want to keep); this only swaps the family.
+
+   Scoped to headings on purpose. Body copy, labels, inputs and dense data stay on
+   Inter, which is genuinely better at small sizes - the goal is a distinctive
+   voice at display sizes, not novelty everywhere. */
+h1, h2,
+.astryx-heading,
+.astryx-text.display-1,
+.astryx-text.display-2,
+.astryx-text.display-3 {
+  font-family: var(--font-display);
 }
 
 html {

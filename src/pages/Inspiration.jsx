@@ -12,6 +12,7 @@ import { useInspirationBoards, generateId } from '../store'
 import { compressImage } from '../utils/imageUtils'
 import Lightbox from '../components/Lightbox'
 import AstryxScope from '../ui/ax/AstryxScope'
+import { useSEO } from '../ui/seo'
 
 function downloadImage(src, filename) {
   const a = document.createElement('a')
@@ -209,6 +210,8 @@ export default function Inspiration() {
   const [boards, setBoards] = useInspirationBoards()
   const [selectedId, setSelectedId] = useState(null)
 
+  useSEO({ path: '/inspiration' })
+
   function createBoard() {
     const board = { id: generateId(), name: 'New Board', images: [], createdAt: Date.now() }
     setBoards(prev => [...prev, board])
@@ -248,9 +251,11 @@ export default function Inspiration() {
                 >
                   Moodboards
                 </Text>
-                <Text type="display-2" weight="bold" display="block" style={{ letterSpacing: '-1.2px', lineHeight: 1 }}>
-                  Inspiration
-                </Text>
+                <h1 style={{ font: 'inherit', margin: 0 }}>
+                  <Text type="display-2" weight="bold" display="block" style={{ letterSpacing: '-1.2px', lineHeight: 1 }}>
+                    AI influencer inspiration
+                  </Text>
+                </h1>
               </div>
               <Button label="+ New Board" variant="primary" size="md" onClick={createBoard} />
             </div>

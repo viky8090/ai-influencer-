@@ -175,11 +175,7 @@ export default function Docs() {
   const location = useLocation()
   const [active, setActive] = useState('start')
 
-  useSEO({
-    title: 'Documentation — Vymotion User Guide',
-    description: 'Step-by-step guide to every Vymotion feature: create influencers, Photo Studio, Video Studio, publish, credits, and settings.',
-    path: '/docs',
-  })
+  useSEO({ path: '/docs' })
 
   // Highlight TOC from scroll position
   useEffect(() => {
@@ -275,7 +271,7 @@ export default function Docs() {
 
             <Section id="start" title="Getting started">
               <Ol items={[
-                <>Sign up free to explore (no generation credits). Start Starter ($5) or higher to generate and publish.</>,
+                <>Sign up free to explore (no generation credits). Start Starter ($5.99) or higher to generate and publish.</>,
                 <>Open <LinkBtn to="/dashboard">Home</LinkBtn> — your plan, balance, recent generations, and influencer list.</>,
                 <>Explore the sample influencer <strong style={{ color: 'var(--text-primary)' }}>Camila</strong> under <LinkBtn to="/influencers">Influencers</LinkBtn> (Profile, Photos, Videos).</>,
                 <>Create your own: <LinkBtn to="/create">+ Create</LinkBtn> in the nav → 5-step wizard → pick a look → you land on that influencer’s studio.</>,
@@ -319,20 +315,20 @@ export default function Docs() {
                 headers={['Plan', 'Price', 'Credits / mo', 'Highlights']}
                 rows={[
                   ['Free', '$0', '0', 'Explore only · no generation · no publish'],
-                  ['Starter', '$5/mo or $50/yr', '200', '1 influencer · full Photo/Video (no Seedance 2/Veo) · Publish · personal use · no watermark'],
-                  ['Creator', '$29/mo or $290/yr', '600', '5 influencers · all models incl. premium video · commercial license'],
-                  ['Pro', '$69/mo or $690/yr', '1,800', '25 influencers · 4K · high priority · 1-month rollover'],
-                  ['Studio', '$179/mo or $1,790/yr', '5,500', 'Unlimited influencers · highest priority · 2-month rollover'],
+                  ['Starter', '$5.99/mo or $71.88/yr', '200', '1 influencer · full Photo/Video (no Seedance 2/Veo) · Publish · personal use · no watermark'],
+                  ['Creator', '$31.99/mo or $319.90/yr', '600', '5 influencers · all models incl. premium video · commercial license'],
+                  ['Pro', '$74.99/mo or $749.90/yr', '1,800', '25 influencers · 4K · high priority · 1-month rollover'],
+                  ['Studio', '$191.99/mo or $1,919.90/yr', '5,500', 'Unlimited influencers · highest priority · 2-month rollover'],
                 ]}
               />
               <H3>Credit packs (one-off)</H3>
               <Table
                 headers={['Pack', 'Credits', 'Price']}
                 rows={[
-                  ['Small', '500', '$20'],
-                  ['Medium', '1,500', '$55'],
-                  ['Large', '5,000', '$160'],
-                  ['Mega', '15,000', '$450'],
+                  ['Small', '500', '$21.99'],
+                  ['Medium', '1,500', '$59.99'],
+                  ['Large', '5,000', '$171.99'],
+                  ['Mega', '15,000', '$481.99'],
                 ]}
               />
               <P>Checkout goes through Polar. After purchase, manage invoices and payment methods from Settings → Manage billing & invoices.</P>

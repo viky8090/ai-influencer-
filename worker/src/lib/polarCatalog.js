@@ -1,6 +1,14 @@
 // Plan + pack catalog — Polar sync and D1 polar_products source of truth.
-// B3 hybrid + Starter $5 entry (200 VC/mo). Annual ≈ 10× monthly (~2 months free).
-// Packs ~$0.04/VC.
+// B3 hybrid + Starter entry (200 VC/mo). Annual = exactly 10× monthly sticker (~2 months
+// free) — the frontend derives every annual display from the monthly `m`, so keep the ratio.
+//
+// FEE GROSS-UP (2026-07-22): stickers are grossed up so Vymotion nets the former list price
+// after Polar's worst-case cut (Starter tier: 5% + $0.50, +1.5% international cards = 6.5%
+// + $0.50). price = (old_net + 0.50)/0.935 rounded up to .99. E.g. Starter $5.99 nets
+// $5.10–5.19; Creator 600 $31.99 nets $29.41+. Annual transactions net MORE than 12× the
+// monthly net (one fixed 50¢ instead of twelve). If Polar's fee tier ever changes
+// (polar.sh/docs/merchant-of-record/fees), recompute. Polar cannot surcharge buyers, and
+// fees must never be labeled as tax — the gross-up is the only compliant pass-through.
 //
 // Credit tiers (B4): Creator/Pro/Studio each come in multiple credit sizes selected by the
 // pricing-page slider. Same plan key (feature gates unchanged — gates read subscriptions.plan),
@@ -10,37 +18,38 @@
 
 export const B3_CATALOG = [
   // Starter — full product surface, personal-use, no premium video (Seedance 2 / Veo).
-  // Single fixed tier: 200 VC @ $5 ≈ $0.025/VC list. NO annual discount on the $5 entry
+  // Single fixed tier: 200 VC @ $5.99 (nets ≈$5). NO annual discount on the entry plan
   // (annual = flat 12× monthly) — the 17%-off annual deal starts at Creator.
-  { kind: 'plan', key: 'starter', interval: 'month', name: 'Starter',          cents: 500,    grantVc: 200 },
-  { kind: 'plan', key: 'starter', interval: 'year',  name: 'Starter (annual)', cents: 6000,   grantVc: 2400 },
+  { kind: 'plan', key: 'starter', interval: 'month', name: 'Starter',          cents: 599,    grantVc: 200 },
+  { kind: 'plan', key: 'starter', interval: 'year',  name: 'Starter (annual)', cents: 7188,   grantVc: 2400 },
 
-  // Creator — $0.0483/VC base → $0.0467/VC at 900.
-  { kind: 'plan', key: 'creator', interval: 'month', name: 'Creator 600',           cents: 2900,   grantVc: 600 },
-  { kind: 'plan', key: 'creator', interval: 'year',  name: 'Creator 600 (annual)',  cents: 29000,  grantVc: 7200 },
-  { kind: 'plan', key: 'creator', interval: 'month', name: 'Creator 900',           cents: 4200,   grantVc: 900 },
-  { kind: 'plan', key: 'creator', interval: 'year',  name: 'Creator 900 (annual)',  cents: 42000,  grantVc: 10800 },
+  // Creator — nets ≈$29/$42 (old list) per month after fees.
+  { kind: 'plan', key: 'creator', interval: 'month', name: 'Creator 600',           cents: 3199,   grantVc: 600 },
+  { kind: 'plan', key: 'creator', interval: 'year',  name: 'Creator 600 (annual)',  cents: 31990,  grantVc: 7200 },
+  { kind: 'plan', key: 'creator', interval: 'month', name: 'Creator 900',           cents: 4599,   grantVc: 900 },
+  { kind: 'plan', key: 'creator', interval: 'year',  name: 'Creator 900 (annual)',  cents: 45990,  grantVc: 10800 },
 
-  // Pro — $0.0383 → $0.0367 → $0.035/VC.
-  { kind: 'plan', key: 'pro', interval: 'month', name: 'Pro 1800',          cents: 6900,   grantVc: 1800 },
-  { kind: 'plan', key: 'pro', interval: 'year',  name: 'Pro 1800 (annual)', cents: 69000,  grantVc: 21600 },
-  { kind: 'plan', key: 'pro', interval: 'month', name: 'Pro 2700',          cents: 9900,   grantVc: 2700 },
-  { kind: 'plan', key: 'pro', interval: 'year',  name: 'Pro 2700 (annual)', cents: 99000,  grantVc: 32400 },
-  { kind: 'plan', key: 'pro', interval: 'month', name: 'Pro 3600',          cents: 12600,  grantVc: 3600 },
-  { kind: 'plan', key: 'pro', interval: 'year',  name: 'Pro 3600 (annual)', cents: 126000, grantVc: 43200 },
+  // Pro — nets ≈$69/$99/$126 per month after fees.
+  { kind: 'plan', key: 'pro', interval: 'month', name: 'Pro 1800',          cents: 7499,   grantVc: 1800 },
+  { kind: 'plan', key: 'pro', interval: 'year',  name: 'Pro 1800 (annual)', cents: 74990,  grantVc: 21600 },
+  { kind: 'plan', key: 'pro', interval: 'month', name: 'Pro 2700',          cents: 10699,  grantVc: 2700 },
+  { kind: 'plan', key: 'pro', interval: 'year',  name: 'Pro 2700 (annual)', cents: 106990, grantVc: 32400 },
+  { kind: 'plan', key: 'pro', interval: 'month', name: 'Pro 3600',          cents: 13599,  grantVc: 3600 },
+  { kind: 'plan', key: 'pro', interval: 'year',  name: 'Pro 3600 (annual)', cents: 135990, grantVc: 43200 },
 
-  // Studio — $0.0325 → $0.0311 → $0.0299/VC (lowest cost per credit).
-  { kind: 'plan', key: 'studio', interval: 'month', name: 'Studio 5500',           cents: 17900,  grantVc: 5500 },
-  { kind: 'plan', key: 'studio', interval: 'year',  name: 'Studio 5500 (annual)',  cents: 179000, grantVc: 66000 },
-  { kind: 'plan', key: 'studio', interval: 'month', name: 'Studio 8000',           cents: 24900,  grantVc: 8000 },
-  { kind: 'plan', key: 'studio', interval: 'year',  name: 'Studio 8000 (annual)',  cents: 249000, grantVc: 96000 },
-  { kind: 'plan', key: 'studio', interval: 'month', name: 'Studio 11000',          cents: 32900,  grantVc: 11000 },
-  { kind: 'plan', key: 'studio', interval: 'year',  name: 'Studio 11000 (annual)', cents: 329000, grantVc: 132000 },
+  // Studio — nets ≈$179/$249/$329 per month after fees (lowest cost per credit).
+  { kind: 'plan', key: 'studio', interval: 'month', name: 'Studio 5500',           cents: 19199,  grantVc: 5500 },
+  { kind: 'plan', key: 'studio', interval: 'year',  name: 'Studio 5500 (annual)',  cents: 191990, grantVc: 66000 },
+  { kind: 'plan', key: 'studio', interval: 'month', name: 'Studio 8000',           cents: 26699,  grantVc: 8000 },
+  { kind: 'plan', key: 'studio', interval: 'year',  name: 'Studio 8000 (annual)',  cents: 266990, grantVc: 96000 },
+  { kind: 'plan', key: 'studio', interval: 'month', name: 'Studio 11000',          cents: 35299,  grantVc: 11000 },
+  { kind: 'plan', key: 'studio', interval: 'year',  name: 'Studio 11000 (annual)', cents: 352990, grantVc: 132000 },
 
-  { kind: 'pack', key: 'small',  interval: null, name: '500 credits',    cents: 2000,  grantVc: 500 },
-  { kind: 'pack', key: 'medium', interval: null, name: '1,500 credits',  cents: 5500,  grantVc: 1500 },
-  { kind: 'pack', key: 'large',  interval: null, name: '5,000 credits',  cents: 16000, grantVc: 5000 },
-  { kind: 'pack', key: 'mega',   interval: null, name: '15,000 credits', cents: 45000, grantVc: 15000 },
+  // Packs — net ≈$20/$55/$160/$450 (old list) after fees.
+  { kind: 'pack', key: 'small',  interval: null, name: '500 credits',    cents: 2199,  grantVc: 500 },
+  { kind: 'pack', key: 'medium', interval: null, name: '1,500 credits',  cents: 5999,  grantVc: 1500 },
+  { kind: 'pack', key: 'large',  interval: null, name: '5,000 credits',  cents: 17199, grantVc: 5000 },
+  { kind: 'pack', key: 'mega',   interval: null, name: '15,000 credits', cents: 48199, grantVc: 15000 },
 ]
 
 // One Polar product per catalog row — tiers of the same plan are distinct products,

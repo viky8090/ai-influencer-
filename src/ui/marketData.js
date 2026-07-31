@@ -74,7 +74,7 @@ export const FAQ = [
   },
   {
     q: 'How much does it cost to start?',
-    a: 'Start for free — no card required to explore the studio. Generation and social publish unlock on Starter at $5/month (200 credits). You’re only charged credits for delivered generations; failed or filtered results are refunded.',
+    a: 'Start for free — no card required to explore the studio. Generation and social publish unlock on Starter at $5.99/month (200 credits). You’re only charged credits for delivered generations; failed or filtered results are refunded.',
   },
   {
     q: 'Is this allowed — is it ethical?',

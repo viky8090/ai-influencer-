@@ -19,9 +19,9 @@ import { api } from '../api/client'
 // generation is short on credits (pass `needed`). Buying a pack goes straight to the Polar
 // hosted checkout; plan upgrades route through /pricing.
 const PACKS = [
-  { key: 'small', c: 500, label: '500', price: '$20', per: '$0.040/cr' },
-  { key: 'medium', c: 1500, label: '1,500', price: '$55', per: '$0.037/cr', best: true },
-  { key: 'large', c: 5000, label: '5,000', price: '$160', per: '$0.032/cr' },
+  { key: 'small', c: 500, label: '500', price: '$21.99', per: '$0.044/cr' },
+  { key: 'medium', c: 1500, label: '1,500', price: '$59.99', per: '$0.040/cr', best: true },
+  { key: 'large', c: 5000, label: '5,000', price: '$171.99', per: '$0.034/cr' },
 ]
 
 export default function PaywallModal({ balance, needed, onClose }) {

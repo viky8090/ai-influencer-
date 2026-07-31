@@ -16,6 +16,7 @@ import PhotoStudioPanel from './PhotoStudio'
 import WardrobeDrawer from '../components/WardrobeDrawer'
 import { glassCard, glassPanel, glassModal, glassOverlay, glassInput, glassBtnGhost, glassBtnPrimary } from '../ui/glass'
 import AIAssist from '../components/AIAssist'
+import { useSEO } from '../ui/seo'
 
 // Video Studio model lineup — ids must match worker/src/providers/fal.js buildRequest cases
 // and the price_book rows (migration 0008). cost = flat VC per clip, shown as a hint only;
@@ -5838,6 +5839,8 @@ ${shotsWithBeats.join('\n\n')}`
 // ─────────────────────────────────────────────
 // Main export
 export default function Influencers() {
+  useSEO({ path: '/influencers' })
+
   const [influencers,setInfluencers]=useInfluencers()
   const { isDark } = useTheme()
   const location = useLocation()

@@ -22,6 +22,7 @@ import { api } from '../api/client'
 import { useCredits } from '../api/creditsStore'
 import AstryxScope from '../ui/ax/AstryxScope'
 import RouterLink from '../ui/ax/RouterLink'
+import { useSEO } from '../ui/seo'
 
 // Side-label sections — title in a left rail; fields sit right.
 // Stacks to a single column ≤760px (.vy-side-section CSS).
@@ -345,6 +346,8 @@ function ChannelsSection() {
 }
 
 export default function Settings() {
+  useSEO({ path: '/settings' })
+
   const { theme, toggle } = useTheme()
 
   return (

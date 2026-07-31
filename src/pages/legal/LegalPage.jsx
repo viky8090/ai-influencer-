@@ -1,7 +1,8 @@
 // Shared layout for the legal / policy pages (Terms, Privacy, DMCA, Cookies).
-// Same always-dark marketing surface as Landing/HowItWorks so the footer links feel
-// native. Content is data-driven: pages pass { title, updated, intro, sections } and get
-// consistent typography, anchor ids, and a table of contents for longer documents.
+// Same marketing surface as Landing/HowItWorks (the --m-* tokens, which follow the app
+// theme) so the footer links feel native. Content is data-driven: pages pass
+// { title, updated, intro, sections } and get consistent typography, anchor ids, and a
+// table of contents for longer documents.
 import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { M } from '../../ui/marketing'
@@ -13,7 +14,7 @@ export const LEGAL_EMAIL = 'contact@vymotion.org'
 export function Mail({ subject }) {
   const href = subject ? `mailto:${LEGAL_EMAIL}?subject=${encodeURIComponent(subject)}` : `mailto:${LEGAL_EMAIL}`
   return (
-    <a href={href} style={{ color: M.brand, textDecoration: 'none', fontWeight: 600 }}>
+    <a href={href} style={{ color: M.brandText, textDecoration: 'none', fontWeight: 600 }}>
       {LEGAL_EMAIL}
     </a>
   )
@@ -34,7 +35,7 @@ export function L({ to, children }) {
         navigate(to)
         window.scrollTo({ top: 0 })
       }}
-      style={{ color: M.brand, textDecoration: 'none', fontWeight: 600 }}
+      style={{ color: M.brandText, textDecoration: 'none', fontWeight: 600 }}
     >
       {children}
     </a>
@@ -57,7 +58,9 @@ export function UL({ items }) {
 
 export default function LegalPage({ title, eyebrow = 'Legal', updated, description, path, intro, sections, children }) {
   const location = useLocation()
-  useSEO({ title, description, path })
+  // `title`/`description` stay props because they render in the page body; the indexed
+  // <head> copy comes from the route manifest so it matches the prerendered shell.
+  useSEO({ path })
 
   // Land on #anchor links (e.g. /terms#likeness) after the content mounts.
   useEffect(() => {
@@ -74,7 +77,7 @@ export default function LegalPage({ title, eyebrow = 'Legal', updated, descripti
       {/* Header band */}
       <div style={{ padding: 'calc(var(--nav-h) + 56px) 24px 44px', borderBottom: `1px solid ${M.line}`, background: M.bgTop }}>
         <div style={{ maxWidth: 820, margin: '0 auto' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 12, fontWeight: 800, letterSpacing: '1.4px', textTransform: 'uppercase', color: M.brand }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 12, fontWeight: 800, letterSpacing: '1.4px', textTransform: 'uppercase', color: M.brandText }}>
             <span style={{ width: 7, height: 7, borderRadius: 2, background: M.brand }} />
             {eyebrow}
           </div>

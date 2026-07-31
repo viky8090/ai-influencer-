@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Show, RedirectToSignIn } from '@clerk/react'
 import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider } from './context/theme'
@@ -33,6 +33,7 @@ const Terms = lazy(() => import('./pages/legal/Terms'))
 const Privacy = lazy(() => import('./pages/legal/Privacy'))
 const Dmca = lazy(() => import('./pages/legal/Dmca'))
 const Cookies = lazy(() => import('./pages/legal/Cookies'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 // Warm the most likely next chunks while the browser is idle, so in-app navigation never
 // waits on the network. Failures are fine — the route's own lazy() retries on navigation.
@@ -93,8 +94,19 @@ export default function App() {
             <Influencers />
           </Show>
         } />
-        <Route path="/inspiration" element={<Inspiration />} />
-        <Route path="/brand-deals" element={<BrandDeals />} />
+        <Route path="/inspiration" element={
+          <Show when="signed-in" fallback={<RedirectToSignIn />}>
+            <Inspiration />
+          </Show>
+        } />
+        <Route path="/brand-deals" element={
+          <Show when="signed-in" fallback={<RedirectToSignIn />}>
+            <BrandDeals />
+          </Show>
+        } />
+        {/* /create stays public on purpose: it's the top-of-funnel landing page for the
+            "create an AI influencer" query, and the wizard gates itself at Step 5
+            (Create.jsx) so a visitor can walk the whole flow before signing up. */}
         <Route path="/create" element={<Create />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/publish" element={
@@ -110,7 +122,9 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/dmca" element={<Dmca />} />
         <Route path="/cookies" element={<Cookies />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* A real 404 rather than a redirect home — redirecting made every bad URL look
+            like a 200 with homepage content, which Google flags as a soft 404. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       </Suspense>
       <Analytics />

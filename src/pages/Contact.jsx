@@ -49,8 +49,6 @@ const CHANNELS = [
 export default function Contact() {
   const navigate = useNavigate()
   useSEO({
-    title: 'Contact Vymotion — Support, Billing, Legal',
-    description: 'Reach the Vymotion team: product support, billing and credits, privacy requests, DMCA notices, security reports, and partnership inquiries.',
     path: '/contact',
     jsonLd: {
       '@context': 'https://schema.org',
@@ -64,7 +62,7 @@ export default function Contact() {
     <div style={{ background: M.bg, color: M.ink, minHeight: '100vh' }}>
       {/* Header band */}
       <div style={{ position: 'relative', overflow: 'hidden', padding: 'calc(var(--nav-h) + 70px) 24px 64px', textAlign: 'center', background: M.bgTop, borderBottom: `1px solid ${M.line}` }}>
-        <div style={{ position: 'absolute', width: '50vmax', height: '50vmax', top: '-30%', left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, rgba(199,242,78,0.10) 0%, transparent 62%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', width: '50vmax', height: '50vmax', top: '-30%', left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, var(--m-accent-soft) 0%, transparent 62%)', pointerEvents: 'none' }} />
         <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
           <Reveal><Eyebrow>Contact</Eyebrow></Reveal>
           <Reveal delay={0.05}>
@@ -100,15 +98,15 @@ export default function Contact() {
               <a
                 href={`mailto:${EMAIL}?subject=${encodeURIComponent(ch.subject)}`}
                 style={{ ...mCard, display: 'flex', flexDirection: 'column', gap: 12, padding: 24, height: '100%', textDecoration: 'none', color: 'inherit', boxSizing: 'border-box' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(199,242,78,0.45)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--m-brand-border)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = M.line }}
               >
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(199,242,78,0.12)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--m-accent-soft)', color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{ch.icon}</svg>
                 </div>
                 <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.3px', color: M.ink }}>{ch.k}</div>
                 <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: M.sub, flex: 1 }}>{ch.d}</p>
-                <span style={{ fontSize: 13.5, fontWeight: 700, color: M.brand }}>Email us →</span>
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: M.brandText }}>Email us →</span>
               </a>
             </Reveal>
           ))}

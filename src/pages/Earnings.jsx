@@ -17,8 +17,6 @@ const WAYS = [
 export default function Earnings() {
   const navigate = useNavigate()
   useSEO({
-    title: 'How Much Do AI Influencers Earn? Monetization Guide',
-    description: 'How AI influencers make money — brand deals, UGC services, affiliate, subscriptions, and licensing — plus market-size data and what creators earn in the US and Europe.',
     path: '/earnings',
     jsonLd: {
       '@context': 'https://schema.org', '@type': 'FAQPage',
@@ -30,7 +28,7 @@ export default function Earnings() {
     <div style={{ background: M.bg, color: M.ink }}>
       {/* Header band */}
       <div style={{ position: 'relative', overflow: 'hidden', padding: 'calc(var(--nav-h) + 70px) 24px 66px', textAlign: 'center', background: M.bgTop, borderBottom: `1px solid ${M.line}` }}>
-        <div style={{ position: 'absolute', width: '50vmax', height: '50vmax', top: '-30%', left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,61,139,0.08) 0%, transparent 62%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', width: '50vmax', height: '50vmax', top: '-30%', left: '50%', transform: 'translateX(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, var(--m-pink-soft) 0%, transparent 62%)', pointerEvents: 'none' }} />
         <div style={{ maxWidth: 780, margin: '0 auto', position: 'relative' }}>
           <Reveal><Eyebrow color={M.pink}>Earn with AI influencers</Eyebrow></Reveal>
           <Reveal delay={0.05}><h1 style={{ fontSize: 'clamp(38px, 6vw, 62px)', fontWeight: 800, letterSpacing: '-2px', lineHeight: 1.05, margin: 0 }}>How AI influencers make money</h1></Reveal>
@@ -83,7 +81,7 @@ export default function Earnings() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 34 }} className="earn-3">
           {WAYS.map(([id, t, b, icon], i) => (
             <Reveal key={t} id={id} delay={(i % 3) * 0.05} style={{ ...mCard, padding: 24, scrollMarginTop: 90 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(199,242,78,0.12)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: 'var(--m-accent-soft)', color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                 <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
               </div>
               <h3 style={{ fontSize: 16.5, fontWeight: 800, color: M.ink, margin: '0 0 7px' }}>{t}</h3>
@@ -107,7 +105,7 @@ export default function Earnings() {
                   <div style={{ fontSize: 19, fontWeight: 800, color: M.ink, letterSpacing: '-0.4px' }}>{r.name}</div>
                   <div style={{ fontSize: 12.5, color: M.faint }}>{r.marketLabel}</div>
                 </div>
-                <div style={{ marginLeft: 'auto', fontSize: 26, fontWeight: 800, color: M.brand, letterSpacing: '-1px' }}>{r.market}</div>
+                <div style={{ marginLeft: 'auto', fontSize: 26, fontWeight: 800, color: M.brandText, letterSpacing: '-1px' }}>{r.market}</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {r.stats.map(([v, l]) => (
@@ -143,7 +141,7 @@ export default function Earnings() {
               ['Scale to an agency', 'Manage multiple influencers and client rosters from one account.'],
             ].map((row, i) => (
               <div key={row[0]} style={{ display: 'flex', gap: 14, padding: '15px 0', borderTop: i === 0 ? 'none' : `1px solid ${M.lineSoft}` }}>
-                <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, background: 'rgba(199,242,78,0.12)', color: M.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, background: 'var(--m-accent-soft)', color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                 </span>
                 <div>

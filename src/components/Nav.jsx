@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Show, SignInButton, SignUpButton, useAuth } from '@clerk/react'
-import { Menu, X, Plus, Settings } from 'lucide-react'
+import { Menu, X, Plus, Settings, Sun, Moon } from 'lucide-react'
 import {
   Button,
   IconButton,
@@ -26,8 +26,10 @@ const links = [
 
 const SIGNED_IN_LINKS = ['/influencers', '/publish']
 
-// Marketing routes force dark chrome so hero pages stay cohesive.
-const MARKETING_ROUTES = ['/', '/how-it-works', '/earnings']
+// NOTE: a MARKETING_ROUTES list used to live here and force dark chrome on '/',
+// '/how-it-works' and '/earnings'. It's gone: the marketing surface now themes off
+// `data-theme` like the rest of the app (see the --m-* tokens in index.css), so pinning the
+// nav to dark produced dark chrome sitting on top of a white page in light mode.
 
 function LogoMark({ dark }) {
   return (
@@ -44,10 +46,9 @@ function LogoMark({ dark }) {
 
 export default function Nav() {
   const { pathname } = useLocation()
-  const { isDark } = useTheme()
+  const { isDark, toggle } = useTheme()
   const { isSignedIn } = useAuth()
-  const landing = MARKETING_ROUTES.includes(pathname)
-  const dark = landing || isDark
+  const dark = isDark
 
   const visibleLinks = links.filter((l) => !SIGNED_IN_LINKS.includes(l.to) || isSignedIn)
 
@@ -87,7 +88,7 @@ export default function Nav() {
             justifyContent: 'flex-start',
             fontWeight: pathname === l.to || (l.to !== '/' && pathname.startsWith(l.to)) ? 700 : 500,
             color: pathname === l.to || (l.to !== '/' && pathname.startsWith(l.to))
-              ? 'var(--brand)'
+              ? 'var(--m-brand-text)'
               : undefined,
           }}
         />
@@ -162,7 +163,7 @@ export default function Nav() {
             <span className="nav-brand-label" style={{
               fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px', color: ink,
             }}>
-              vy<span style={{ color: 'var(--brand)' }}>motion</span>
+              vy<span style={{ color: 'var(--m-brand-text)' }}>motion</span>
             </span>
           </NavLink>
 
@@ -180,7 +181,7 @@ export default function Nav() {
                   fontWeight: isActive ? 700 : 500,
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
-                  color: isActive ? 'var(--brand)' : muted,
+                  color: isActive ? 'var(--m-brand-text)' : muted,
                   background: isActive ? 'var(--accent-light)' : 'transparent',
                   transition: 'background 0.15s var(--ease-out), color 0.15s var(--ease-out)',
                   textDecoration: 'none',
@@ -205,6 +206,23 @@ export default function Nav() {
               <span className="nav-create-label">Create</span>
             </Button>
 
+            {/* Theme toggle. Previously the only way to change theme was Settings, which is
+                behind sign-in — so a signed-out visitor on the marketing pages had no way to
+                reach light mode at all. `toggle` takes the click point to originate the
+                view-transition droplet from the button. */}
+            <IconButton
+              label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              variant="ghost"
+              size="md"
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect()
+                toggle(r.left + r.width / 2, r.top + r.height / 2)
+              }}
+              icon={isDark
+                ? <Sun size={18} strokeWidth={1.9} aria-hidden />
+                : <Moon size={18} strokeWidth={1.9} aria-hidden />}
+            />
+
             <Show when="signed-out">
               <span className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
                 <SignInButton mode="modal">
@@ -213,7 +231,7 @@ export default function Nav() {
                     variant="ghost"
                     size="sm"
                     style={{
-                      color: dark ? 'var(--brand)' : 'var(--text-primary)',
+                      color: dark ? 'var(--m-brand-text)' : 'var(--text-primary)',
                       fontWeight: 700,
                     }}
                   />
