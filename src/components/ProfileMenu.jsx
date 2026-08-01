@@ -24,7 +24,6 @@ import {
 } from '@astryxdesign/core'
 import { api } from '../api/client'
 import { useCredits } from '../api/creditsStore'
-import PaywallModal from './PaywallModal'
 
 // Account popup (replaces Clerk's bare <UserButton>). Absorbs the credit balance
 // as a "Credits" row and Settings entry so the nav stays clean. Theme toggle
@@ -61,7 +60,6 @@ export default function ProfileMenu() {
   const clerk = useClerk()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [paywall, setPaywall] = useState(false)
   const { bal, total: creditTotal, refresh: refreshCredits } = useCredits()
   const [plan, setPlan] = useState(null)
 
@@ -110,13 +108,12 @@ export default function ProfileMenu() {
           </VStack>
         </HStack>
 
-        {/* Credits bar */}
+        {/* Credits bar → full usage breakdown (the chevron implies navigation, not a modal) */}
         <button
           type="button"
           onClick={() => {
-            setOpen(false)
-            setPaywall(true)
             refreshCredits().catch(() => {})
+            go('/usage')
           }}
           style={{
             display: 'block',
@@ -249,13 +246,6 @@ export default function ProfileMenu() {
           </button>
         )}
       </Popover>
-
-      {paywall && (
-        <PaywallModal
-          balance={bal}
-          onClose={() => setPaywall(false)}
-        />
-      )}
     </div>
   )
 }

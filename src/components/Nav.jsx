@@ -24,7 +24,10 @@ const links = [
   { to: '/pricing', label: 'Pricing' },
 ]
 
-const SIGNED_IN_LINKS = ['/influencers', '/publish']
+// '/dashboard' is in here because a signed-out visitor was being shown a "Home" link that
+// pointed at a dashboard they have no account for. Signed out, the header is now purely
+// marketing: Pricing plus the sign-up path.
+const SIGNED_IN_LINKS = ['/dashboard', '/influencers', '/publish']
 
 // NOTE: a MARKETING_ROUTES list used to live here and force dark chrome on '/',
 // '/how-it-works' and '/earnings'. It's gone: the marketing surface now themes off
@@ -94,18 +97,21 @@ export default function Nav() {
         />
       ))}
 
-      <Divider variant="subtle" style={{ margin: '4px 0' }} />
-
-      <Button
-        label="Settings"
-        variant="ghost"
-        size="md"
-        href="/settings"
-        as={RouterLink}
-        icon={<Settings size={18} strokeWidth={1.8} aria-hidden />}
-        onClick={() => setMenuOpen(false)}
-        style={{ width: '100%', justifyContent: 'flex-start' }}
-      />
+      {/* Same reasoning as the dashboard link: Settings is an account surface, so offering
+          it to someone without an account is a dead end. */}
+      <Show when="signed-in">
+        <Divider variant="subtle" style={{ margin: '4px 0' }} />
+        <Button
+          label="Settings"
+          variant="ghost"
+          size="md"
+          href="/settings"
+          as={RouterLink}
+          icon={<Settings size={18} strokeWidth={1.8} aria-hidden />}
+          onClick={() => setMenuOpen(false)}
+          style={{ width: '100%', justifyContent: 'flex-start' }}
+        />
+      </Show>
 
       <Show when="signed-out">
         <Divider variant="subtle" style={{ margin: '4px 0' }} />
@@ -158,7 +164,10 @@ export default function Nav() {
         }}>
 
           {/* Logo */}
-          <NavLink to="/" style={{ marginRight: 12, display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
+          {/* Home means "my workspace" once you have one. Signed in, the logo goes to the
+              dashboard rather than back out to the marketing pitch. This is a destination
+              change, NOT a redirect on '/' - see the note in App.jsx for why. */}
+          <NavLink to={isSignedIn ? '/dashboard' : '/'} style={{ marginRight: 12, display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
             <LogoMark dark={dark} />
             <span className="nav-brand-label" style={{
               fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px', color: ink,

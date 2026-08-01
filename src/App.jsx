@@ -84,6 +84,13 @@ export default function App() {
       <OnboardingTour />
       <Suspense fallback={<RouteLoader />}>
       <Routes>
+        {/* '/' stays the Landing page for everyone, signed in or not. The nav logo now
+            points signed-in users at /dashboard, so nobody lands here by accident - but the
+            route is deliberately NOT redirected, for two reasons:
+            1. Clerk resolves asynchronously, so a redirect here would render Landing, then
+               jump once the session arrives. That flash is worse than the extra click.
+            2. Signed-in users still have real reasons to visit: showing the product to
+               someone, or sharing the link. */}
         <Route path="/" element={<Landing />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/docs" element={<Docs />} />
