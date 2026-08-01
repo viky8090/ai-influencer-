@@ -260,8 +260,8 @@ const CAMILA_SEED = {
   createdAt: 1715000001000,
   mainImage: '/camila/main.jpg',
   characterSheetImage: '/camila/sheet.jpg',
-  closeUpImage1: '/camila/closeup1.png',
-  closeUpImage2: '/camila/closeup2.png',
+  closeUpImage1: '/camila/closeup1.webp',
+  closeUpImage2: '/camila/closeup2.webp',
   prompt: 'Candid iPhone photo of @image1, wearing the complete outfit from @image2, reproducing all clothing, headwear, and accessories exactly. Match skin texture and facial detail from @image3 and @image4. Mid-action — mid-laugh, mid-sip, mid-step, or mid-reach — body fully committed to the action, expression caught at the apex. Eyes can be on lens (late-arrival) or completely off-axis. Hands engaged with the action, not posed. Expression: direct and serious — neutral mouth at rest, steady gaze into the lens, no smile. Composed and self-assured. Eyes directed off-axis — looking to the side or slightly above the camera, as if unaware of being photographed. A small front window table, street traffic soft and blurred outside the glass, a half-drunk flat white on the table beside her. Soft morning window light from one side, cool and directional. Eye-level, 24mm, handheld. 9:16, chest-up framing. Deep focus, no bokeh, photorealistic. No other people in frame.',
   age: '22',
   backstory: "Camilla got into fitness relatively young, but after realizing she wasn't passionate in personal training clients in the gym, she switched careers to teaching yoga classes.",
@@ -280,11 +280,11 @@ const CAMILA_SEED = {
   homeImages: [],
   brandDealImages: [],
   wardrobeSlots: [
-    { id: 'camila-wardrobe-sporty', name: 'sporty fit', image: '/camila/wardrobe/sporty_fit.png' },
-    { id: 'camila-wardrobe-yoga',   name: 'yoga fit',   image: '/camila/wardrobe/yoga_fit.png'   },
+    { id: 'camila-wardrobe-sporty', name: 'sporty fit', image: '/camila/wardrobe/sporty_fit.webp' },
+    { id: 'camila-wardrobe-yoga',   name: 'yoga fit',   image: '/camila/wardrobe/yoga_fit.webp'   },
   ],
   brandDeals: [
-    { id: 'camila-deal-swatch', brand: 'swatch', category: 'fashion', image: '/camila/brand_deals/swatch_original.png', images: ['/camila/brand_deals/swatch_original.png'], characterSheet: '/camila/brand_deals/swatch_sheet.png' },
+    { id: 'camila-deal-swatch', brand: 'swatch', category: 'fashion', image: '/camila/brand_deals/swatch_original.webp', images: ['/camila/brand_deals/swatch_original.webp'], characterSheet: '/camila/brand_deals/swatch_sheet.webp' },
   ],
   physicalDesc: 'Latina, medium-length wavy brunette hair with side-swept bangs, brown eyes, olive skin tone, slim athletic build',
   generationHistory: [
@@ -357,11 +357,11 @@ try {
 // Step 3: Inject Camila sample photos into photo_studio_history
 try {
   const CAMILA_PHOTO_URLS = [
-    '/camila/photos/p1.png', '/camila/photos/p2.png', '/camila/photos/p3.png',
-    '/camila/photos/p4.png', '/camila/photos/p5.png', '/camila/photos/p6.png',
-    '/camila/photos/p7.png', '/camila/photos/p8.png', '/camila/photos/p9.png',
-    '/camila/photos/p10.png', '/camila/photos/p11.png',
-    '/camila/photos/p12.png', '/camila/photos/p13.png',
+    '/camila/photos/p1.webp', '/camila/photos/p2.webp', '/camila/photos/p3.webp',
+    '/camila/photos/p4.webp', '/camila/photos/p5.webp', '/camila/photos/p6.webp',
+    '/camila/photos/p7.webp', '/camila/photos/p8.webp', '/camila/photos/p9.webp',
+    '/camila/photos/p10.webp', '/camila/photos/p11.webp',
+    '/camila/photos/p12.webp', '/camila/photos/p13.webp',
   ]
   const existing = JSON.parse(localStorage.getItem('photo_studio_history') || '[]')
   // Drop photo history rows that belonged to retired demos (keep user + Camila)

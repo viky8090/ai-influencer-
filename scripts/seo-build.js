@@ -205,6 +205,16 @@ function headersFile() {
 
 /og.jpg
   Cache-Control: public, max-age=604800
+
+# Showcase and sample media. Filenames are stable but not content-hashed, so these get a
+# long-but-not-immutable cache: without a rule they inherit max-age=0 and every repeat
+# visitor re-downloads the whole showcase wall.
+/camila/*
+  Cache-Control: public, max-age=2592000
+/inf/*
+  Cache-Control: public, max-age=2592000
+/inspiration/*
+  Cache-Control: public, max-age=2592000
 `
 }
 

@@ -124,31 +124,31 @@ function Hero() {
 const ROW_A = [
   { src: '/camila/main.jpg', name: 'Camila', tag: 'Signature look' },
   { src: '/camila/videos/v1.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p1.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p3.png', name: 'Camila', tag: 'Editorial' },
-  { src: '/camila/wardrobe/sporty_fit.png', name: 'Camila', tag: 'Wardrobe' },
+  { src: '/camila/photos/p1.webp', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p3.webp', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/wardrobe/sporty_fit.webp', name: 'Camila', tag: 'Wardrobe' },
   { src: '/camila/videos/v3.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p5.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/closeup1.png', name: 'Camila', tag: 'Close-up' },
-  { src: '/camila/photos/p7.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p5.webp', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/closeup1.webp', name: 'Camila', tag: 'Close-up' },
+  { src: '/camila/photos/p7.webp', name: 'Camila', tag: 'Photo Studio' },
   { src: '/camila/videos/v4.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p9.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p11.png', name: 'Camila', tag: 'Editorial' },
-  { src: '/camila/brand_deals/swatch_original.png', name: 'Camila', tag: 'Brand deal' },
+  { src: '/camila/photos/p9.webp', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p11.webp', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/brand_deals/swatch_original.webp', name: 'Camila', tag: 'Brand deal' },
 ]
 const ROW_B = [
-  { src: '/camila/photos/p2.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p2.webp', name: 'Camila', tag: 'Photo Studio' },
   { src: '/camila/videos/v2.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p4.png', name: 'Camila', tag: 'Editorial' },
-  { src: '/camila/wardrobe/yoga_fit.png', name: 'Camila', tag: 'Wardrobe' },
-  { src: '/camila/photos/p6.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p4.webp', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/wardrobe/yoga_fit.webp', name: 'Camila', tag: 'Wardrobe' },
+  { src: '/camila/photos/p6.webp', name: 'Camila', tag: 'Photo Studio' },
   { src: '/camila/videos/v1.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/closeup2.png', name: 'Camila', tag: 'Close-up' },
-  { src: '/camila/photos/p8.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p10.png', name: 'Camila', tag: 'Editorial' },
+  { src: '/camila/closeup2.webp', name: 'Camila', tag: 'Close-up' },
+  { src: '/camila/photos/p8.webp', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p10.webp', name: 'Camila', tag: 'Editorial' },
   { src: '/camila/videos/v3.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p12.png', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p13.png', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p12.webp', name: 'Camila', tag: 'Photo Studio' },
+  { src: '/camila/photos/p13.webp', name: 'Camila', tag: 'Photo Studio' },
 ]
 
 // Videos only start downloading once the strip is near the viewport — the clips are
@@ -195,9 +195,11 @@ function ShowcaseSection() {
   return (
     <section style={{ padding: '92px 0', overflow: 'hidden', position: 'relative' }}>
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px' }}>
+        {/* No caption narrating what the wall obviously is, and no "hover to pause"
+            instruction. The wall is the argument; the only thing worth stating is the
+            claim a viewer cannot verify by looking, which is that it is all one persona. */}
         <Reveal><Eyebrow>Made with Vymotion</Eyebrow></Reveal>
-        <Reveal delay={0.05}><H2>Meet Camila — straight out of the studio</H2></Reveal>
-        <Reveal delay={0.1}><Lead>Every still and every looping clip below is one persona, generated here — the same face, wardrobe, and vibe holding across every shot. Hover to pause.</Lead></Reveal>
+        <Reveal delay={0.05}><H2>One persona. Every frame.</H2></Reveal>
       </div>
       <Reveal delay={0.12} style={{ marginTop: 44, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="vy-marquee-mask">
