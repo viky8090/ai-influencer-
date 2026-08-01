@@ -413,25 +413,96 @@ export default function Landing() {
         </Reveal>
       </Section>
 
-      {/* Pricing teaser */}
-      <Section style={{ borderTop: `1px solid ${M.line}` }}>
-        <div style={{ ...mCard, padding: 'clamp(28px, 5vw, 52px)', textAlign: 'center', background: `linear-gradient(180deg, ${M.accentSoft}, ${M.surfaceSoft})` }}>
-          <Reveal><Eyebrow>Simple pricing</Eyebrow></Reveal>
-          <Reveal delay={0.05}><H2 style={{ margin: '0 auto' }}>Start free. Scale when you grow.</H2></Reveal>
-          <Reveal delay={0.1}><Lead style={{ margin: '16px auto 0', textAlign: 'center' }}>Credits power everything — images, video, and prompts. You’re only charged for delivered generations; failed ones are always refunded.</Lead></Reveal>
-          <Reveal delay={0.14} style={{ display: 'flex', gap: 26, justifyContent: 'center', flexWrap: 'wrap', margin: '30px 0' }}>
-            {[['Free', 'Explore only'], ['Starter', '$5.99/mo'], ['Creator', '$31.99/mo'], ['Pro', '$74.99/mo'], ['Studio', '$191.99/mo']].map(([p, v]) => (
-              <div key={p} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: M.faint }}>{p}</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: M.ink, marginTop: 2 }}>{v}</div>
+      {/* Pricing section */}
+      <Section id="pricing" style={{ borderTop: `1px solid ${M.line}` }}>
+        <Reveal><Eyebrow>Simple pricing</Eyebrow></Reveal>
+        <Reveal delay={0.05}><H2 style={{ margin: '0 auto' }}>Start free. Scale when you grow.</H2></Reveal>
+        <Reveal delay={0.1}><Lead style={{ margin: '16px auto 0', textAlign: 'center', maxWidth: 620 }}>Credits power everything — images, video, and AI assist. You’re only charged for delivered generations; failed ones are always refunded.</Lead></Reveal>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 40 }} className="grid-4">
+          {[
+            {
+              name: 'Starter', price: '$5.99', sub: '/month', credits: '200 credits/mo',
+              desc: 'For trying your first AI influencer.',
+              feats: ['1 AI Influencer', 'Photo & Video Studio', 'Social Scheduling', 'AI Assist'],
+              tag: null,
+            },
+            {
+              name: 'Creator', price: '$31.99', sub: '/month', credits: '600 credits/mo',
+              desc: 'For consistent, easy AI content creation.',
+              feats: ['5 AI Influencers', 'All Image & Video Models', '2K/1080p Export', 'Commercial License'],
+              tag: 'MOST POPULAR', tagColor: M.brandText,
+            },
+            {
+              name: 'Pro', price: '$74.99', sub: '/month', credits: '1,800 credits/mo',
+              desc: 'For agencies and high-volume creators.',
+              feats: ['25 AI Influencers', '4K Upscale + High Priority', '1-Month Credit Rollover', 'Commercial License'],
+              tag: null,
+            },
+            {
+              name: 'Studio', price: '$191.99', sub: '/month', credits: '5,500 credits/mo',
+              desc: 'For teams shipping many personas.',
+              feats: ['Unlimited Influencers', 'Highest Queue Priority', '2-Month Credit Rollover', '40% Cheaper / Credit'],
+              tag: 'BEST VALUE', tagColor: M.pink,
+            },
+          ].map((card, i) => (
+            <Reveal key={card.name} delay={i * 0.06} style={{
+              ...mCard,
+              padding: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              border: card.tag ? `1px solid ${card.tagColor}` : `1px solid ${M.line}`,
+            }}>
+              {card.tag && (
+                <span style={{
+                  position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)',
+                  background: M.card, border: `1px solid ${card.tagColor}`, color: card.tagColor,
+                  fontSize: 10, fontWeight: 800, padding: '2px 10px', borderRadius: 999, letterSpacing: '0.5px'
+                }}>
+                  {card.tag}
+                </span>
+              )}
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: M.ink, margin: '0 0 4px' }}>{card.name}</h3>
+              <p style={{ fontSize: 13, color: M.sub, margin: '0 0 16px', lineHeight: 1.4, minHeight: 36 }}>{card.desc}</p>
+              
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 }}>
+                <span style={{ fontSize: 32, fontWeight: 900, color: M.ink, letterSpacing: '-1px' }}>{card.price}</span>
+                <span style={{ fontSize: 13, color: M.faint, fontWeight: 600 }}>{card.sub}</span>
               </div>
-            ))}
-          </Reveal>
-          <Reveal delay={0.18} style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <CTA onClick={() => navigate('/create')}>Create your influencer →</CTA>
-            <CTA kind="ghost" onClick={() => navigate('/pricing')}>Compare plans</CTA>
-          </Reveal>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: M.brandText, marginBottom: 16 }}>
+                ⚡ {card.credits}
+              </div>
+
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {card.feats.map((f) => (
+                  <li key={f} style={{ fontSize: 13, color: M.sub, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={M.brandText} strokeWidth="3" strokeLinecap="round"><path d="M20 6 9 17l-5-5" /></svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                onClick={() => navigate('/pricing')}
+                style={{
+                  width: '100%', padding: '10px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  background: card.tag ? M.brand : M.card,
+                  color: card.tag ? M.brandInk : M.ink,
+                  border: card.tag ? 'none' : `1px solid ${M.line}`,
+                  transition: 'transform 0.12s var(--ease-out)',
+                }}
+              >
+                Choose {card.name}
+              </button>
+            </Reveal>
+          ))}
         </div>
+
+        <Reveal delay={0.2} style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 32 }}>
+          <CTA onClick={() => navigate('/create')}>Create your influencer free →</CTA>
+          <CTA kind="ghost" onClick={() => navigate('/pricing')}>Compare all plans & top-up packs</CTA>
+        </Reveal>
       </Section>
 
       {/* FAQ */}

@@ -15,24 +15,23 @@ import RouterLink from '../ui/ax/RouterLink'
 import ProfileMenu from './ProfileMenu'
 import CreditChip from './CreditChip'
 
-// Docs, How it works, and Earn intentionally live in the footer only (Footer.jsx COLUMNS) —
-// they're reference/marketing pages, kept out of the header to keep the app nav uncluttered.
-const links = [
-  { to: '/dashboard', label: 'Home' },
-  { to: '/influencers', label: 'Influencers' },
-  { to: '/publish', label: 'Publish' },
-  { to: '/pricing', label: 'Pricing' },
-]
+import MorphicNavbar from './MorphicNavbar'
 
-// '/dashboard' is in here because a signed-out visitor was being shown a "Home" link that
-// pointed at a dashboard they have no account for. Signed out, the header is now purely
-// marketing: Pricing plus the sign-up path.
-const SIGNED_IN_LINKS = ['/dashboard', '/influencers', '/publish']
+// Pricing lives INSIDE both sets rather than floating on its own in the right-hand
+// actions. Signed out it was the only nav item on the bar and read as an orphan; it also
+// left the segmented control with a single segment, which has nothing to morph against.
+// Paired with home it forms a real two-segment bar.
+const SIGNED_OUT_ITEMS = {
+  '/': { name: 'home' },
+  '/pricing': { name: 'pricing' },
+}
 
-// NOTE: a MARKETING_ROUTES list used to live here and force dark chrome on '/',
-// '/how-it-works' and '/earnings'. It's gone: the marketing surface now themes off
-// `data-theme` like the rest of the app (see the --m-* tokens in index.css), so pinning the
-// nav to dark produced dark chrome sitting on top of a white page in light mode.
+const SIGNED_IN_ITEMS = {
+  '/dashboard': { name: 'home' },
+  '/influencers': { name: 'influencers' },
+  '/publish': { name: 'publish' },
+  '/pricing': { name: 'pricing' },
+}
 
 function LogoMark({ dark }) {
   return (
@@ -53,7 +52,14 @@ export default function Nav() {
   const { isSignedIn } = useAuth()
   const dark = isDark
 
-  const visibleLinks = links.filter((l) => !SIGNED_IN_LINKS.includes(l.to) || isSignedIn)
+  const items = isSignedIn ? SIGNED_IN_ITEMS : SIGNED_OUT_ITEMS
+
+  const isActiveLink = (path) => {
+    if (path === '/') {
+      return pathname === '/'
+    }
+    return pathname.startsWith(path)
+  }
 
   const [menuOpen, setMenuOpen] = useState(false)
   // First-lifetime visit → "Start for free"; return visits → "Sign up"
@@ -71,32 +77,30 @@ export default function Nav() {
   useEffect(() => { setMenuOpen(false) }, [pathname])
 
   const ink = dark ? '#F4F4F5' : 'var(--text-primary)'
-  const muted = dark ? 'rgba(255,255,255,0.52)' : 'var(--text-secondary)'
   const barBg = dark ? 'rgba(10, 10, 11, 0.92)' : 'rgba(244, 244, 245, 0.92)'
   const barBorder = dark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,11,0.08)'
 
   const mobileMenu = (
     <VStack gap={0.5} style={{ padding: 4 }}>
-      {visibleLinks.map((l) => (
+      {Object.entries(items).map(([path, { name }]) => (
         <Button
-          key={l.to}
-          label={l.label}
+          key={path}
+          label={name}
           variant="ghost"
           size="md"
-          href={l.to}
+          href={path}
           as={RouterLink}
           onClick={() => setMenuOpen(false)}
           style={{
             width: '100%',
             justifyContent: 'flex-start',
-            fontWeight: pathname === l.to || (l.to !== '/' && pathname.startsWith(l.to)) ? 700 : 500,
-            color: pathname === l.to || (l.to !== '/' && pathname.startsWith(l.to))
+            fontWeight: isActiveLink(path) ? 700 : 500,
+            color: isActiveLink(path)
               ? 'var(--m-brand-text)'
               : undefined,
           }}
         />
       ))}
-
       {/* Same reasoning as the dashboard link: Settings is an account surface, so offering
           it to someone without an account is a dead end. */}
       <Show when="signed-in">
@@ -164,9 +168,6 @@ export default function Nav() {
         }}>
 
           {/* Logo */}
-          {/* Home means "my workspace" once you have one. Signed in, the logo goes to the
-              dashboard rather than back out to the marketing pitch. This is a destination
-              change, NOT a redirect on '/' - see the note in App.jsx for why. */}
           <NavLink to={isSignedIn ? '/dashboard' : '/'} style={{ marginRight: 12, display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
             <LogoMark dark={dark} />
             <span className="nav-brand-label" style={{
@@ -176,32 +177,12 @@ export default function Nav() {
             </span>
           </NavLink>
 
-          {/* Desktop links — keep NavLink for brand active styles */}
-          <div className="nav-links-inline" style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0, overflow: 'hidden' }}>
-            {visibleLinks.map((l) => (
-              <NavLink
-                key={l.to}
-                to={l.to}
-                className="nav-link"
-                style={({ isActive }) => ({
-                  padding: '6px 11px',
-                  borderRadius: 8,
-                  fontSize: 13.5,
-                  fontWeight: isActive ? 700 : 500,
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  color: isActive ? 'var(--m-brand-text)' : muted,
-                  background: isActive ? 'var(--accent-light)' : 'transparent',
-                  transition: 'background 0.15s var(--ease-out), color 0.15s var(--ease-out)',
-                  textDecoration: 'none',
-                })}
-              >
-                {l.label}
-              </NavLink>
-            ))}
+          {/* Desktop Morphic Navbar */}
+          <div className="nav-links-inline" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}>
+            <MorphicNavbar items={items} />
           </div>
 
-          {/* Right actions */}
+          {/* Right actions are CTAs only. Pricing moved into the segmented bar above. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
             <Button
               label="Create"
