@@ -75,6 +75,57 @@ function readLegacyList() {
   } catch { return [] }
 }
 
+/**
+ * Repair records that point at bundled sample media by its old filename.
+ *
+ * The bundled Camila media was re-encoded from PNG to WebP, and the PNG files were removed.
+ * Records already in localStorage still referenced the old names, and because the seed only
+ * populates generationHistory when it is empty, a returning user kept those dead paths and
+ * saw broken tiles in the library. Nothing was wrong with the page - the URLs pointed at
+ * files that no longer existed.
+ *
+ * The rewrite is deliberately narrow: only /camila/* and /inf/* .png, which is exactly the
+ * set that was converted (verified: zero PNGs remain under either directory). User-generated
+ * URLs live on remote hosts and never match. Walking the record generically rather than
+ * naming fields means it also catches media nested in wardrobeSlots, brandDeals, homeSlots
+ * and generationHistory without having to enumerate them.
+ */
+const MEDIA_WEBP_MIGRATION_KEY = 'vy_media_webp_migrated_v1'
+const BUNDLED_PNG = /^(\/(?:camila|inf)\/[^?#]*)\.png$/i
+
+function rewriteBundledPaths(node) {
+  if (typeof node === 'string') return node.replace(BUNDLED_PNG, '$1.webp')
+  if (Array.isArray(node)) return node.map(rewriteBundledPaths)
+  if (node && typeof node === 'object') {
+    const out = {}
+    for (const k of Object.keys(node)) out[k] = rewriteBundledPaths(node[k])
+    return out
+  }
+  return node
+}
+
+function migrateBundledMediaPaths() {
+  try {
+    if (localStorage.getItem(MEDIA_WEBP_MIGRATION_KEY)) return
+    for (const id of readIds() || []) {
+      const inf = readInfluencer(id)
+      if (!inf) continue
+      const next = rewriteBundledPaths(inf)
+      if (JSON.stringify(next) !== JSON.stringify(inf)) writeInfluencer(next)
+    }
+    for (const key of ['photo_studio_history', 'influencers']) {
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      const fixed = JSON.stringify(rewriteBundledPaths(JSON.parse(raw)))
+      if (fixed !== raw) localStorage.setItem(key, fixed)
+    }
+    localStorage.setItem(MEDIA_WEBP_MIGRATION_KEY, '1')
+  } catch (e) {
+    // A failed migration must never block boot - the media component degrades gracefully.
+    console.warn('bundled media path migration skipped:', e)
+  }
+}
+
 // One-time ship cutover: wipe every influencer except Camila (demo seed).
 // After this flag is set, newly created influencers are kept normally.
 const SHIP_CAMILA_ONLY_KEY = 'vy_ship_camila_only_v2'
@@ -309,6 +360,11 @@ try {
     }
   }
 } catch (_) {}
+
+// Step 1b: Repair bundled sample media whose filenames changed under existing records.
+// Runs before the seed step so the Camila record is already correct by the time the seed
+// decides whether to leave the stored generationHistory alone.
+migrateBundledMediaPaths()
 
 // Step 2: Ship cutover — local roster is Camila only (one-time), then normal ops
 try {

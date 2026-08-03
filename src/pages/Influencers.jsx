@@ -16,6 +16,7 @@ import PhotoStudioPanel from './PhotoStudio'
 import WardrobeDrawer from '../components/WardrobeDrawer'
 import { glassCard, glassPanel, glassModal, glassOverlay, glassInput, glassBtnGhost, glassBtnPrimary } from '../ui/glass'
 import AIAssist from '../components/AIAssist'
+import { SmartImage, SmartVideo } from '../components/Media'
 import { useSEO } from '../ui/seo'
 
 // Video Studio model lineup — ids must match worker/src/providers/fal.js buildRequest cases
@@ -267,7 +268,7 @@ function HeroBanner({ influencer, onDelete, pct, onUpdate }) {
             transition:'border-radius 0.2s',
           }}>
             {influencer.mainImage
-              ?<img src={influencer.mainImage} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              ?<SmartImage src={influencer.mainImage} alt={influencer.name||''} fallbackLabel={influencer.name} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
               :<span style={{fontSize:24,fontWeight:800,color:ac,letterSpacing:'-1px'}}>
                 {influencer.name[0]?.toUpperCase()}
               </span>
@@ -462,7 +463,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
         {loading && <GenLoadingOverlay elapsed={elapsed} onCancel={cancelGeneration}/>}
         {value ? (
           <>
-            <img src={value} alt="Character sheet" onClick={onLightbox} style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:'var(--radius-sm)',cursor:'zoom-in',display:'block',background:'var(--bg-tertiary)'}}/>
+            <SmartImage src={value} alt="Character sheet" fallbackLabel="Character sheet" onClick={onLightbox} style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:'var(--radius-sm)',cursor:'zoom-in',display:'block',background:'var(--bg-tertiary)'}}/>
 
             {/* Delete — top right on hover */}
             <button onClick={()=>onSave(null)} style={{
@@ -838,7 +839,7 @@ function MainImageSlot({ influencer, onChange, onLightbox }) {
         {loading && <GenLoadingOverlay elapsed={elapsed} maxLabel="5 min 30 sec" />}
         {value ? (
           <>
-            <img src={value} alt="Main image" onClick={onLightbox}
+            <SmartImage src={value} alt="Main image" fallbackLabel="Main image" onClick={onLightbox}
               style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'zoom-in', display: 'block' }} />
             {/* Delete — top right on hover */}
             <button onClick={() => onChange(null)} style={{
@@ -1936,7 +1937,7 @@ function WorldDropCard({ drop, editing, editName, onEditName, onStartEdit, onCom
       >
         {drop.image
           ? <>
-              <img src={drop.image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
+              <SmartImage src={drop.image} alt={drop.name||''} fallbackLabel={drop.name} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
               <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0)', transition:'background 0.15s' }}
                 onMouseEnter={e=>{e.currentTarget.style.background='rgba(0,0,0,0.2)'}}
                 onMouseLeave={e=>{e.currentTarget.style.background='rgba(0,0,0,0)'}}
@@ -2173,7 +2174,7 @@ function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit
       >
         {displayImage
           ? <>
-              <img src={displayImage} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+              <SmartImage src={displayImage} alt={deal?.brand||''} fallbackLabel={deal?.brand} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
               {!generating && (
                 <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0)',transition:'background 0.15s'}}
                   onMouseEnter={e=>{e.currentTarget.style.background='rgba(0,0,0,0.2)'}}
@@ -2388,7 +2389,7 @@ function ImportBrandDealsModal({ deals, existingBrands, onImport, onClose }) {
                 >
                   <div style={{ aspectRatio:'16/9',background:'var(--bg-tertiary)',position:'relative' }}>
                     {thumb
-                      ? <img src={thumb} alt={deal.brand} style={{ width:'100%',height:'100%',objectFit:'cover',display:'block' }}/>
+                      ? <SmartImage src={thumb} alt={deal.brand} fallbackLabel={deal.brand} style={{ width:'100%',height:'100%',objectFit:'cover',display:'block' }}/>
                       : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:800,color:'var(--text-tertiary)',opacity:0.25 }}>{deal.brand[0]}</div>
                     }
                     {isSelected && (
@@ -3142,7 +3143,7 @@ function WardrobeChipWithHover({ slot, active, onClick }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {slot.image
-            ? <img src={slot.image} alt={slot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+            ? <SmartImage src={slot.image} alt={slot.name} fallbackLabel={slot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
             : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" opacity="0.5"><circle cx="12" cy="8" r="3"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
           }
         </div>
@@ -3165,7 +3166,7 @@ function WardrobeChipWithHover({ slot, active, onClick }) {
             border: '1px solid var(--glass-border)',
           }}
         >
-          <img src={slot.image} alt={slot.name} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
+          <SmartImage src={slot.image} alt={slot.name} fallbackLabel={slot.name} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
           <div style={{ padding: '5px 8px', fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>{slot.name}</div>
         </div>,
         document.body
@@ -3281,7 +3282,7 @@ function MediaLightbox({ entry, onClose, onDownload, onReuse, onDelete, initialT
             </div>
           </div>
         ) : (
-          <img src={entry.url} alt={entry.label}
+          <SmartImage src={entry.url} alt={entry.label} fallbackLabel={entry.label}
             style={{width:'100%', display:'block', objectFit:'contain', maxHeight:'80vh'}}/>
         )}
         <div style={{padding:'10px 12px', display:'flex', gap:8, background:'var(--glass-bg-strong)', backdropFilter:'blur(var(--blur-md)) saturate(1.7)', WebkitBackdropFilter:'blur(var(--blur-md)) saturate(1.7)', boxShadow:'inset 0 1px 0 var(--glass-highlight)'}}>
@@ -3361,10 +3362,14 @@ function HistoryCard({ entry, onDelete, onDownload, isSelected, onSelect, showSe
           zIndex: hovered ? 10 : 1,
         }}>
         <div style={{position:'relative', width:'100%', aspectRatio: isVideo ? '9/16' : '3/4', overflow:'hidden'}}>
+          {/* Smart* rather than bare img/video: a dead URL used to render the browser's
+              broken-image box permanently, with no retry and nothing explaining it. */}
           {isVideo
-            ? <video ref={videoRef} src={entry.url} preload="metadata" muted playsInline
+            ? <SmartVideo videoRef={videoRef} src={entry.url} preload="metadata" muted playsInline
+                fallbackLabel={entry.label || 'Video unavailable'}
                 style={{width:'100%', height:'100%', objectFit:'cover', display:'block'}}/>
-            : <img src={thumbUrl(entry.url, 600)} alt={entry.label}
+            : <SmartImage src={thumbUrl(entry.url, 600)} alt={entry.label}
+                fallbackLabel={entry.label || 'Image unavailable'}
                 style={{width:'100%', height:'100%', objectFit:'cover', display:'block'}}/>
           }
           {isVideo && !hovered && (
