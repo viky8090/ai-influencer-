@@ -3,14 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="alternate icon" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Influencer Studio</title>
+    <meta name="theme-color" content="#0A0A0B" />
+    <!-- Apply the saved theme before first paint. :root tokens are light-first,
+         so without this every dark-mode load flashes light until React mounts. -->
+    <script>
+      try {
+        document.documentElement.setAttribute(
+          'data-theme',
+          localStorage.getItem('theme') === 'light' ? 'light' : 'dark'
+        )
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark')
+      }
+    </script>
+    <!-- Everything between these markers is rewritten per route at build time by
+         scripts/seo-build.js, which emits dist/<route>/index.html for every indexable URL.
+         The values below are the homepage defaults and what `vite dev` serves. Edit route
+         copy in src/ui/seoRoutes.js, not here. -->
+    <!--SEO:START-->
+    <title>AI Influencer Generator — Create &amp; Monetize | Vymotion</title>
+    <meta name="description" content="Create a hyper-realistic AI influencer, generate on-brand photos and video, and turn the audience into income. Built for creators and agencies in the US and Europe." />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://vymotion.org/" />
+    <link rel="alternate" hreflang="en" href="https://vymotion.org/" />
+    <link rel="alternate" hreflang="x-default" href="https://vymotion.org/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Vymotion" />
+    <meta property="og:title" content="AI Influencer Generator — Create &amp; Monetize | Vymotion" />
+    <meta property="og:description" content="Create a hyper-realistic AI influencer, generate on-brand photos and video, and turn the audience into income. Built for creators and agencies in the US and Europe." />
+    <meta property="og:url" content="https://vymotion.org/" />
+    <meta property="og:image" content="https://vymotion.org/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AI Influencer Generator — Create &amp; Monetize | Vymotion" />
+    <meta name="twitter:description" content="Create a hyper-realistic AI influencer, generate on-brand photos and video, and turn the audience into income." />
+    <meta name="twitter:image" content="https://vymotion.org/og.jpg" />
+    <!--SEO:END-->
+
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Two variable fonts in ONE stylesheet request (still a single round trip): Inter
+         300..800 for body/UI, Bricolage Grotesque 600..800 for headings via --font-display.
+         Inter covers the 800 the headings use, which was previously faux-bolded from 700.
+         Loaded non-render-blocking — the stylesheet
+         starts as media="print" and is promoted on load, so first paint never waits on
+         fonts.googleapis.com. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600..800&family=Inter:wght@300..800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600..800&family=Inter:wght@300..800&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600..800&family=Inter:wght@300..800&display=swap" />
+    </noscript>
+
+    <!-- Warm the connections the app hits right after boot: the Vymotion API Worker
+         (credits/plan/data sync) and Clerk's frontend API (session + clerk-js). Saves a
+         DNS+TLS round trip (~100-300ms) on the first authenticated fetch. -->
+    <link rel="preconnect" href="https://vymotion-api.vikranty301.workers.dev" crossorigin />
+    <link rel="preconnect" href="https://clerk.vymotion.org" crossorigin />
   </head>
   <body>
     <div id="root"></div>
+    <!-- Build-time no-JS fallback (headline, summary, internal links) is injected here so
+         non-rendering crawlers get real content instead of an empty div. Invisible to any
+         visitor with JS enabled. -->
+    <!--SEO:BODY-->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -10,10 +10,29 @@ import { generateSingleImage, generateThreeImages, generateVideo, initSession, p
 import { buildThreeVariationPrompts } from '../utils/systemPrompt'
 import { gColor, pLabel } from '../utils/influencerUtils'
 import { useTheme } from '../context/theme'
-import { isHFConnected } from '../utils/higgsfieldAuth'
+import { isVymotionSession, promptSignUp, thumbUrl } from '../api/serverGenerate'
 import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/charSheetPrompt'
 import PhotoStudioPanel from './PhotoStudio'
 import WardrobeDrawer from '../components/WardrobeDrawer'
+import { glassCard, glassPanel, glassModal, glassOverlay, glassInput, glassBtnGhost, glassBtnPrimary } from '../ui/glass'
+import AIAssist from '../components/AIAssist'
+import { SmartImage, SmartVideo } from '../components/Media'
+import { useCredits } from '../api/creditsStore'
+import { useSEO } from '../ui/seo'
+
+// Video Studio model lineup — ids must match worker/src/providers/fal.js buildRequest cases
+// and the price_book rows (migration 0008). cost = flat VC per clip, shown as a hint only;
+// the server-side price book is always the source of truth for what's actually charged.
+const VIDEO_MODELS = [
+  // cost = base clip VC (5s where applicable); server adds extra seconds / 1080p multipliers.
+  // premium: true → Creator+ only (enforced server-side).
+  { id: 'seedance_lite', name: 'Seedance Lite', hint: 'Fast & affordable',            cost: 25 },
+  { id: 'seedance_pro',  name: 'Seedance Pro',  hint: 'Sharper motion, 1080p',        cost: 80 },
+  { id: 'kling_2_5_pro', name: 'Kling 2.5 Pro', hint: 'Cinematic motion · 5s/10s',    cost: 50 },
+  { id: 'sora_2',        name: 'Sora 2',        hint: 'OpenAI · creative scenes',     cost: 100 },
+  { id: 'veo_3_fast',    name: 'Veo 3 Fast',    hint: 'Creator+ · native audio · 8s', cost: 160, premium: true },
+  { id: 'seedance_2_0',  name: 'Seedance 2',    hint: 'Creator+ · native audio · 15s', cost: 200, premium: true },
+]
 
 function useMobile() {
   const [m, setM] = useState(() => window.innerWidth < 768)
@@ -26,15 +45,15 @@ function useMobile() {
 }
 
 // ─────────────────────────────────────────────
-// Dark sidebar palette
+// Studio sidebar palette (Editorial solid surfaces)
 const SD = {
-  bg:      '#0d0d14',
-  border:  'rgba(255,255,255,0.07)',
-  text:    '#F4F4F5',
-  dim:     'rgba(255,255,255,0.38)',
-  active:  'rgba(255,255,255,0.1)',
-  hover:   'rgba(255,255,255,0.055)',
-  ring:    'rgba(255,255,255,0.12)',
+  bg:      'var(--surface)',
+  border:  'var(--border)',
+  text:    'var(--text-primary)',
+  dim:     'var(--text-tertiary)',
+  active:  'var(--bg-tertiary)',
+  hover:   'var(--surface-hover)',
+  ring:    'var(--border)',
 }
 
 // ─────────────────────────────────────────────
@@ -190,18 +209,20 @@ function CtxMenu({ x, y, items, onClose }) {
   return (
     <div onClick={e=>e.stopPropagation()} style={{
       position:'fixed', top:y, left:x, zIndex:400,
-      background:'rgba(28,28,30,0.96)', backdropFilter:'blur(20px)',
-      borderRadius:12, boxShadow:'0 8px 32px rgba(0,0,0,0.4)', border:'1px solid rgba(255,255,255,0.1)',
+      background:'var(--glass-bg-strong)',
+      backdropFilter:'blur(var(--blur-lg)) saturate(1.8)', WebkitBackdropFilter:'blur(var(--blur-lg)) saturate(1.8)',
+      borderRadius:'var(--radius-lg)', boxShadow:'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)', border:'1px solid var(--glass-border)',
       padding:4, minWidth:170,
     }}>
       {items.map(({label,color,action})=>(
         <button key={label} onClick={()=>{action();onClose()}} style={{
           display:'block', width:'100%', textAlign:'left',
-          padding:'9px 14px', borderRadius:8,
+          padding:'9px 14px', borderRadius:'var(--radius-sm)',
           fontSize:13, fontWeight:500,
-          color: color||'#F4F4F5', background:'transparent', transition:'background 0.1s',
+          color: color||'var(--text-primary)', background:'transparent',
+          transition:'background 0.45s var(--ease-liquid)',
         }}
-          onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.1)'}}
+          onMouseEnter={e=>{e.currentTarget.style.background='var(--surface-hover)'}}
           onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}
         >{label}</button>
       ))}
@@ -222,10 +243,7 @@ function HeroBanner({ influencer, onDelete, pct, onUpdate }) {
 
   return (
     <div style={{
-      background:'var(--surface)',
-      borderRadius:16,
-      border:'1px solid var(--border-subtle)',
-      boxShadow:'var(--shadow-sm)',
+      ...glassPanel,
       overflow:'hidden',
       flexShrink:0,
     }}>
@@ -251,7 +269,7 @@ function HeroBanner({ influencer, onDelete, pct, onUpdate }) {
             transition:'border-radius 0.2s',
           }}>
             {influencer.mainImage
-              ?<img src={influencer.mainImage} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              ?<SmartImage src={influencer.mainImage} alt={influencer.name||''} fallbackLabel={influencer.name} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
               :<span style={{fontSize:24,fontWeight:800,color:ac,letterSpacing:'-1px'}}>
                 {influencer.name[0]?.toUpperCase()}
               </span>
@@ -273,15 +291,15 @@ function HeroBanner({ influencer, onDelete, pct, onUpdate }) {
                 onBlur={()=>{setEditingTag(false);onUpdate({tag:tagDraft.trim()})}}
                 onKeyDown={e=>{if(e.key==='Enter'||e.key==='Escape'){setEditingTag(false);onUpdate({tag:tagDraft.trim()})}}}
                 placeholder="Add title…"
-                style={{fontSize:12,fontWeight:600,padding:'3px 10px',borderRadius:20,border:'1.5px solid rgba(139,92,246,0.5)',background:'rgba(139,92,246,0.07)',color:'#8B5CF6',outline:'none',fontFamily:'inherit',width:140}}
+                style={{fontSize:12,fontWeight:600,padding:'3px 10px',borderRadius:20,border:'1.5px solid rgba(199,242,78,0.5)',background:'rgba(199,242,78,0.07)',color:'var(--brand)',outline:'none',fontFamily:'inherit',width:140}}
               />
             ) : (
               <button
                 onClick={()=>{setTagDraft(influencer.tag||'');setEditingTag(true)}}
                 style={{fontSize:12,fontWeight:600,padding:'3px 10px',borderRadius:20,
-                  border:`1.5px solid ${influencer.tag?'rgba(139,92,246,0.35)':'var(--border)'}`,
-                  background:influencer.tag?'rgba(139,92,246,0.07)':'transparent',
-                  color:influencer.tag?'#8B5CF6':'var(--text-tertiary)',
+                  border:`1.5px solid ${influencer.tag?'rgba(199,242,78,0.35)':'var(--border)'}`,
+                  background:influencer.tag?'rgba(199,242,78,0.07)':'transparent',
+                  color:influencer.tag?'var(--brand)':'var(--text-tertiary)',
                   cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s',
                 }}
               >{influencer.tag || '+ Add title'}</button>
@@ -312,7 +330,7 @@ function HeroBanner({ influencer, onDelete, pct, onUpdate }) {
         {/* Actions */}
         <div style={{display:'flex',gap:8,flexShrink:0,marginLeft:isMobile?'auto':0}}>
           <button onClick={onDelete} style={{
-            padding:'8px 14px',borderRadius:8,fontSize:12,fontWeight:600,
+            padding:'8px 14px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:600,
             background:'rgba(255,59,48,0.08)',color:'#FF3B30',border:'1.5px solid rgba(255,59,48,0.2)',
             transition:'background 0.15s',
           }}
@@ -333,16 +351,11 @@ function GenLoadingOverlay({ elapsed, onCancel, maxLabel = '5 min' }) {
   const timeStr = `${m}:${s.toString().padStart(2, '0')}`
   return (
     <div style={{
-      position:'absolute', inset:0, zIndex:5, borderRadius:10,
+      position:'absolute', inset:0, zIndex:5, borderRadius:'var(--radius-sm)',
       background:'rgba(10,10,18,0.82)', backdropFilter:'blur(6px)',
       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10,
     }}>
-      <div style={{
-        width:32, height:32, borderRadius:'50%',
-        border:'2.5px solid rgba(139,92,246,0.25)',
-        borderTopColor:'#A78BFA',
-        animation:'spin 0.9s linear infinite',
-      }}/>
+      <div className="blob-loader" style={{ width:34, height:34 }}/>
       <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.9)',letterSpacing:'0.2px'}}>Generating…</div>
       <div style={{fontSize:10,color:'rgba(255,255,255,0.38)',textAlign:'center',lineHeight:1.5}}>
         Up to {maxLabel}<br/>
@@ -440,8 +453,8 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
   return (
     <div>
       {/* Image slot */}
-      <div style={{position:'relative',width:'100%',aspectRatio:'3/4',borderRadius:10,overflow:'hidden',
-        boxShadow: dragOver ? '0 0 0 2px #8B5CF6, 0 0 18px rgba(139,92,246,0.35)' : loading ? '0 0 0 1.5px rgba(139,92,246,0.5), 0 0 18px rgba(139,92,246,0.18)' : 'none',
+      <div style={{position:'relative',width:'100%',aspectRatio:'3/4',borderRadius:'var(--radius-sm)',overflow:'hidden',
+        boxShadow: dragOver ? '0 0 0 2px var(--brand), 0 0 18px rgba(199,242,78,0.35)' : loading ? '0 0 0 1.5px rgba(199,242,78,0.5), 0 0 18px rgba(199,242,78,0.18)' : 'none',
         transition:'box-shadow 0.3s',
       }}
         onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}
@@ -451,7 +464,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
         {loading && <GenLoadingOverlay elapsed={elapsed} onCancel={cancelGeneration}/>}
         {value ? (
           <>
-            <img src={value} alt="Character sheet" onClick={onLightbox} style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:10,cursor:'zoom-in',display:'block',background:'var(--bg-tertiary)'}}/>
+            <SmartImage src={value} alt="Character sheet" fallbackLabel="Character sheet" onClick={onLightbox} style={{width:'100%',height:'100%',objectFit:'contain',borderRadius:'var(--radius-sm)',cursor:'zoom-in',display:'block',background:'var(--bg-tertiary)'}}/>
 
             {/* Delete — top right on hover */}
             <button onClick={()=>onSave(null)} style={{
@@ -459,7 +472,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
               background:'rgba(0,0,0,0.45)',color:'#fff',fontSize:12,
               display:'flex',alignItems:'center',justifyContent:'center',
               backdropFilter:'blur(4px)',border:'1px solid rgba(255,255,255,0.12)',
-              opacity: hovered ? 1 : 0, transition:'opacity 0.15s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.15s, visibility 0.15s',
             }}
               onMouseEnter={e=>{e.currentTarget.style.background='rgba(220,50,50,0.85)'}}
               onMouseLeave={e=>{e.currentTarget.style.background='rgba(0,0,0,0.45)'}}>×</button>
@@ -470,11 +483,11 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
               padding:'28px 8px 8px',
               background:'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
               display:'flex',gap:5,
-              opacity: hovered ? 1 : 0, transition:'opacity 0.2s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.2s, visibility 0.2s',
             }}>
               <button onClick={regenerate} disabled={loading} style={{
                 flex:1.4,padding:'6px 0',borderRadius:7,fontSize:11,fontWeight:700,
-                background:'linear-gradient(135deg,rgba(236,72,153,0.7),rgba(139,92,246,0.7))',color:'#fff',
+                background:'linear-gradient(135deg,rgba(199,242,78,0.7),rgba(199,242,78,0.7))',color:'#fff',
                 backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.18)',
                 transition:'opacity 0.15s',
               }}
@@ -499,15 +512,15 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
             </div>
           </>
         ) : (
-          <div style={{width:'100%',height:'100%',borderRadius:10,border:'1.5px dashed var(--border)',background:'var(--bg-tertiary)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8}}>
+          <div style={{width:'100%',height:'100%',borderRadius:'var(--radius-sm)',border:'1.5px dashed var(--border)',background:'var(--bg-tertiary)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8}}>
             <span style={{fontSize:20,opacity:0.22}}>+</span>
             <span style={{fontSize:11,color:'var(--text-tertiary)',fontWeight:500}}>Character sheet</span>
             {/* Generate Sheet — inside slot at bottom */}
             <button onClick={e=>{e.stopPropagation();setOpen(o=>!o)}} style={{
               position:'absolute',bottom:10,left:10,right:10,
-              padding:'7px 0',borderRadius:8,fontSize:11,fontWeight:700,
-              background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',
-              boxShadow:'0 2px 10px rgba(139,92,246,0.28)',transition:'opacity 0.15s',
+              padding:'7px 0',borderRadius:'var(--radius-sm)',fontSize:11,fontWeight:700,
+              background:'var(--brand)',color:'var(--brand-ink)',
+              boxShadow:'0 2px 10px rgba(199,242,78,0.28)',transition:'opacity 0.15s',
             }}
               onMouseEnter={e=>{e.currentTarget.style.opacity='0.85'}}
               onMouseLeave={e=>{e.currentTarget.style.opacity='1'}}>Generate Sheet</button>
@@ -517,9 +530,9 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
         {loading && (
           <div style={{
             position:'absolute', bottom:0, left:0, right:0, height:2, zIndex:10,
-            backgroundImage:'linear-gradient(90deg, transparent, #EC4899, #8B5CF6, transparent)',
-            backgroundSize:'300% 100%',
-            animation:'progress-slide 1.6s linear infinite',
+            backgroundImage:'linear-gradient(90deg, transparent, var(--brand), var(--accent-2), transparent)',
+            backgroundSize:'200% 100%',
+            animation:'liquid-flow 2s var(--ease-liquid) infinite',
           }}/>
         )}
         <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}}
@@ -528,7 +541,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
 
       {/* Inline panel */}
       {open && (
-        <div style={{marginTop:8,padding:'12px 14px',borderRadius:10,background:'var(--surface)',border:'1.5px solid var(--border)',display:'flex',flexDirection:'column',gap:10}}>
+        <div style={{...glassCard, marginTop:8,padding:'12px 14px',display:'flex',flexDirection:'column',gap:10}}>
           {/* Ratio picker — hidden during generation */}
           {!loading && <div>
             <div style={{fontSize:10,fontWeight:700,color:'var(--text-tertiary)',textTransform:'uppercase',letterSpacing:'0.6px',marginBottom:6}}>Aspect Ratio</div>
@@ -536,9 +549,9 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
               {SHEET_RATIOS.map(r=>(
                 <button key={r.id} onClick={()=>setRatio(r.id)} style={{
                   flex:1,padding:'6px 4px',borderRadius:7,fontSize:11,fontWeight:600,
-                  border:`1.5px solid ${ratio===r.id?'#8B5CF6':'var(--border)'}`,
-                  background:ratio===r.id?'rgba(139,92,246,0.1)':'var(--bg)',
-                  color:ratio===r.id?'#8B5CF6':'var(--text-secondary)',
+                  border:`1.5px solid ${ratio===r.id?'var(--brand)':'var(--border)'}`,
+                  background:ratio===r.id?'rgba(199,242,78,0.1)':'var(--bg)',
+                  color:ratio===r.id?'var(--brand)':'var(--text-secondary)',
                   display:'flex',flexDirection:'column',alignItems:'center',gap:1,
                 }}>
                   <span>{r.label}</span>
@@ -551,10 +564,10 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
           {err && <div style={{fontSize:11,color:'#FF3B30',lineHeight:1.4}}>{err}</div>}
 
           <button onClick={generate} disabled={loading} style={{
-            padding:'9px 0',borderRadius:8,fontSize:13,fontWeight:700,
-            background:loading?'var(--bg-tertiary)':'linear-gradient(135deg,#EC4899,#8B5CF6)',
-            color:loading?'var(--text-tertiary)':'#fff',
-            boxShadow:loading?'none':'0 2px 12px rgba(139,92,246,0.3)',
+            padding:'9px 0',borderRadius:'var(--radius-sm)',fontSize:13,fontWeight:700,
+            background:loading?'var(--bg-tertiary)':'var(--brand)',
+            color:loading?'var(--text-tertiary)':'var(--brand-ink)',
+            boxShadow:loading?'none':'0 2px 12px rgba(199,242,78,0.3)',
             transition:'all 0.15s',
           }}>
             {loading ? 'Generating…' : 'Generate'}
@@ -645,8 +658,8 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
     <div>
       <div
         style={{
-          position:'relative', width:'100%', aspectRatio:'3/2', borderRadius:10, overflow:'hidden',
-          boxShadow: dragOver ? '0 0 0 2px #8B5CF6, 0 0 18px rgba(139,92,246,0.35)' : loading ? '0 0 0 1.5px rgba(139,92,246,0.5), 0 0 18px rgba(139,92,246,0.18)' : 'none',
+          position:'relative', width:'100%', aspectRatio:'3/2', borderRadius:'var(--radius-sm)', overflow:'hidden',
+          boxShadow: dragOver ? '0 0 0 2px var(--brand), 0 0 18px rgba(199,242,78,0.35)' : loading ? '0 0 0 1.5px rgba(199,242,78,0.5), 0 0 18px rgba(199,242,78,0.18)' : 'none',
           transition:'box-shadow 0.3s',
         }}
         onMouseEnter={() => setHovered(true)}
@@ -660,7 +673,7 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
           <>
             <img
               src={value} alt={label} onClick={onLightbox}
-              style={{ width:'100%', height:'100%', objectFit:fit, borderRadius:10, cursor:'zoom-in', display:'block', background:'var(--bg-tertiary)' }}
+              style={{ width:'100%', height:'100%', objectFit:fit, borderRadius:'var(--radius-sm)', cursor:'zoom-in', display:'block', background:'var(--bg-tertiary)' }}
             />
             {/* Hover action bar — bottom: Generate + Replace + ↓ */}
             <div style={{
@@ -668,13 +681,13 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
               padding:'28px 8px 8px',
               background:'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
               display:'flex', gap:5,
-              opacity: hovered ? 1 : 0, transition:'opacity 0.2s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.2s, visibility 0.2s',
             }}>
               <button
                 onClick={regenerate} disabled={loading}
                 style={{
                   flex:1.4, padding:'5px 0', borderRadius:6, fontSize:10, fontWeight:700,
-                  background: loading ? 'rgba(0,0,0,0.45)' : 'linear-gradient(135deg,rgba(236,72,153,0.7),rgba(139,92,246,0.7))',
+                  background: loading ? 'rgba(0,0,0,0.45)' : 'linear-gradient(135deg,rgba(199,242,78,0.7),rgba(199,242,78,0.7))',
                   color:'#fff', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,0.18)',
                   transition:'opacity 0.15s',
                 }}
@@ -707,7 +720,7 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
           </>
         ) : (
           <div style={{
-            width:'100%', height:'100%', borderRadius:10,
+            width:'100%', height:'100%', borderRadius:'var(--radius-sm)',
             border:'1.5px dashed var(--border)', background:'var(--bg-tertiary)',
             display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
             gap:6,
@@ -721,9 +734,9 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
               style={{
                 position:'absolute', bottom:8, left:8, right:8,
                 padding:'6px 0', borderRadius:7, fontSize:11, fontWeight:700,
-                background: loading ? 'var(--bg-tertiary)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-                color: loading ? 'var(--text-tertiary)' : '#fff',
-                boxShadow: loading ? 'none' : '0 2px 10px rgba(139,92,246,0.28)',
+                background: loading ? 'var(--bg-tertiary)' : 'var(--brand)',
+                color: loading ? 'var(--text-tertiary)' : 'var(--brand-ink)',
+                boxShadow: loading ? 'none' : '0 2px 10px rgba(199,242,78,0.28)',
                 transition:'opacity 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
@@ -735,9 +748,9 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
         {loading && (
           <div style={{
             position:'absolute', bottom:0, left:0, right:0, height:2, zIndex:10,
-            backgroundImage:'linear-gradient(90deg, transparent, #EC4899, #8B5CF6, transparent)',
-            backgroundSize:'300% 100%',
-            animation:'progress-slide 1.6s linear infinite',
+            backgroundImage:'linear-gradient(90deg, transparent, var(--brand), var(--accent-2), transparent)',
+            backgroundSize:'200% 100%',
+            animation:'liquid-flow 2s var(--ease-liquid) infinite',
           }}/>
         )}
         <input ref={fileRef} type="file" accept="image/*" style={{ display:'none' }}
@@ -814,8 +827,8 @@ function MainImageSlot({ influencer, onChange, onLightbox }) {
     <div>
       <div
         style={{
-          position: 'relative', width: '100%', aspectRatio: '3/4', borderRadius: 10, overflow: 'hidden',
-          boxShadow: dragOver ? '0 0 0 2px #8B5CF6, 0 0 18px rgba(139,92,246,0.35)' : loading ? '0 0 0 1.5px rgba(139,92,246,0.5), 0 0 18px rgba(139,92,246,0.18)' : 'none',
+          position: 'relative', width: '100%', aspectRatio: '3/4', borderRadius: 'var(--radius-sm)', overflow: 'hidden',
+          boxShadow: dragOver ? '0 0 0 2px var(--brand), 0 0 18px rgba(199,242,78,0.35)' : loading ? '0 0 0 1.5px rgba(199,242,78,0.5), 0 0 18px rgba(199,242,78,0.18)' : 'none',
           transition: 'box-shadow 0.3s',
         }}
         onMouseEnter={() => setHovered(true)}
@@ -827,15 +840,15 @@ function MainImageSlot({ influencer, onChange, onLightbox }) {
         {loading && <GenLoadingOverlay elapsed={elapsed} maxLabel="5 min 30 sec" />}
         {value ? (
           <>
-            <img src={value} alt="Main image" onClick={onLightbox}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10, cursor: 'zoom-in', display: 'block' }} />
+            <SmartImage src={value} alt="Main image" fallbackLabel="Main image" onClick={onLightbox}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'zoom-in', display: 'block' }} />
             {/* Delete — top right on hover */}
             <button onClick={() => onChange(null)} style={{
               position: 'absolute', top: 7, right: 7, width: 22, height: 22, borderRadius: '50%',
               background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 12,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
-              opacity: hovered ? 1 : 0, transition: 'opacity 0.15s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.15s, visibility 0.15s',
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,50,50,0.85)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.45)' }}>×</button>
@@ -845,11 +858,11 @@ function MainImageSlot({ influencer, onChange, onLightbox }) {
               padding: '28px 8px 8px',
               background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
               display: 'flex', gap: 5,
-              opacity: hovered ? 1 : 0, transition: 'opacity 0.2s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.2s, visibility 0.2s',
             }}>
               <button onClick={regenerate} disabled={loading} style={{
                 flex: 1.4, padding: '6px 0', borderRadius: 7, fontSize: 11, fontWeight: 700,
-                background: 'linear-gradient(135deg,rgba(236,72,153,0.7),rgba(139,92,246,0.7))', color: '#fff',
+                background: 'linear-gradient(135deg,rgba(199,242,78,0.7),rgba(199,242,78,0.7))', color: '#fff',
                 backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.18)',
                 transition: 'opacity 0.15s',
               }}
@@ -875,15 +888,15 @@ function MainImageSlot({ influencer, onChange, onLightbox }) {
             {loading && (
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, zIndex: 10,
-                backgroundImage: 'linear-gradient(90deg, transparent, #EC4899, #8B5CF6, transparent)',
-                backgroundSize: '300% 100%',
-                animation: 'progress-slide 1.6s linear infinite',
+                backgroundImage: 'linear-gradient(90deg, transparent, var(--brand), var(--accent-2), transparent)',
+                backgroundSize: '200% 100%',
+                animation: 'liquid-flow 2s var(--ease-liquid) infinite',
               }} />
             )}
           </>
         ) : (
           <div onClick={() => fileRef.current.click()} style={{
-            width: '100%', height: '100%', borderRadius: 10,
+            width: '100%', height: '100%', borderRadius: 'var(--radius-sm)',
             border: '1.5px dashed var(--border)', background: 'var(--bg-tertiary)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', gap: 5, transition: 'border-color 0.15s',
@@ -922,7 +935,7 @@ function FTA({ value, onChange, placeholder, rows=3 }) {
 // ─────────────────────────────────────────────
 // Gender buttons
 const GM = {
-  Female: {icon:'♀',color:'#EC4899',bg:'rgba(236,72,153,0.08)',border:'#EC4899'},
+  Female: {icon:'♀',color:'#EC4899',bg:'rgba(199,242,78,0.08)',border:'#EC4899'},
   Male:   {icon:'♂',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',border:'#3B82F6'},
 }
 function GenderButtons({ value, onChange }) {
@@ -960,7 +973,7 @@ function ColorPalette({ palette=[], onChange, gender }) {
     <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
       {[0,1,2,3].map(i=>(
         <label key={i} style={{cursor:'pointer',position:'relative'}}>
-          <div style={{width:30,height:30,borderRadius:8,background:cols[i],border:'2px solid rgba(0,0,0,0.1)',boxShadow:'0 1px 4px rgba(0,0,0,0.12)',transition:'transform 0.15s'}}
+          <div style={{width:30,height:30,borderRadius:'var(--radius-sm)',background:cols[i],border:'2px solid rgba(0,0,0,0.1)',boxShadow:'0 1px 4px rgba(0,0,0,0.12)',transition:'transform 0.15s'}}
             onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.15)'}}
             onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)'}}/>
           <input type="color" value={cols[i]} onChange={e=>{const n=[...cols];n[i]=e.target.value;onChange(n)}}
@@ -997,8 +1010,8 @@ function SaveScriptModal({ onSave, onClose }) {
   }
 
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:20,padding:28,width:400,maxWidth:'90vw',boxShadow:'var(--shadow-lg)'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,...glassOverlay,display:'flex',alignItems:'center',justifyContent:'center',zIndex:500}}>
+      <div onClick={e=>e.stopPropagation()} className="reveal" style={{...glassModal,padding:28,width:400,maxWidth:'90vw'}}>
         <div style={{fontSize:18,fontWeight:700,letterSpacing:'-0.4px',marginBottom:4}}>Save script</div>
         <div style={{fontSize:13,color:'var(--text-tertiary)',marginBottom:18}}>Give this video a title to find it easily in Scripts.</div>
 
@@ -1007,15 +1020,15 @@ function SaveScriptModal({ onSave, onClose }) {
           onKeyDown={e=>{if(e.key==='Enter')commit();if(e.key==='Escape')onClose()}}
           placeholder="e.g. Product reveal, Morning routine…"
           style={{
-            width:'100%',padding:'11px 14px',borderRadius:10,marginBottom:24,
-            border:'1.5px solid var(--border)',background:'var(--bg)',
-            fontSize:14,color:'var(--text-primary)',boxSizing:'border-box',
+            ...glassInput,
+            width:'100%',padding:'11px 14px',marginBottom:24,
+            fontSize:14,boxSizing:'border-box',
           }}
         />
 
         <div style={{display:'flex',gap:10}}>
-          <button onClick={onClose} style={{flex:1,padding:'11px',borderRadius:10,border:'1.5px solid var(--border)',fontSize:14,fontWeight:500,color:'var(--text-secondary)',background:'transparent'}}>Cancel</button>
-          <button onClick={commit} style={{flex:2,padding:'11px',borderRadius:10,fontSize:14,fontWeight:700,background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',border:'none',boxShadow:'0 2px 12px rgba(139,92,246,0.3)'}}>Save Script</button>
+          <button onClick={onClose} className="liquid-press" style={{...glassBtnGhost,flex:1,padding:'11px',fontSize:14,fontWeight:500}}>Cancel</button>
+          <button onClick={commit} className="liquid-press" style={{...glassBtnPrimary,flex:2,padding:'11px',fontSize:14}}>Save Script</button>
         </div>
       </div>
     </div>
@@ -1110,7 +1123,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
 
   return (
     <div style={{position:'relative'}}>
-      <style>{`@keyframes drawerIn{from{transform:translateX(32px);opacity:0}to{transform:translateX(0);opacity:1}}`}</style>
+      <style>{`@keyframes drawerIn{from{transform:translateX(48px) scale(0.98);opacity:0;filter:blur(10px)}to{transform:translateX(0) scale(1);opacity:1;filter:blur(0)}}`}</style>
 
       {/* ── Header ── */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
@@ -1119,9 +1132,9 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
         </div>
         <button onClick={add} style={{
           padding:'7px 16px',borderRadius:980,
-          background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',
+          background:'var(--brand)',color:'var(--brand-ink)',
           fontSize:12,fontWeight:700,display:'flex',alignItems:'center',gap:5,
-          boxShadow:'0 2px 10px rgba(139,92,246,0.3)',
+          boxShadow:'0 2px 10px rgba(199,242,78,0.3)',
         }}>+ New Script</button>
       </div>
 
@@ -1147,17 +1160,17 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
               onClick={() => setSelectedId(s.id)}
               style={{
                 display:'flex', alignItems:'center', gap:14,
-                padding:'14px 16px', borderRadius:12, cursor:'pointer',
-                background: isSelected ? 'var(--surface)' : 'var(--bg)',
+                padding:'14px 16px', borderRadius:'var(--radius-md)', cursor:'pointer',
+                background: isSelected ? 'var(--glass-bg)' : 'var(--bg-tertiary)',
                 border: isSelected
-                  ? '1.5px solid rgba(139,92,246,0.35)'
+                  ? '1.5px solid rgba(199,242,78,0.35)'
                   : '1.5px solid var(--border-subtle)',
-                boxShadow: isSelected ? '0 2px 12px rgba(139,92,246,0.1)' : '0 1px 3px rgba(0,0,0,0.04)',
-                transition:'all 0.15s',
+                boxShadow: isSelected ? 'inset 0 1px 0 var(--glass-highlight), var(--glow-brand)' : 'none',
+                transition:'background 0.45s var(--ease-liquid), border-color 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid)',
                 userSelect:'none',
               }}
-              onMouseEnter={e=>{ if(!isSelected){e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.07)'}}}
-              onMouseLeave={e=>{ if(!isSelected){e.currentTarget.style.borderColor='var(--border-subtle)';e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,0.04)'}}}
+              onMouseEnter={e=>{ if(!isSelected){e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.background='var(--surface-hover)'}}}
+              onMouseLeave={e=>{ if(!isSelected){e.currentTarget.style.borderColor='var(--border-subtle)';e.currentTarget.style.background='var(--bg-tertiary)'}}}
             >
               {/* Status bar */}
               <div style={{width:3,height:36,borderRadius:2,background:ss.color,flexShrink:0,opacity:0.7}}/>
@@ -1196,7 +1209,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
         const ss = SCRIPT_STATUS_STYLE[s.status] || SCRIPT_STATUS_STYLE.Unposted
         const urls = getUrls(s)
         const fieldStyle = {
-          width:'100%', padding:'10px 13px', borderRadius:10,
+          width:'100%', padding:'10px 13px', borderRadius:'var(--radius-sm)',
           border:'1.5px solid var(--border)', background:'var(--bg)',
           fontSize:13, color:'var(--text-primary)', fontFamily:'inherit',
           boxSizing:'border-box', lineHeight:1.6,
@@ -1206,9 +1219,10 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
             position:'fixed', top:'var(--nav-h)', right:0, bottom:0,
             width:drawerWidth, zIndex:400,
             display:'flex', flexDirection:'row',
-            background:'var(--surface)',
-            boxShadow:'-12px 0 48px rgba(0,0,0,0.1)',
-            animation:'drawerIn 0.2s ease',
+            background:'var(--glass-bg-strong)',
+            backdropFilter:'blur(var(--blur-lg)) saturate(1.8)', WebkitBackdropFilter:'blur(var(--blur-lg)) saturate(1.8)',
+            boxShadow:'inset 1px 1px 0 var(--glass-highlight), var(--shadow-lg)',
+            animation:'drawerIn 0.6s var(--ease-liquid)',
           }}>
             {/* Left drag handle */}
             <div
@@ -1221,7 +1235,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
                 document.body.style.userSelect='none'
               }}
               onMouseEnter={e=>{
-                e.currentTarget.querySelector('span').style.background='rgba(139,92,246,0.7)'
+                e.currentTarget.querySelector('span').style.background='rgba(199,242,78,0.7)'
                 e.currentTarget.querySelector('span').style.width='3px'
               }}
               onMouseLeave={e=>{
@@ -1289,7 +1303,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
                         <div style={{position:'relative',cursor:'pointer'}} onClick={()=>setVidLightbox(url)}>
                           <video src={url} preload="metadata" muted playsInline style={{width:'100%',height:90,objectFit:'cover',display:'block',pointerEvents:'none'}}/>
                           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.18)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            <div style={{width:22,height:22,borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'#fff',boxShadow:'0 2px 8px rgba(139,92,246,0.45)'}}>▶</div>
+                            <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'var(--brand-ink)',boxShadow:'0 2px 8px rgba(199,242,78,0.45)'}}>▶</div>
                           </div>
                         </div>
                         <div style={{display:'flex',gap:1,background:'var(--bg-tertiary)',padding:'3px'}}>
@@ -1299,7 +1313,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
                               try{const r=await fetch(url);const b=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`video-${vi+1}.mp4`;a.click()}
                               catch{window.open(url,'_blank')}
                             }}
-                            style={{flex:1,padding:'3px 0',borderRadius:5,fontSize:11,border:'none',cursor:'pointer',background:'rgba(139,92,246,0.12)',color:'#8B5CF6',fontFamily:'inherit'}}
+                            style={{flex:1,padding:'3px 0',borderRadius:5,fontSize:11,border:'none',cursor:'pointer',background:'rgba(199,242,78,0.12)',color:'var(--brand)',fontFamily:'inherit'}}
                           >↓</button>
                           <button
                             title="Remove"
@@ -1333,8 +1347,8 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
                       <div key={ri} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}
                         onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setHoveredRef({ref,rect:r})}}
                         onMouseLeave={()=>setHoveredRef(null)}>
-                        <div style={{width:54,height:70,borderRadius:9,overflow:'hidden',border:`1.5px solid ${hoveredRef?.ref===ref?'var(--accent,#8B5CF6)':'var(--border)'}`,background:'var(--bg-tertiary)',transition:'border-color 0.15s',cursor:'pointer'}}>
-                          <img src={ref.url} alt={ref.label} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',display:'block'}}/>
+                        <div style={{width:54,height:70,borderRadius:9,overflow:'hidden',border:`1.5px solid ${hoveredRef?.ref===ref?'var(--accent,var(--brand))':'var(--border)'}`,background:'var(--bg-tertiary)',transition:'border-color 0.15s',cursor:'pointer'}}>
+                          <img src={thumbUrl(ref.url, 160)} alt={ref.label} style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',display:'block'}}/>
                         </div>
                         <span style={{fontSize:9,fontWeight:600,color:'var(--text-tertiary)',textAlign:'center',maxWidth:54,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ref.label}</span>
                       </div>
@@ -1406,23 +1420,24 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
                 top: hoveredRef.rect.top - 12,
                 transform:'translate(-50%,-100%)',
                 width:220,
-                background:'var(--surface)',
-                borderRadius:12,
-                boxShadow:'0 12px 40px rgba(0,0,0,0.32)',
-                border:'1px solid var(--border)',
+                background:'var(--glass-bg-strong)',
+                backdropFilter:'blur(var(--blur-md)) saturate(1.7)', WebkitBackdropFilter:'blur(var(--blur-md)) saturate(1.7)',
+                borderRadius:'var(--radius-lg)',
+                boxShadow:'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)',
+                border:'1px solid var(--glass-border)',
                 overflow:'hidden',
                 zIndex:9000,
                 pointerEvents:'none',
-                animation:'refPopIn 0.12s ease',
+                animation:'refPopIn 0.3s var(--ease-liquid)',
               }}>
                 <div style={{width:'100%',background:'var(--bg-tertiary)',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   <img src={hoveredRef.ref.url} alt={hoveredRef.ref.label} style={{maxWidth:'100%',maxHeight:260,display:'block',objectFit:'contain'}}/>
                 </div>
-                <div style={{padding:'6px 10px',fontSize:11,fontWeight:600,color:'var(--text-secondary)',borderTop:'1px solid var(--border)'}}>{hoveredRef.ref.label}</div>
+                <div style={{padding:'6px 10px',fontSize:11,fontWeight:600,color:'var(--text-secondary)',borderTop:'1px solid var(--glass-border)'}}>{hoveredRef.ref.label}</div>
               </div>,
               document.body
             )}
-            <style>{`@keyframes refPopIn{from{opacity:0;transform:translate(-50%,-94%)}to{opacity:1;transform:translate(-50%,-100%)}}`}</style>
+            <style>{`@keyframes refPopIn{from{opacity:0;filter:blur(6px);transform:translate(-50%,-94%)}to{opacity:1;filter:blur(0);transform:translate(-50%,-100%)}}`}</style>
 
             {/* Video lightbox */}
             {vidLightbox && createPortal(
@@ -1447,12 +1462,12 @@ function InfoCell({ label, icon, children, span }) {
   return (
     <div
       style={{
-        background: focused ? 'var(--surface)' : 'var(--bg)',
-        borderRadius: 12,
+        background: focused ? 'var(--glass-bg)' : 'transparent',
+        borderRadius: 'var(--radius-md)',
         padding: '13px 16px',
         border: `1.5px solid ${focused ? 'var(--accent)' : 'transparent'}`,
-        boxShadow: focused ? '0 0 0 3px rgba(0,113,227,0.09)' : 'none',
-        transition: 'border-color 0.15s, box-shadow 0.15s, background 0.15s',
+        boxShadow: focused ? 'inset 0 1px 0 var(--glass-highlight), 0 0 0 3px rgba(0,113,227,0.09)' : 'none',
+        transition: 'border-color 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid), background 0.45s var(--ease-liquid)',
         gridColumn: span ? `span ${span}` : undefined,
       }}
       onFocusCapture={() => setFocused(true)}
@@ -1770,11 +1785,11 @@ function WardrobeGenerator({ influencer, onAdd }) {
     setResult(null); setSaveName('')
   }
 
-  const iS = { padding: '9px 12px', borderRadius: 8, fontSize: 13, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
+  const iS = { padding: '9px 12px', borderRadius: 'var(--radius-sm)', fontSize: 13, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' }
   const lS = { fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }
 
   return (
-    <div style={{ background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border-subtle)', padding: 20, marginBottom: 20 }}>
+    <div style={{ ...glassPanel, borderRadius: 'var(--radius-lg)', padding: 20, marginBottom: 20 }}>
 
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
@@ -1788,11 +1803,11 @@ function WardrobeGenerator({ influencer, onAdd }) {
         )}
         <div
           onClick={() => setLightboxOpen(true)}
-          style={{ position: 'relative', cursor: 'zoom-in', marginBottom: 14, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}
+          style={{ position: 'relative', cursor: 'zoom-in', marginBottom: 14, borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}
           onMouseEnter={e => { e.currentTarget.querySelector('img').style.transform = 'scale(1.03)' }}
           onMouseLeave={e => { e.currentTarget.querySelector('img').style.transform = 'scale(1)' }}
         >
-          <img src={result.url} alt="" style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover', transition: 'transform 0.3s ease' }} />
+          <img src={thumbUrl(result.url, 800)} alt="" style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover', transition: 'transform 0.3s ease' }} />
           <button
             onClick={e => { e.stopPropagation(); downloadImage(result.url, `${(result.name || 'look').replace(/\s+/g, '-')}.jpg`) }}
             style={{
@@ -1810,8 +1825,8 @@ function WardrobeGenerator({ influencer, onAdd }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={saveToWardrobe} style={{
             flex: 1, padding: '10px', borderRadius: 9, fontSize: 13, fontWeight: 700,
-            background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff',
-            boxShadow: '0 2px 10px rgba(139,92,246,0.3)',
+            background: 'var(--brand)', color: 'var(--brand-ink)',
+            boxShadow: '0 2px 10px rgba(199,242,78,0.3)',
           }}>Save to Wardrobe</button>
           <button onClick={discardResult} style={{
             padding: '10px 14px', borderRadius: 9, fontSize: 13, fontWeight: 600,
@@ -1840,10 +1855,10 @@ function WardrobeGenerator({ influencer, onAdd }) {
             <div style={{
               height: '100%',
               width: `${Math.max(3, progress)}%`,
-              background: 'linear-gradient(90deg,#EC4899,#8B5CF6)',
+              background: 'var(--brand)',
               borderRadius: 980,
               transition: 'width 0.5s ease',
-              boxShadow: '0 0 10px rgba(139,92,246,0.5)',
+              boxShadow: '0 0 10px rgba(199,242,78,0.5)',
             }}/>
           </div>
         </div>
@@ -1874,18 +1889,18 @@ function WardrobeGenerator({ influencer, onAdd }) {
         </div>
 
         {!refImage && (
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 14, padding: '9px 12px', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 14, padding: '9px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)' }}>
             No character sheet — generate one in the Overview tab first.
           </div>
         )}
         {error && <div style={{ fontSize: 12, color: '#FF3B30', marginTop: 10 }}>{error}</div>}
 
         <button onClick={generate} disabled={!canGenerate} style={{
-          width: '100%', marginTop: 16, padding: '12px', borderRadius: 10, fontSize: 14, fontWeight: 700,
-          background: canGenerate ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : 'var(--bg-tertiary)',
-          color: canGenerate ? '#fff' : 'var(--text-tertiary)',
+          width: '100%', marginTop: 16, padding: '12px', borderRadius: 'var(--radius-sm)', fontSize: 14, fontWeight: 700,
+          background: canGenerate ? 'var(--brand)' : 'var(--bg-tertiary)',
+          color: canGenerate ? 'var(--brand-ink)' : 'var(--text-tertiary)',
           cursor: canGenerate ? 'pointer' : 'not-allowed',
-          boxShadow: canGenerate ? '0 2px 12px rgba(139,92,246,0.32)' : 'none',
+          boxShadow: canGenerate ? '0 2px 12px rgba(199,242,78,0.32)' : 'none',
           transition: 'all 0.15s',
         }}>Generate Look</button>
       </>)}
@@ -1909,13 +1924,13 @@ function WorldDropCard({ drop, editing, editName, onEditName, onStartEdit, onCom
 
   return (
     <div
-      style={{ background:'var(--bg)', borderRadius:12, border:`1.5px solid ${dragOver?'#8B5CF6':hovered?'var(--accent)':'var(--border)'}`, overflow:'hidden', boxShadow:hovered?'var(--shadow-md)':'none', transition:'border-color 0.15s, box-shadow 0.15s' }}
+      style={{ background:'var(--bg)', borderRadius:12, border:`1.5px solid ${dragOver?'var(--brand)':hovered?'var(--accent)':'var(--border)'}`, overflow:'hidden', boxShadow:hovered?'var(--shadow-md)':'none', transition:'border-color 0.15s, box-shadow 0.15s' }}
       onMouseEnter={()=>setHovered(true)}
       onMouseLeave={()=>setHovered(false)}
     >
       {/* Image slot */}
       <div
-        style={{ aspectRatio:'4/3', background: dragOver ? 'rgba(139,92,246,0.07)' : 'var(--bg-tertiary)', overflow:'hidden', cursor:'pointer', position:'relative', transition:'background 0.15s' }}
+        style={{ aspectRatio:'4/3', background: dragOver ? 'rgba(199,242,78,0.07)' : 'var(--bg-tertiary)', overflow:'hidden', cursor:'pointer', position:'relative', transition:'background 0.15s' }}
         onClick={() => drop.image ? onLightbox?.() : fileRef.current.click()}
         onDragOver={e=>{e.preventDefault();setDragOver(true)}}
         onDragLeave={()=>setDragOver(false)}
@@ -1923,7 +1938,7 @@ function WorldDropCard({ drop, editing, editName, onEditName, onStartEdit, onCom
       >
         {drop.image
           ? <>
-              <img src={drop.image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
+              <SmartImage src={drop.image} alt={drop.name||''} fallbackLabel={drop.name} style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
               <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0)', transition:'background 0.15s' }}
                 onMouseEnter={e=>{e.currentTarget.style.background='rgba(0,0,0,0.2)'}}
                 onMouseLeave={e=>{e.currentTarget.style.background='rgba(0,0,0,0)'}}
@@ -1954,7 +1969,7 @@ function WorldDropCard({ drop, editing, editName, onEditName, onStartEdit, onCom
               style={{ flex:1, fontSize:13, fontWeight:600, border:'none', background:'transparent', color:'var(--text-primary)', outline:'none' }}/>
           : <span style={{ flex:1, fontSize:13, fontWeight:600, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{drop.name}</span>
         }
-        <div style={{ display:'flex', gap:3, flexShrink:0, opacity: hovered ? 1 : 0, transition:'opacity 0.15s' }}>
+        <div style={{ display:'flex', gap:3, flexShrink:0, opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.15s, visibility 0.15s' }}>
           {drop.image && (
             <button onClick={e=>{e.stopPropagation();downloadImage(drop.image,`${drop.name||'wardrobe'}.jpg`)}} title="Download" style={{
               width:26, height:26, borderRadius:7, border:'none', cursor:'pointer',
@@ -2019,7 +2034,7 @@ function WorldDropSection({ drops=[], onChange }) {
       )}
       <button onClick={addDrop} style={{
         display:'flex', alignItems:'center', gap:6,
-        padding:'8px 16px', borderRadius:8,
+        padding:'8px 16px', borderRadius:'var(--radius-sm)',
         border:'1.5px dashed var(--border)',
         background:'transparent', color:'var(--text-secondary)',
         fontSize:13, fontWeight:500, cursor:'pointer',
@@ -2073,7 +2088,7 @@ function HomeSection({ slots=[], onChange }) {
       )}
       <button onClick={addSlot} style={{
         display:'flex',alignItems:'center',gap:6,
-        padding:'8px 16px',borderRadius:8,
+        padding:'8px 16px',borderRadius:'var(--radius-sm)',
         border:'1.5px dashed var(--border)',
         background:'transparent',color:'var(--text-secondary)',
         fontSize:13,fontWeight:500,cursor:'pointer',
@@ -2146,13 +2161,13 @@ function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit
 
   return (
     <div
-      style={{background:'var(--bg)',borderRadius:12,border:`1.5px solid ${dragOver?'#8B5CF6':hovered?'var(--accent)':'var(--border)'}`,overflow:'hidden',boxShadow:hovered?'var(--shadow-md)':'none',transition:'border-color 0.15s, box-shadow 0.15s'}}
+      style={{background:'var(--bg)',borderRadius:12,border:`1.5px solid ${dragOver?'var(--brand)':hovered?'var(--accent)':'var(--border)'}`,overflow:'hidden',boxShadow:hovered?'var(--shadow-md)':'none',transition:'border-color 0.15s, box-shadow 0.15s'}}
       onMouseEnter={()=>setHovered(true)}
       onMouseLeave={()=>setHovered(false)}
     >
       {/* Image slot */}
       <div
-        style={{aspectRatio:'4/3',background:dragOver?'rgba(139,92,246,0.07)':'var(--bg-tertiary)',overflow:'hidden',cursor:'pointer',position:'relative',transition:'background 0.15s'}}
+        style={{aspectRatio:'4/3',background:dragOver?'rgba(199,242,78,0.07)':'var(--bg-tertiary)',overflow:'hidden',cursor:'pointer',position:'relative',transition:'background 0.15s'}}
         onClick={()=>{ if(generating) return; if(displayImage){const imgs=hasBoth?[deal.image,deal.characterSheet]:[displayImage];onLightbox?.(imgs,hasBoth&&viewSheet?1:0)}else{fileRef.current.click()} }}
         onDragOver={e=>{e.preventDefault();setDragOver(true)}}
         onDragLeave={()=>setDragOver(false)}
@@ -2160,7 +2175,7 @@ function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit
       >
         {displayImage
           ? <>
-              <img src={displayImage} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+              <SmartImage src={displayImage} alt={deal?.brand||''} fallbackLabel={deal?.brand} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
               {!generating && (
                 <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0)',transition:'background 0.15s'}}
                   onMouseEnter={e=>{e.currentTarget.style.background='rgba(0,0,0,0.2)'}}
@@ -2194,7 +2209,7 @@ function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit
         }
         {generating && (
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.62)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10}}>
-            <div style={{width:24,height:24,borderRadius:'50%',border:'2.5px solid rgba(255,255,255,0.2)',borderTopColor:'#fff',animation:'bdSpin 0.75s linear infinite'}}/>
+            <div className="blob-loader" style={{width:26,height:26}}/>
             <div style={{color:'#fff',fontSize:11,fontWeight:600}}>{genLabel(smoothPct)}</div>
             <div style={{width:100,height:3,borderRadius:99,background:'rgba(255,255,255,0.15)'}}>
               <div style={{height:'100%',borderRadius:99,background:'#fff',width:`${smoothPct}%`,transition:'width 0.4s ease'}}/>
@@ -2203,7 +2218,7 @@ function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit
         )}
         {!generating && claudeStatus && (
           <div style={{position:'absolute',bottom:6,right:6,fontSize:10,fontWeight:700,padding:'3px 7px',borderRadius:6,backdropFilter:'blur(6px)',
-            background: claudeStatus==='done' ? 'rgba(52,199,89,0.85)' : claudeStatus==='analyzing' ? 'rgba(139,92,246,0.85)' : 'rgba(255,59,48,0.85)',
+            background: claudeStatus==='done' ? 'rgba(52,199,89,0.85)' : claudeStatus==='analyzing' ? 'rgba(199,242,78,0.85)' : 'rgba(255,59,48,0.85)',
             color:'#fff',maxWidth:'90%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
           }}>
             {claudeStatus==='done' ? '✓ Claude analyzed' : claudeStatus==='analyzing' ? 'Claude analyzing…' : '✗ '+claudeStatus.replace('error:','')}
@@ -2250,11 +2265,10 @@ function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit
         {deal.image && !generating && (
           <button
             onClick={e=>{e.stopPropagation();onGenerate(deal)}}
-            style={{marginTop:8,width:'100%',padding:'5px 0',borderRadius:6,fontSize:11,fontWeight:600,background:hasSheet?'var(--bg-tertiary)':'linear-gradient(135deg,#EC4899,#8B5CF6)',color:hasSheet?'var(--text-secondary)':'#fff',boxShadow:hasSheet?'none':'0 1px 6px rgba(139,92,246,0.3)',transition:'all 0.15s',cursor:'pointer'}}
+            style={{marginTop:8,width:'100%',padding:'5px 0',borderRadius:6,fontSize:11,fontWeight:600,background:hasSheet?'var(--bg-tertiary)':'var(--brand)',color:hasSheet?'var(--text-secondary)':'var(--brand-ink)',boxShadow:hasSheet?'none':'0 1px 6px rgba(199,242,78,0.3)',transition:'all 0.15s',cursor:'pointer'}}
           >{hasSheet ? '↺ Regenerate Sheet' : 'Generate Sheet'}</button>
         )}
       </div>
-      <style>{`@keyframes bdSpin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
@@ -2276,22 +2290,22 @@ function NewBrandModal({ onClose, onSave }) {
   }
 
   return (
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:20,padding:28,width:400,maxWidth:'90vw',boxShadow:'var(--shadow-lg)'}}>
+    <div onClick={onClose} style={{position:'fixed',inset:0,...glassOverlay,display:'flex',alignItems:'center',justifyContent:'center',zIndex:300}}>
+      <div onClick={e=>e.stopPropagation()} className="reveal" style={{...glassModal,padding:28,width:400,maxWidth:'90vw'}}>
         <div style={{fontSize:18,fontWeight:700,letterSpacing:'-0.4px',marginBottom:20}}>New Brand Deal</div>
 
         <label style={{display:'block',marginBottom:14}}>
           <div style={{fontSize:11,fontWeight:700,color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:6}}>Brand Name</div>
           <input autoFocus value={brand} onChange={e=>setBrand(e.target.value)}
             placeholder="e.g. Nike"
-            style={{width:'100%',padding:'10px 14px',borderRadius:8,border:'1.5px solid var(--border)',background:'var(--bg)',fontSize:14,color:'var(--text-primary)',boxSizing:'border-box'}}/>
+            style={{...glassInput,width:'100%',padding:'10px 14px',fontSize:14,boxSizing:'border-box'}}/>
         </label>
 
         <label style={{display:'block',marginBottom:18}}>
           <div style={{fontSize:11,fontWeight:700,color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:6}}>Category</div>
           <input value={category} onChange={e=>setCategory(e.target.value)}
             placeholder="e.g. Fitness, Beauty, Tech…"
-            style={{width:'100%',padding:'10px 14px',borderRadius:8,border:'1.5px solid var(--border)',background:'var(--bg)',fontSize:14,color:'var(--text-primary)',boxSizing:'border-box'}}/>
+            style={{...glassInput,width:'100%',padding:'10px 14px',fontSize:14,boxSizing:'border-box'}}/>
         </label>
 
         <div style={{marginBottom:22}}>
@@ -2302,15 +2316,15 @@ function NewBrandModal({ onClose, onSave }) {
             onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDragging(false)}}
             onDrop={e=>{e.preventDefault();setDragging(false);handleFiles(e.dataTransfer.files)}}
             style={{
-              borderRadius:10,padding:8,
-              border: dragging ? '1.5px dashed #8B5CF6' : '1.5px dashed transparent',
-              background: dragging ? 'rgba(139,92,246,0.07)' : 'transparent',
+              borderRadius:'var(--radius-sm)',padding:8,
+              border: dragging ? '1.5px dashed var(--brand)' : '1.5px dashed transparent',
+              background: dragging ? 'rgba(199,242,78,0.07)' : 'transparent',
               transition:'all 0.15s',
             }}
           >
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
               {images.map((img,i) => (
-                <div key={i} style={{position:'relative',aspectRatio:'1',borderRadius:8,overflow:'hidden',background:'var(--bg-tertiary)'}}>
+                <div key={i} style={{position:'relative',aspectRatio:'1',borderRadius:'var(--radius-sm)',overflow:'hidden',background:'var(--bg-tertiary)'}}>
                   <img src={img} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                   <button onClick={()=>setImages(prev=>prev.filter((_,j)=>j!==i))}
                     style={{position:'absolute',top:4,right:4,width:18,height:18,borderRadius:'50%',background:'rgba(0,0,0,0.6)',color:'#fff',fontSize:11,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
@@ -2318,7 +2332,7 @@ function NewBrandModal({ onClose, onSave }) {
                 </div>
               ))}
               {images.length < 5 && (
-                <div onClick={()=>fileRef.current.click()} style={{aspectRatio:'1',borderRadius:8,border:'1.5px dashed var(--border)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,cursor:'pointer',background:'var(--bg-tertiary)'}}>
+                <div onClick={()=>fileRef.current.click()} style={{aspectRatio:'1',borderRadius:'var(--radius-sm)',border:'1.5px dashed var(--border)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,cursor:'pointer',background:'var(--bg-tertiary)'}}>
                   <span style={{fontSize:20,opacity:0.3}}>+</span>
                   <span style={{fontSize:10,color:'var(--text-tertiary)'}}>{dragging?'Drop here':'Add photo'}</span>
                 </div>
@@ -2329,11 +2343,12 @@ function NewBrandModal({ onClose, onSave }) {
         </div>
 
         <div style={{display:'flex',gap:10}}>
-          <button onClick={onClose} style={{flex:1,padding:'10px',borderRadius:10,border:'1.5px solid var(--border)',fontSize:14,fontWeight:500,color:'var(--text-secondary)',background:'transparent'}}>Cancel</button>
+          <button onClick={onClose} className="liquid-press" style={{...glassBtnGhost,flex:1,padding:'10px',fontSize:14,fontWeight:500}}>Cancel</button>
           <button
             disabled={!brand.trim()}
             onClick={()=>onSave({brand,category,image:images[0]||null,images})}
-            style={{flex:2,padding:'10px',borderRadius:10,fontSize:14,fontWeight:700,background:brand.trim()?'linear-gradient(135deg,#EC4899,#8B5CF6)':'var(--border)',color:brand.trim()?'#fff':'var(--text-tertiary)',boxShadow:brand.trim()?'0 2px 12px rgba(139,92,246,0.3)':'none',transition:'all 0.15s'}}
+            className="liquid-press"
+            style={{...glassBtnPrimary,flex:2,padding:'10px',fontSize:14,opacity:brand.trim()?1:0.5,cursor:brand.trim()?'pointer':'default'}}
           >Add Brand</button>
         </div>
       </div>
@@ -2346,8 +2361,8 @@ function ImportBrandDealsModal({ deals, existingBrands, onImport, onClose }) {
   const toggle = id => setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   return (
-    <div onClick={onClose} style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:'var(--surface)',borderRadius:20,padding:28,width:560,maxWidth:'92vw',boxShadow:'var(--shadow-lg)',maxHeight:'80vh',display:'flex',flexDirection:'column' }}>
+    <div onClick={onClose} style={{ position:'fixed',inset:0,...glassOverlay,display:'flex',alignItems:'center',justifyContent:'center',zIndex:300 }}>
+      <div onClick={e=>e.stopPropagation()} className="reveal" style={{ ...glassModal,padding:28,width:560,maxWidth:'92vw',maxHeight:'80vh',display:'flex',flexDirection:'column' }}>
         <div style={{ fontSize:18,fontWeight:700,letterSpacing:'-0.4px',marginBottom:4 }}>Import Brand Deals</div>
         <div style={{ fontSize:13,color:'var(--text-secondary)',marginBottom:20 }}>Select deals from the Brand Deals page to add to this influencer.</div>
 
@@ -2367,19 +2382,19 @@ function ImportBrandDealsModal({ deals, existingBrands, onImport, onClose }) {
                   onClick={() => !already && toggle(deal.id)}
                   style={{
                     borderRadius:12,overflow:'hidden',cursor:already?'default':'pointer',
-                    border:`2px solid ${isSelected?'#8B5CF6':already?'var(--border-subtle)':'var(--border)'}`,
-                    background: isSelected ? 'rgba(139,92,246,0.08)' : 'var(--bg)',
+                    border:`2px solid ${isSelected?'var(--brand)':already?'var(--border-subtle)':'var(--border)'}`,
+                    background: isSelected ? 'rgba(199,242,78,0.08)' : 'var(--bg)',
                     opacity: already ? 0.5 : 1,
                     transition:'border-color 0.15s',
                   }}
                 >
                   <div style={{ aspectRatio:'16/9',background:'var(--bg-tertiary)',position:'relative' }}>
                     {thumb
-                      ? <img src={thumb} alt={deal.brand} style={{ width:'100%',height:'100%',objectFit:'cover',display:'block' }}/>
+                      ? <SmartImage src={thumb} alt={deal.brand} fallbackLabel={deal.brand} style={{ width:'100%',height:'100%',objectFit:'cover',display:'block' }}/>
                       : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:800,color:'var(--text-tertiary)',opacity:0.25 }}>{deal.brand[0]}</div>
                     }
                     {isSelected && (
-                      <div style={{ position:'absolute',top:6,right:6,width:20,height:20,borderRadius:'50%',background:'#8B5CF6',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#fff',fontWeight:700 }}>✓</div>
+                      <div style={{ position:'absolute',top:6,right:6,width:20,height:20,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'var(--brand-ink)',fontWeight:700 }}>✓</div>
                     )}
                     {already && (
                       <div style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.35)',fontSize:11,fontWeight:700,color:'#fff' }}>Already added</div>
@@ -2396,11 +2411,12 @@ function ImportBrandDealsModal({ deals, existingBrands, onImport, onClose }) {
         )}
 
         <div style={{ display:'flex',gap:10 }}>
-          <button onClick={onClose} style={{ flex:1,padding:'11px',borderRadius:10,border:'1.5px solid var(--border)',fontSize:14,fontWeight:500,color:'var(--text-secondary)',background:'transparent',cursor:'pointer',fontFamily:'inherit' }}>Cancel</button>
+          <button onClick={onClose} className="liquid-press" style={{ ...glassBtnGhost,flex:1,padding:'11px',fontSize:14,fontWeight:500,fontFamily:'inherit' }}>Cancel</button>
           <button
             disabled={selected.size === 0}
             onClick={() => { onImport(deals.filter(d => selected.has(d.id))); onClose() }}
-            style={{ flex:2,padding:'11px',borderRadius:10,background:selected.size?'linear-gradient(135deg,#EC4899,#8B5CF6)':'var(--bg-tertiary)',color:selected.size?'#fff':'var(--text-tertiary)',fontSize:14,fontWeight:700,border:'none',cursor:selected.size?'pointer':'default',fontFamily:'inherit' }}
+            className="liquid-press"
+            style={{ ...glassBtnPrimary,flex:2,padding:'11px',fontSize:14,fontFamily:'inherit',opacity:selected.size?1:0.5,cursor:selected.size?'pointer':'default' }}
           >Import {selected.size > 0 ? `${selected.size} Deal${selected.size>1?'s':''}` : 'Selected'}</button>
         </div>
       </div>
@@ -2437,20 +2453,19 @@ function BrandDealSection({ deals=[], onChange }) {
   function commitRename(){ if(editBrand.trim()) updateDeal(editId,{brand:editBrand.trim()}); setEditId(null); setEditBrand('') }
 
   async function handleGenerate(deal) {
-    if (!isHFConnected()) { alert('Connect Higgsfield in Settings first'); return }
+    if (!isVymotionSession()) { promptSignUp(); return }
     if (!deal.image) { alert('Upload a product image first'); return }
 
     setGenerating(g=>({...g,[deal.id]:true}))
     setGenProgress(p=>({...p,[deal.id]:0}))
 
     let imagePrompt = null
-    const claudeKey = localStorage.getItem('claude_api_key')
     const allImages = deal.images?.length ? deal.images : (deal.image ? [deal.image] : [])
-    if (claudeKey && allImages.length) {
+    if (isVymotionSession() && allImages.length) {
       setClaudeStatus(s=>({...s,[deal.id]:'analyzing'}))
       try {
         setGenProgress(p=>({...p,[deal.id]:5}))
-        imagePrompt = await buildCharSheetPromptWithClaude(allImages, deal.brand, deal.category, claudeKey)
+        imagePrompt = await buildCharSheetPromptWithClaude(allImages, deal.brand, deal.category)
         setClaudeStatus(s=>({...s,[deal.id]:'done'}))
         setTimeout(()=>setClaudeStatus(s=>({...s,[deal.id]:null})),3000)
       } catch(e) {
@@ -2516,7 +2531,7 @@ function BrandDealSection({ deals=[], onChange }) {
       <div style={{ display:'flex',gap:8,flexWrap:'wrap' }}>
         <button onClick={()=>setShowModal(true)} style={{
           display:'flex',alignItems:'center',gap:6,
-          padding:'8px 16px',borderRadius:8,
+          padding:'8px 16px',borderRadius:'var(--radius-sm)',
           border:'1.5px dashed var(--border)',
           background:'transparent',color:'var(--text-secondary)',
           fontSize:13,fontWeight:500,cursor:'pointer',
@@ -2528,14 +2543,14 @@ function BrandDealSection({ deals=[], onChange }) {
         {globalDeals.length > 0 && (
           <button onClick={()=>setShowImport(true)} style={{
             display:'flex',alignItems:'center',gap:6,
-            padding:'8px 16px',borderRadius:8,
-            border:'1.5px solid rgba(139,92,246,0.35)',
-            background:'rgba(139,92,246,0.07)',color:'#8B5CF6',
+            padding:'8px 16px',borderRadius:'var(--radius-sm)',
+            border:'1.5px solid rgba(199,242,78,0.35)',
+            background:'rgba(199,242,78,0.07)',color:'var(--brand)',
             fontSize:13,fontWeight:600,cursor:'pointer',
             transition:'border-color 0.15s, background 0.15s',
           }}
-            onMouseEnter={e=>{e.currentTarget.style.background='rgba(139,92,246,0.14)';e.currentTarget.style.borderColor='#8B5CF6'}}
-            onMouseLeave={e=>{e.currentTarget.style.background='rgba(139,92,246,0.07)';e.currentTarget.style.borderColor='rgba(139,92,246,0.35)'}}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(199,242,78,0.14)';e.currentTarget.style.borderColor='var(--brand)'}}
+            onMouseLeave={e=>{e.currentTarget.style.background='rgba(199,242,78,0.07)';e.currentTarget.style.borderColor='rgba(199,242,78,0.35)'}}
           >↓ Import from Brand Deals</button>
         )}
       </div>
@@ -2549,15 +2564,15 @@ function NewModal({ onClose, onSave }) {
   const [name,setName]=useState('')
   const [gender,setGender]=useState('')
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderRadius:20,padding:32,width:360,boxShadow:'var(--shadow-lg)'}}>
+    <div style={{position:'fixed',inset:0,...glassOverlay,display:'flex',alignItems:'center',justifyContent:'center',zIndex:200}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} className="reveal" style={{...glassModal,padding:32,width:360}}>
         <h2 style={{fontSize:20,fontWeight:700,letterSpacing:'-0.4px',marginBottom:20}}>New Influencer</h2>
         <label style={{display:'block',marginBottom:16}}><FL>Name</FL><FI value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Luna Rose"/></label>
         <div style={{marginBottom:28}}><FL>Gender</FL><GenderButtons value={gender} onChange={setGender}/></div>
         <div style={{display:'flex',gap:10}}>
-          <button onClick={onClose} style={{flex:1,padding:10,borderRadius:8,border:'1.5px solid var(--border)',fontSize:14,fontWeight:500,color:'var(--text-secondary)',background:'transparent'}}>Cancel</button>
-          <button disabled={!name.trim()} onClick={()=>onSave(name.trim(),gender)}
-            style={{flex:1,padding:10,borderRadius:8,background:name.trim()?'linear-gradient(135deg,#EC4899,#8B5CF6)':'var(--border)',color:name.trim()?'#fff':'var(--text-tertiary)',fontSize:14,fontWeight:600,boxShadow:name.trim()?'0 2px 12px rgba(139,92,246,0.3)':'none',transition:'all 0.15s'}}>Create</button>
+          <button onClick={onClose} className="liquid-press" style={{flex:1,padding:10,borderRadius:999,border:'1px solid var(--glass-border)',boxShadow:'inset 0 1px 0 var(--glass-highlight)',fontSize:14,fontWeight:500,color:'var(--text-secondary)',background:'var(--bg-secondary)'}}>Cancel</button>
+          <button disabled={!name.trim()} onClick={()=>onSave(name.trim(),gender)} className="liquid-press"
+            style={{flex:1,padding:10,borderRadius:999,background:name.trim()?'var(--brand)':'var(--bg-tertiary)',color:name.trim()?'var(--brand-ink)':'var(--text-tertiary)',fontSize:14,fontWeight:800,border:name.trim()?'1px solid rgba(255,255,255,0.35)':'1px solid var(--glass-border)',boxShadow:name.trim()?'inset 0 1px 0 rgba(255,255,255,0.55), var(--glow-brand)':'inset 0 1px 0 var(--glass-highlight)',transition:'background 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid), transform 0.5s var(--ease-jelly)'}}>Create</button>
         </div>
       </div>
     </div>
@@ -2567,33 +2582,38 @@ function NewModal({ onClose, onSave }) {
 function Sec({ children, style }) {
   return (
     <div
-      style={{background:'var(--surface)',borderRadius:'var(--radius-lg)',padding:20,boxShadow:'var(--shadow-sm)',border:'1px solid var(--border-subtle)',transition:'box-shadow 0.2s',...style}}
-      onMouseEnter={e=>{e.currentTarget.style.boxShadow='var(--shadow-md)'}}
-      onMouseLeave={e=>{e.currentTarget.style.boxShadow='var(--shadow-sm)'}}
+      style={{...glassPanel,padding:20,transition:'box-shadow 0.45s var(--ease-liquid)',...style}}
+      onMouseEnter={e=>{e.currentTarget.style.boxShadow='inset 0 1px 0 var(--glass-highlight), var(--shadow-md), var(--glow-brand)'}}
+      onMouseLeave={e=>{e.currentTarget.style.boxShadow=glassPanel.boxShadow}}
     >{children}</div>
   )
 }
 
 // ─────────────────────────────────────────────
 // Detail tabs with palette-tinted active state
-const DETAIL_TABS = ['Overview','Scripts','Wardrobe','Home','Brand Deals','History']
+/**
+ * The studio's navigation, flat and in work order.
+ *
+ * Replaces DETAIL_TABS + the studioTab pill group. The old shape was a three-item pill row
+ * (Profile / Photos / Videos) where only Profile had children - six underline sub-tabs - so
+ * one branch carried six destinations and the other two carried none. It also buried the
+ * library (then "History") at the last position of the nested level, which meant the work
+ * you actually came to look at was the hardest thing on the page to reach.
+ *
+ * Order here is the real workflow: see what you have, make more, then dress/stage/sell it.
+ * `count` surfaces how much exists behind each view so the nav doubles as a status readout.
+ */
+const VIEWS = [
+  { key:'library',  label:'Library',  count: i => (i?.generationHistory||[]).length },
+  { key:'photos',   label:'Photos' },
+  { key:'videos',   label:'Videos' },
+  { key:'wardrobe', label:'Wardrobe', count: i => (i?.wardrobeSlots||[]).filter(s=>s?.image).length },
+  { key:'spaces',   label:'Spaces',   count: i => (i?.homeSlots||[]).filter(s=>s?.image).length },
+  { key:'deals',    label:'Deals',    count: i => (i?.brandDeals||[]).length },
+  { key:'scripts',  label:'Scripts',  count: i => (i?.scripts||[]).length },
+  { key:'identity', label:'Identity' },
+]
 
-function Tabs({ active, onChange, ac }) {
-  const tc = accentText(ac)
-  return (
-    <div style={{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}}>
-      {DETAIL_TABS.map(tab=>(
-        <button key={tab} onClick={()=>onChange(tab)} style={{
-          padding:'7px 16px',borderRadius:8,fontSize:13,fontWeight:500,
-          background: active===tab ? ac : 'var(--bg-tertiary)',
-          color: active===tab ? tc : 'var(--text-secondary)',
-          border: `1.5px solid ${active===tab ? ac+'55' : 'transparent'}`,
-          transition:'all 0.18s',
-        }}>{tab}</button>
-      ))}
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────
 // Content Studio helpers
@@ -2735,19 +2755,22 @@ const VIBE_META = {
   'Confident': 'Grounded and sure — zero doubt, pure presence.',
 }
 
+// Phase 10 remix: ledger-style step header — tabular "01"-style index + eyebrow rule
+// instead of the ancestor repo's numbered lime circles.
 function CSStepHeader({ n, title, sub }) {
   return (
-    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
-      <div style={{
-        width:22,height:22,borderRadius:'50%',flexShrink:0,
-        background:'linear-gradient(135deg,#EC4899,#8B5CF6)',
-        color:'#fff',fontSize:11,fontWeight:800,
-        display:'flex',alignItems:'center',justifyContent:'center',
-      }}>{n}</div>
-      <div>
-        <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',lineHeight:1.2}}>{title}</div>
-        {sub && <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>{sub}</div>}
+    <div style={{marginBottom:14}}>
+      <div style={{display:'flex',alignItems:'center',gap:9,minWidth:0}}>
+        <span style={{
+          fontSize:10,fontWeight:800,fontVariantNumeric:'tabular-nums',letterSpacing:'1px',
+          color:'var(--brand)',background:'rgba(199,242,78,0.10)',
+          border:'1px solid rgba(199,242,78,0.30)',borderRadius:'3px 8px 8px 8px',
+          padding:'2px 7px',flexShrink:0,lineHeight:1.5,
+        }}>{String(n).padStart(2,'0')}</span>
+        <span style={{fontSize:12,fontWeight:800,letterSpacing:'1.2px',textTransform:'uppercase',color:'var(--text-primary)',whiteSpace:'nowrap'}}>{title}</span>
+        <span aria-hidden="true" style={{flex:1,height:1,minWidth:16,background:'var(--glass-border)'}}/>
       </div>
+      {sub && <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:5,paddingLeft:2}}>{sub}</div>}
     </div>
   )
 }
@@ -2762,9 +2785,9 @@ function CSChips({ options, value, onChange }) {
         return (
           <button key={key} onClick={()=>onChange(on ? '' : key)} style={{
             padding:'7px 14px',borderRadius:980,fontSize:12,fontWeight:600,
-            background: on ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-            color: on ? '#8B5CF6' : 'var(--text-secondary)',
-            border: on ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+            background: on ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+            color: on ? 'var(--brand)' : 'var(--text-secondary)',
+            border: on ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
             transition:'all 0.15s',
           }}>{label}</button>
         )
@@ -2804,8 +2827,8 @@ function CSProductSlot({ value, onChange, dragOver, setDragOver, fileRef, label 
           onDrop={e=>{e.preventDefault();setDragOver(false);const f=e.dataTransfer.files[0];if(f)handleFile(f)}}
           style={{
             width:size,height:size,borderRadius:14,cursor:'pointer',
-            border: dragOver ? '2px solid #8B5CF6' : '1.5px dashed var(--border)',
-            background: dragOver ? 'rgba(139,92,246,0.07)' : 'var(--bg-tertiary)',
+            border: dragOver ? '2px solid var(--brand)' : '1.5px dashed var(--border)',
+            background: dragOver ? 'rgba(199,242,78,0.07)' : 'var(--bg-tertiary)',
             display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:6,
             transition:'all 0.15s',
           }}
@@ -3113,19 +3136,19 @@ function WardrobeChipWithHover({ slot, active, onClick }) {
         style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flexShrink: 0 }}
       >
         <div style={{
-          width: 64, height: 86, borderRadius: 10, overflow: 'hidden',
-          border: `2px solid ${active ? '#8B5CF6' : 'var(--border)'}`,
-          boxShadow: active ? '0 0 0 2px rgba(139,92,246,0.25)' : 'none',
+          width: 64, height: 86, borderRadius: 'var(--radius-sm)', overflow: 'hidden',
+          border: `2px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+          boxShadow: active ? '0 0 0 2px rgba(199,242,78,0.25)' : 'none',
           background: slot.image ? 'transparent' : 'var(--bg-tertiary)',
           transition: 'border-color 0.15s, box-shadow 0.15s',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {slot.image
-            ? <img src={slot.image} alt={slot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+            ? <SmartImage src={slot.image} alt={slot.name} fallbackLabel={slot.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
             : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" opacity="0.5"><circle cx="12" cy="8" r="3"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
           }
         </div>
-        <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? '#8B5CF6' : 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.2, minHeight: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? 'var(--brand)' : 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.2, minHeight: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
           {slot.name}
         </span>
       </button>
@@ -3137,12 +3160,14 @@ function WardrobeChipWithHover({ slot, active, onClick }) {
           style={{
             position: 'fixed', zIndex: 99999,
             left: popup.left, top: popup.top, width: popup.width,
-            borderRadius: 10, overflow: 'hidden',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.07)',
-            background: 'var(--surface)',
+            borderRadius: 'var(--radius-md)', overflow: 'hidden',
+            boxShadow: 'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)',
+            background: 'var(--glass-bg-strong)',
+            backdropFilter: 'blur(var(--blur-md)) saturate(1.7)', WebkitBackdropFilter: 'blur(var(--blur-md)) saturate(1.7)',
+            border: '1px solid var(--glass-border)',
           }}
         >
-          <img src={slot.image} alt={slot.name} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
+          <SmartImage src={slot.image} alt={slot.name} fallbackLabel={slot.name} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
           <div style={{ padding: '5px 8px', fontSize: 10, fontWeight: 600, color: 'var(--text-primary)' }}>{slot.name}</div>
         </div>,
         document.body
@@ -3258,29 +3283,26 @@ function MediaLightbox({ entry, onClose, onDownload, onReuse, onDelete, initialT
             </div>
           </div>
         ) : (
-          <img src={entry.url} alt={entry.label}
+          <SmartImage src={entry.url} alt={entry.label} fallbackLabel={entry.label}
             style={{width:'100%', display:'block', objectFit:'contain', maxHeight:'80vh'}}/>
         )}
-        <div style={{padding:'10px 12px', display:'flex', gap:8, background:'var(--surface)'}}>
+        <div style={{padding:'10px 12px', display:'flex', gap:8, background:'var(--glass-bg-strong)', backdropFilter:'blur(var(--blur-md)) saturate(1.7)', WebkitBackdropFilter:'blur(var(--blur-md)) saturate(1.7)', boxShadow:'inset 0 1px 0 var(--glass-highlight)'}}>
           {onDownload && (
-            <button onClick={e=>{e.stopPropagation(); onDownload()}} style={{
-              flex:1, padding:'9px', borderRadius:10, fontSize:12, fontWeight:700,
-              border:'none', cursor:'pointer', fontFamily:'inherit',
-              background:'linear-gradient(135deg,#EC4899,#8B5CF6)', color:'#fff',
+            <button onClick={e=>{e.stopPropagation(); onDownload()}} className="liquid-press" style={{
+              ...glassBtnPrimary,
+              flex:1, padding:'9px', fontSize:12, fontWeight:700,
             }}>Download</button>
           )}
           {onReuse && (
-            <button onClick={e=>{e.stopPropagation(); onReuse()}} style={{
-              flex:1, padding:'9px', borderRadius:10, fontSize:12, fontWeight:700,
-              border:'none', cursor:'pointer', fontFamily:'inherit',
-              background:'rgba(139,92,246,0.12)', color:'#8B5CF6',
+            <button onClick={e=>{e.stopPropagation(); onReuse()}} className="liquid-press" style={{
+              ...glassBtnGhost,
+              flex:1, padding:'9px', fontSize:12, fontWeight:700, color:'var(--brand)',
             }}>↺ Reuse</button>
           )}
           {onDelete && (
-            <button onClick={e=>{e.stopPropagation(); onDelete(); onClose()}} style={{
-              flex:1, padding:'9px', borderRadius:10, fontSize:12, fontWeight:600,
-              border:'none', cursor:'pointer', fontFamily:'inherit',
-              background:'rgba(255,59,48,0.08)', color:'#FF3B30',
+            <button onClick={e=>{e.stopPropagation(); onDelete(); onClose()}} className="liquid-press" style={{
+              ...glassBtnGhost,
+              flex:1, padding:'9px', fontSize:12, fontWeight:600, color:'#FF3B30',
             }}>Delete</button>
           )}
         </div>
@@ -3326,12 +3348,25 @@ function HistoryCard({ entry, onDelete, onDownload, isSelected, onSelect, showSe
 
   return (
     <>
+      {/* role+tabIndex rather than a bare div: Library is the view the studio opens on, and
+          this card was the only way into a generation — so the grid of everything the user
+          has made was unreachable by keyboard and announced as nothing. It stays a div
+          because it contains its own buttons (download/delete/select), and a <button> may
+          not nest interactive children. */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={`${isVideo ? 'Video' : 'Image'}${entry.label ? `: ${entry.label}` : ''} — open`}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
+        onFocus={handleEnter}
+        onBlur={handleLeave}
         onClick={() => openLightbox()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLightbox() }
+        }}
         style={{
-          position:'relative', borderRadius:10, overflow:'hidden', background:'var(--bg-tertiary)',
+          position:'relative', borderRadius:'var(--radius-sm)', overflow:'hidden', background:'var(--bg-tertiary)',
           outline: isSelected ? '2px solid var(--accent)' : 'none',
           outlineOffset: -2,
           cursor: 'pointer',
@@ -3341,21 +3376,25 @@ function HistoryCard({ entry, onDelete, onDownload, isSelected, onSelect, showSe
           zIndex: hovered ? 10 : 1,
         }}>
         <div style={{position:'relative', width:'100%', aspectRatio: isVideo ? '9/16' : '3/4', overflow:'hidden'}}>
+          {/* Smart* rather than bare img/video: a dead URL used to render the browser's
+              broken-image box permanently, with no retry and nothing explaining it. */}
           {isVideo
-            ? <video ref={videoRef} src={entry.url} preload="metadata" muted playsInline
+            ? <SmartVideo videoRef={videoRef} src={entry.url} preload="metadata" muted playsInline
+                fallbackLabel={entry.label || 'Video unavailable'}
                 style={{width:'100%', height:'100%', objectFit:'cover', display:'block'}}/>
-            : <img src={entry.url} alt={entry.label}
+            : <SmartImage src={thumbUrl(entry.url, 600)} alt={entry.label}
+                fallbackLabel={entry.label || 'Image unavailable'}
                 style={{width:'100%', height:'100%', objectFit:'cover', display:'block'}}/>
           }
           {isVideo && !hovered && (
             <div style={{position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.22)', pointerEvents:'none'}}>
-              <div style={{width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,#EC4899,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, paddingLeft:3, color:'#fff', boxShadow:'0 2px 10px rgba(139,92,246,0.5)'}}>▶</div>
+              <div style={{width:34, height:34, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, paddingLeft:3, color:'var(--brand-ink)', boxShadow:'0 2px 10px rgba(199,242,78,0.5)'}}>▶</div>
             </div>
           )}
           {!isVideo && hovered && (
             <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.28)',pointerEvents:'none',transition:'opacity 0.15s'}}>
               <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
-                <div style={{width:36,height:36,borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 10px rgba(139,92,246,0.5)'}}>
+                <div style={{width:36,height:36,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 10px rgba(199,242,78,0.5)'}}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                 </div>
                 <button
@@ -3464,6 +3503,7 @@ function HistoryTab({ influencer, onUpdate, onReuseSettings }) {
         const all = JSON.parse(localStorage.getItem(PHOTO_STUDIO_HISTORY_KEY) || '[]')
         const next = all.filter(h => h.url !== entry.url || h.createdAt !== entry.createdAt)
         localStorage.setItem(PHOTO_STUDIO_HISTORY_KEY, JSON.stringify(next))
+        window.dispatchEvent(new CustomEvent('photo_studio_history_updated'))
         setPhotoEntries(next.filter(h => h.influencerId === influencer.id))
       } catch {}
     } else {
@@ -3479,6 +3519,7 @@ function HistoryTab({ influencer, onUpdate, onReuseSettings }) {
         const all = JSON.parse(localStorage.getItem(PHOTO_STUDIO_HISTORY_KEY) || '[]')
         const next = all.filter(h => !(h.influencerId === influencer.id && keys.has(h.url)))
         localStorage.setItem(PHOTO_STUDIO_HISTORY_KEY, JSON.stringify(next))
+        window.dispatchEvent(new CustomEvent('photo_studio_history_updated'))
         setPhotoEntries(next.filter(h => h.influencerId === influencer.id))
       } catch {}
     } else {
@@ -3540,14 +3581,14 @@ function HistoryTab({ influencer, onUpdate, onReuseSettings }) {
     <>
       {/* Segment switcher */}
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:18,flexWrap:'wrap'}}>
-        <div style={{display:'flex',gap:0,background:'var(--bg-tertiary)',borderRadius:10,padding:3}}>
+        <div style={{display:'flex',gap:0,background:'var(--bg-tertiary)',borderRadius:'var(--radius-sm)',padding:3}}>
           {[['photos','📸 Photos'],['videos','🎬 Videos']].map(([s,label])=>(
-            <button key={s} onClick={()=>{setSegment(s);setSelected(new Set())}} style={{
-              padding:'7px 18px',borderRadius:8,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',fontFamily:'inherit',
-              background: segment===s ? 'var(--surface)' : 'transparent',
+            <button key={s} onClick={()=>{setSegment(s);setSelected(new Set())}} className="liquid-press" style={{
+              padding:'7px 18px',borderRadius:'var(--radius-sm)',fontSize:13,fontWeight:600,border:'none',cursor:'pointer',fontFamily:'inherit',
+              background: segment===s ? 'var(--glass-bg-strong)' : 'transparent',
               color: segment===s ? 'var(--text-primary)' : 'var(--text-tertiary)',
-              boxShadow: segment===s ? '0 1px 6px rgba(0,0,0,0.10),0 0 0 1px var(--border-subtle)' : 'none',
-              transition:'all 0.15s',
+              boxShadow: segment===s ? 'inset 0 1px 0 var(--glass-highlight), var(--shadow-sm)' : 'none',
+              transition:'background 0.45s var(--ease-liquid), color 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid)',
             }}>{label}</button>
           ))}
         </div>
@@ -3556,15 +3597,15 @@ function HistoryTab({ influencer, onUpdate, onReuseSettings }) {
         {selecting && (<>
           <span style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)',marginLeft:4}}>{selected.size} selected</span>
           <button onClick={downloadSelected} style={{
-            padding:'5px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',fontFamily:'inherit',
+            padding:'5px 12px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',fontFamily:'inherit',
             background:'var(--bg-tertiary)',color:'var(--text-secondary)',
           }}>↓ Download</button>
           <button onClick={deleteSelected} style={{
-            padding:'5px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',fontFamily:'inherit',
+            padding:'5px 12px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:600,border:'none',cursor:'pointer',fontFamily:'inherit',
             background:'rgba(255,59,48,0.1)',color:'#FF3B30',
           }}>Delete</button>
           <button onClick={()=>setSelected(new Set())} style={{
-            padding:'5px 8px',borderRadius:8,fontSize:12,fontWeight:500,border:'none',cursor:'pointer',fontFamily:'inherit',
+            padding:'5px 8px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:500,border:'none',cursor:'pointer',fontFamily:'inherit',
             background:'transparent',color:'var(--text-tertiary)',
           }}>Cancel</button>
         </>)}
@@ -3685,18 +3726,18 @@ function VideoStripThumb({ entry, onReuse, onDelete, isSelected, onToggle }) {
         onClick={e => { if (onToggle) { onToggle(); } else { openLightbox() } }}
         onDoubleClick={() => openLightbox()}
         style={{ flexShrink:0, width:60, borderRadius:9, overflow:'hidden', cursor:'pointer', position:'relative',
-          outline: isSelected ? '2.5px solid #8B5CF6' : hovered ? '2px solid rgba(139,92,246,0.4)' : '2px solid transparent',
+          outline: isSelected ? '2.5px solid var(--brand)' : hovered ? '2px solid rgba(199,242,78,0.4)' : '2px solid transparent',
         }}>
         {isSelected && (
-          <div style={{position:'absolute',top:4,left:4,zIndex:2,width:16,height:16,borderRadius:'50%',background:'#8B5CF6',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>
+          <div style={{position:'absolute',top:4,left:4,zIndex:2,width:16,height:16,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 1px 4px rgba(0,0,0,0.4)'}}>
             <svg width="9" height="9" viewBox="0 0 10 8" fill="none"><polyline points="1,4 4,7 9,1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
         )}
         <video src={entry.url} preload="metadata" muted playsInline style={{width:'100%',height:90,objectFit:'cover',display:'block'}}/>
-        <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background: isSelected ? 'rgba(139,92,246,0.18)' : 'rgba(0,0,0,0.18)'}}>
-          <div style={{width:22,height:22,borderRadius:'50%',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'#fff',boxShadow:'0 2px 8px rgba(139,92,246,0.45)'}}>▶</div>
+        <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background: isSelected ? 'rgba(199,242,78,0.18)' : 'rgba(0,0,0,0.18)'}}>
+          <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'var(--brand-ink)',boxShadow:'0 2px 8px rgba(199,242,78,0.45)'}}>▶</div>
         </div>
-        <div style={{padding:'4px 6px',fontSize:9,color:'var(--text-tertiary)',fontWeight:500,background:'var(--surface)'}}>
+        <div style={{padding:'4px 6px',fontSize:9,color:'var(--text-tertiary)',fontWeight:500,background:'var(--glass-bg-strong)',backdropFilter:'blur(var(--blur-sm))',WebkitBackdropFilter:'blur(var(--blur-sm))'}}>
           {new Date(entry.date).toLocaleDateString([],{month:'short',day:'numeric'})}
         </div>
       </div>
@@ -3709,9 +3750,9 @@ function VideoStripThumb({ entry, onReuse, onDelete, isSelected, onToggle }) {
           style={{
             position:'fixed', zIndex:9998,
             left:popup.left, top:popup.top, width:popup.width,
-            borderRadius:16, overflow:'hidden',
-            boxShadow:'0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08)',
-            background:'var(--surface)', cursor:'pointer',
+            borderRadius:'var(--radius-lg)', overflow:'hidden',
+            boxShadow:'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)',
+            background:'var(--glass-bg-strong)', backdropFilter:'blur(var(--blur-lg)) saturate(1.7)', WebkitBackdropFilter:'blur(var(--blur-lg)) saturate(1.7)', cursor:'pointer',
           }}>
           <div style={{position:'relative'}}>
             <video ref={popupVideoRef} src={entry.url} muted playsInline
@@ -3727,12 +3768,12 @@ function VideoStripThumb({ entry, onReuse, onDelete, isSelected, onToggle }) {
           }</button>
           </div>
           <div style={{padding:'7px 8px', display:'flex', gap:5}}>
-            <button onClick={download} title="Download" style={{flex:1,padding:'6px 0',borderRadius:8,fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff'}}>↓</button>
+            <button onClick={download} title="Download" style={{flex:1,padding:'6px 0',borderRadius:'var(--radius-sm)',fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'var(--brand)',color:'var(--brand-ink)'}}>↓</button>
             {onReuse && (
-              <button onClick={e=>{e.stopPropagation(); onReuse(entry); clearPopup(); if(_clearActiveStripPopup===clearPopup) _clearActiveStripPopup=null}} title="Reuse settings" style={{flex:1,padding:'6px 0',borderRadius:8,fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'rgba(139,92,246,0.12)',color:'#8B5CF6'}}>↺</button>
+              <button onClick={e=>{e.stopPropagation(); onReuse(entry); clearPopup(); if(_clearActiveStripPopup===clearPopup) _clearActiveStripPopup=null}} title="Reuse settings" style={{flex:1,padding:'6px 0',borderRadius:'var(--radius-sm)',fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'rgba(199,242,78,0.12)',color:'var(--brand)'}}>↺</button>
             )}
             {onDelete && (
-              <button onClick={e=>{e.stopPropagation(); onDelete(); clearPopup(); if(_clearActiveStripPopup===clearPopup) _clearActiveStripPopup=null}} title="Delete" style={{flex:1,padding:'6px 0',borderRadius:8,fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'rgba(255,59,48,0.08)',color:'#FF3B30'}}>×</button>
+              <button onClick={e=>{e.stopPropagation(); onDelete(); clearPopup(); if(_clearActiveStripPopup===clearPopup) _clearActiveStripPopup=null}} title="Delete" style={{flex:1,padding:'6px 0',borderRadius:'var(--radius-sm)',fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'rgba(255,59,48,0.08)',color:'#FF3B30'}}>×</button>
             )}
           </div>
         </div>
@@ -3753,7 +3794,7 @@ function VideoStripThumb({ entry, onReuse, onDelete, isSelected, onToggle }) {
   )
 }
 
-function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, restoreKey = 0, pendingStartFrame = null, onStartFrameConsumed }) {
+function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, restoreKey = 0, pendingStartFrame = null, onStartFrameConsumed, isActiveView = true }) {
   const allImages = [
     { key: 'mainImage',          label: 'Main',          url: influencer.mainImage },
     { key: 'characterSheetImage',label: 'Character Sheet',url: influencer.characterSheetImage },
@@ -3901,7 +3942,14 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
   const [selectedHomeId, setSelectedHomeId] = useState(() => { try { return localStorage.getItem(`hf_home_id_${influencer.id}`) || '' } catch { return '' } })
   const homeSlots = (influencer.homeSlots || []).filter(s => s.image)
   const selectedHome = homeSlots.find(s => s.id === selectedHomeId) || null
-  const videoModel = 'seedance_2_0'
+  const [videoModel, setVideoModel] = useState(() => {
+    try {
+      const saved = localStorage.getItem('hf_video_model')
+      // Default = the budget tier; seedance_2_0 is now the REAL (expensive) Seedance 2,
+      // so existing un-picked sessions shouldn't silently land on the 150-credit model.
+      return VIDEO_MODELS.some(m => m.id === saved) ? saved : 'seedance_lite'
+    } catch { return 'seedance_lite' }
+  })
 
   // Reset wardrobe drawer state when the active influencer changes
   useEffect(() => {
@@ -3993,8 +4041,18 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
     }
   }, [generating])
 
-  // Cmd+Enter to generate
+  // Cmd+Enter to generate — only while the Videos view is the one on screen.
+  //
+  // ContentStudio is never unmounted; the view switcher hides it with display:none so a
+  // running job survives navigation. That meant this window-level listener stayed armed in
+  // Library, Photos, Wardrobe, Deals, Scripts and Identity — and ⌘↵ in the *Photos* studio,
+  // where the muscle memory is to submit that form, silently started a paid video render.
+  // The missing dependency array also re-bound the listener on every render.
+  // No dependency array on purpose: `canAct` and `generate` are declared further down this
+  // component, so naming them here would evaluate them in the temporal dead zone. Rebinding
+  // each render keeps the closure fresh and costs one addEventListener on window.
   useEffect(() => {
+    if (!isActiveView) return undefined
     function onKey(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canAct && !generating) {
         e.preventDefault()
@@ -4501,6 +4559,27 @@ ${shotsWithBeats.join('\n\n')}`
 
   const canAct = startFrameUrl || dialogue.trim() || environment || vibe
 
+  // What this click costs, at the point of commitment.
+  //
+  // The per-clip figure was already on the model chip, but every multiplier lived in a
+  // different sub-block, so the user was doing the arithmetic — and "Generate 3 Videos"
+  // against a chip reading "~200 cr" is off by 3x before resolution is considered.
+  //
+  // worker/src/lib/priceBook.js stays authoritative. This mirrors only the two factors the
+  // client can know for certain: base x clip count, and Seedance 2's documented 1080p
+  // uplift (quote() line 99). Per-model extra-second rates are DB rows the client never
+  // sees, so this deliberately reads low and says "~" rather than inventing a number.
+  const activeVideoModel = VIDEO_MODELS.find(m => m.id === videoModel) || VIDEO_MODELS[0]
+  const costEstimate = Math.ceil(
+    activeVideoModel.cost * outputs *
+    (activeVideoModel.id === 'seedance_2_0' && String(resolution).includes('1080') ? 2.25 : 1)
+  )
+  // Warn on a shortfall, but never disable: `bal` can be stale or still loading, and a
+  // wrong local number must not be what stops a paying user from generating. The server
+  // rejects an genuinely underfunded job anyway.
+  const { bal: creditBalance } = useCredits()
+  const shortfall = typeof creditBalance === 'number' && creditBalance < costEstimate
+
   function doVideoRandomize() {
     const vibeOpts = CS_VIBES
     const envKeys  = Object.keys(CS_ENV_PRESETS)
@@ -4543,14 +4622,14 @@ ${shotsWithBeats.join('\n\n')}`
       {/* Influencer reference banner — hidden in start-frame mode */}
       {allImages.length > 0 && !startFrameUrl ? (
         <div style={{
-          display:'flex',alignItems:'center',gap:10,padding:'9px 13px',borderRadius:10,
-          background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.15)',
+          display:'flex',alignItems:'center',gap:10,padding:'9px 13px',borderRadius:'var(--radius-sm)',
+          background:'rgba(199,242,78,0.06)',border:'1px solid rgba(199,242,78,0.15)',
         }}>
           <div style={{display:'flex'}}>
             {allImages.slice(0,3).map((img,i)=>(
-              <img key={img.key} src={img.url} style={{
+              <img key={img.key} src={thumbUrl(img.url, 80)} style={{
                 width:26,height:26,borderRadius:'50%',objectFit:'cover',
-                border:'2px solid var(--surface)',marginLeft:i>0?-8:0,flexShrink:0,
+                border:'2px solid var(--glass-bg-strong)',marginLeft:i>0?-8:0,flexShrink:0,
               }}/>
             ))}
           </div>
@@ -4571,8 +4650,8 @@ ${shotsWithBeats.join('\n\n')}`
               {refTip && (
                 <div style={{
                   position:'absolute',top:'calc(100% + 8px)',right:0,
-                  zIndex:999,background:'var(--surface)',border:'1px solid var(--border)',
-                  borderRadius:12,padding:'12px 12px 10px',boxShadow:'0 8px 28px rgba(0,0,0,0.4)',
+                  zIndex:999,background:'var(--glass-bg-strong)',backdropFilter:'blur(var(--blur-lg)) saturate(1.7)',WebkitBackdropFilter:'blur(var(--blur-lg)) saturate(1.7)',border:'1px solid var(--glass-border)',
+                  borderRadius:'var(--radius-lg)',padding:'12px 12px 10px',boxShadow:'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)',
                   pointerEvents:'none',
                 }}>
                   <div style={{fontSize:10,fontWeight:700,color:'var(--text-primary)',marginBottom:10,whiteSpace:'nowrap'}}>Reference images</div>
@@ -4584,7 +4663,7 @@ ${shotsWithBeats.join('\n\n')}`
                       {key:'closeUpImage2',      label:'Feature Sheet',   url:influencer.closeUpImage2},
                     ].filter(img=>img.url).map(img=>(
                       <div key={img.key} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
-                        <img src={img.url} alt={img.label} style={{
+                        <img src={thumbUrl(img.url, 160)} alt={img.label} style={{
                           width:54,height:76,objectFit:'cover',objectPosition:'top',
                           borderRadius:7,border:'1px solid var(--border)',flexShrink:0,
                         }}/>
@@ -4594,8 +4673,8 @@ ${shotsWithBeats.join('\n\n')}`
                   </div>
                   <div style={{
                     position:'absolute',top:-5,right:6,transform:'rotate(45deg)',
-                    width:9,height:9,background:'var(--surface)',
-                    border:'1px solid var(--border)',borderBottom:'none',borderRight:'none',
+                    width:9,height:9,background:'var(--glass-bg-strong)',
+                    border:'1px solid var(--glass-border)',borderBottom:'none',borderRight:'none',
                   }}/>
                 </div>
               )}
@@ -4632,13 +4711,13 @@ ${shotsWithBeats.join('\n\n')}`
 
       {/* Start frame */}
       {startFrameUrl && (
-        <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:10,background:'rgba(236,72,153,0.06)',border:'1px solid rgba(236,72,153,0.2)'}}>
-          <img src={startFrameUrl} alt="Start frame" style={{width:36,height:48,objectFit:'cover',objectPosition:'top',borderRadius:6,border:'1px solid rgba(236,72,153,0.3)',flexShrink:0}}/>
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',borderRadius:'var(--radius-sm)',background:'rgba(199,242,78,0.06)',border:'1px solid rgba(199,242,78,0.2)'}}>
+          <img src={startFrameUrl} alt="Start frame" style={{width:36,height:48,objectFit:'cover',objectPosition:'top',borderRadius:6,border:'1px solid rgba(199,242,78,0.3)',flexShrink:0}}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:11,fontWeight:700,color:'#EC4899',marginBottom:2}}>Start Frame</div>
             <div style={{fontSize:11,color:'var(--text-tertiary)'}}>Video begins from this photo</div>
           </div>
-          <button onClick={clearStartFrame} style={{width:24,height:24,borderRadius:'50%',border:'none',background:'rgba(236,72,153,0.12)',color:'#EC4899',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>×</button>
+          <button onClick={clearStartFrame} style={{width:24,height:24,borderRadius:'50%',border:'none',background:'rgba(199,242,78,0.12)',color:'#EC4899',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>×</button>
         </div>
       )}
 
@@ -4647,7 +4726,7 @@ ${shotsWithBeats.join('\n\n')}`
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
           {history.map((h,i)=>(
             <button key={i} onClick={()=>restoreHistory(h)} style={{
-              textAlign:'left',padding:'10px 12px',borderRadius:10,width:'100%',
+              textAlign:'left',padding:'10px 12px',borderRadius:'var(--radius-sm)',width:'100%',
               background:'var(--bg-tertiary)',border:'1.5px solid var(--border)',
               transition:'border-color 0.15s',
             }}>
@@ -4666,7 +4745,7 @@ ${shotsWithBeats.join('\n\n')}`
                 {[h.camera, h.vibe, `${h.duration}s`, h.aspect, h.shotMode==='oner'?'1 shot':'multi'].filter(Boolean).map(tag=>(
                   <span key={tag} style={{
                     padding:'2px 8px',borderRadius:980,fontSize:10,fontWeight:600,
-                    background:'rgba(139,92,246,0.08)',color:'var(--text-secondary)',
+                    background:'rgba(199,242,78,0.08)',color:'var(--text-secondary)',
                   }}>{tag}</span>
                 ))}
               </div>
@@ -4677,14 +4756,23 @@ ${shotsWithBeats.join('\n\n')}`
 
       {/* Step 1: Script */}
       <Sec>
-        <CSStepHeader n={1} title="Script" sub={`What should ${influencer.name} say?`}/>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <CSStepHeader n={1} title="Script" sub={`What should ${influencer.name} say?`}/>
+          <AIAssist
+            purpose="script"
+            title="Write a line with AI"
+            context={{ influencer }}
+            draft={dialogue}
+            onAccept={setDialogue}
+          />
+        </div>
         <textarea
           value={dialogue}
           onChange={e => setDialogue(e.target.value)}
           placeholder={`Write what ${influencer.name} should say...`}
           rows={4}
           style={{
-            width:'100%',padding:'12px 14px',borderRadius:10,
+            width:'100%',padding:'12px 14px',borderRadius:'var(--radius-sm)',
             border:'1.5px solid var(--border)',background:'var(--bg)',
             fontSize:14,color:'var(--text-primary)',resize:'vertical',
             lineHeight:1.65,boxSizing:'border-box',fontFamily:'inherit',
@@ -4722,10 +4810,10 @@ ${shotsWithBeats.join('\n\n')}`
               const active = opt === 'Worn' ? productWorn : !productWorn
               return (
                 <button key={opt} onClick={()=>{const w=opt==='Worn';setProductWorn(w);localStorage.setItem('hf_product_worn',w?'1':'0')}} style={{
-                  padding:'5px 13px',borderRadius:8,fontSize:11,fontWeight:600,cursor:'pointer',
-                  background: active ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                  color: active ? '#8B5CF6' : 'var(--text-secondary)',
-                  border: active ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                  padding:'5px 13px',borderRadius:'var(--radius-sm)',fontSize:11,fontWeight:600,cursor:'pointer',
+                  background: active ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                  color: active ? 'var(--brand)' : 'var(--text-secondary)',
+                  border: active ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                   transition:'all 0.15s',
                 }}>{opt}</button>
               )
@@ -4769,8 +4857,8 @@ ${shotsWithBeats.join('\n\n')}`
                           return (
                             <button key={label} onClick={()=>setDealViewSheet(p=>({...p,[deal.id]:val}))} style={{
                               padding:'3px 7px',border:'none',cursor:'pointer',fontFamily:'inherit',fontWeight:700,fontSize:9,lineHeight:1.4,
-                              background: active ? 'linear-gradient(135deg,rgba(236,72,153,0.18),rgba(139,92,246,0.18))' : 'var(--bg-tertiary)',
-                              color: active ? '#8B5CF6' : 'var(--text-secondary)',
+                              background: active ? 'linear-gradient(135deg,rgba(199,242,78,0.18),rgba(199,242,78,0.18))' : 'var(--bg-tertiary)',
+                              color: active ? 'var(--brand)' : 'var(--text-secondary)',
                               transition:'all 0.12s',
                             }}>{label}</button>
                           )
@@ -4791,8 +4879,8 @@ ${shotsWithBeats.join('\n\n')}`
             left: dealPopup.left,
             top: dealPopup.top,
             zIndex:9999, pointerEvents:'none',
-            background:'var(--surface)',border:'1px solid var(--border)',
-            borderRadius:14,padding:12,boxShadow:'0 12px 40px rgba(0,0,0,0.5)',
+            background:'var(--glass-bg-strong)',backdropFilter:'blur(var(--blur-lg)) saturate(1.7)',WebkitBackdropFilter:'blur(var(--blur-lg)) saturate(1.7)',border:'1px solid var(--glass-border)',
+            borderRadius:'var(--radius-lg)',padding:12,boxShadow:'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)',
             display:'flex',flexDirection:'column',gap:8,alignItems:'center',
             width:260,
           }}>
@@ -4809,10 +4897,10 @@ ${shotsWithBeats.join('\n\n')}`
         onClick={() => setAdvanced(v => { const next = !v; try { localStorage.setItem('cs_advanced_open', next ? '1' : '0') } catch {} return next })}
         style={{
           display:'flex',alignItems:'center',justifyContent:'center',gap:8,
-          padding:'10px',borderRadius:10,fontSize:12,fontWeight:600,
-          background: advanced ? 'rgba(139,92,246,0.07)' : 'var(--bg-tertiary)',
-          color: advanced ? '#8B5CF6' : 'var(--text-secondary)',
-          border: advanced ? '1.5px solid rgba(139,92,246,0.3)' : '1.5px solid var(--border)',
+          padding:'10px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:600,
+          background: advanced ? 'rgba(199,242,78,0.07)' : 'var(--bg-tertiary)',
+          color: advanced ? 'var(--brand)' : 'var(--text-secondary)',
+          border: advanced ? '1.5px solid rgba(199,242,78,0.3)' : '1.5px solid var(--border)',
           cursor:'pointer',transition:'all 0.15s',
         }}
       >
@@ -4832,9 +4920,9 @@ ${shotsWithBeats.join('\n\n')}`
               return (
                 <button key={val} onClick={() => setVideoTimeOfDay(val)} style={{
                   padding:'7px 14px', borderRadius:980, fontSize:12, fontWeight:600,
-                  background: on ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                  color: on ? '#8B5CF6' : 'var(--text-secondary)',
-                  border: on ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                  background: on ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                  color: on ? 'var(--brand)' : 'var(--text-secondary)',
+                  border: on ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                   transition:'all 0.15s', cursor:'pointer', fontFamily:'inherit',
                 }}>{icon} {val.charAt(0).toUpperCase() + val.slice(1)}</button>
               )
@@ -4845,7 +4933,7 @@ ${shotsWithBeats.join('\n\n')}`
         {/* Wardrobe */}
         <Sec>
           <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:14}}>
-            <div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',marginTop:1}}>4</div>
+            <div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,background:'var(--brand)',color:'var(--brand-ink)',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',marginTop:1}}>4</div>
             <div style={{flex:1}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',lineHeight:1.2}}>Wardrobe</div>
@@ -4854,8 +4942,8 @@ ${shotsWithBeats.join('\n\n')}`
                   style={{
                     display:'flex',alignItems:'center',gap:4,flexShrink:0,
                     padding:'3px 9px',borderRadius:980,fontSize:11,fontWeight:600,
-                    border:'1px solid rgba(139,92,246,0.35)',background:'rgba(139,92,246,0.08)',
-                    color:'#8B5CF6',cursor:'pointer',fontFamily:'inherit',
+                    border:'1px solid rgba(199,242,78,0.35)',background:'rgba(199,242,78,0.08)',
+                    color:'var(--brand)',cursor:'pointer',fontFamily:'inherit',
                   }}
                 >
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -4866,7 +4954,7 @@ ${shotsWithBeats.join('\n\n')}`
             </div>
           </div>
           {startFrameUrl ? (
-            <div style={{fontSize:12,color:'var(--text-tertiary)',padding:'10px 12px',background:'var(--bg-tertiary)',borderRadius:10,lineHeight:1.5}}>
+            <div style={{fontSize:12,color:'var(--text-tertiary)',padding:'10px 12px',background:'var(--bg-tertiary)',borderRadius:'var(--radius-sm)',lineHeight:1.5}}>
               Not applicable — outfit is already set by the start frame.
             </div>
           ) : (
@@ -4892,7 +4980,7 @@ ${shotsWithBeats.join('\n\n')}`
         <Sec>
           <CSStepHeader n={5} title="Location" sub="Where is the scene? Pick a preset, use a home setting, or write your own."/>
           {startFrameUrl ? (
-            <div style={{fontSize:12,color:'var(--text-tertiary)',padding:'10px 12px',background:'var(--bg-tertiary)',borderRadius:10,lineHeight:1.5}}>
+            <div style={{fontSize:12,color:'var(--text-tertiary)',padding:'10px 12px',background:'var(--bg-tertiary)',borderRadius:'var(--radius-sm)',lineHeight:1.5}}>
               Not applicable — location is already set by the start frame.
             </div>
           ) : (<>
@@ -4906,9 +4994,9 @@ ${shotsWithBeats.join('\n\n')}`
                   onClick={() => { setSelectedHomeId(''); localStorage.setItem(`hf_home_id_${influencer.id}`, '') }}
                   style={{
                     padding:'7px 14px',borderRadius:980,fontSize:12,fontWeight:600,
-                    background: !selectedHomeId ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                    color: !selectedHomeId ? '#8B5CF6' : 'var(--text-secondary)',
-                    border: !selectedHomeId ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                    background: !selectedHomeId ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                    color: !selectedHomeId ? 'var(--brand)' : 'var(--text-secondary)',
+                    border: !selectedHomeId ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                     transition:'all 0.15s',
                   }}
                 >None</button>
@@ -4919,9 +5007,9 @@ ${shotsWithBeats.join('\n\n')}`
                       onClick={() => { setSelectedHomeId(s.id); localStorage.setItem(`hf_home_id_${influencer.id}`, s.id) }}
                       style={{
                         padding:'7px 14px',borderRadius:980,fontSize:12,fontWeight:600,
-                        background: on ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                        color: on ? '#8B5CF6' : 'var(--text-secondary)',
-                        border: on ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                        background: on ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                        color: on ? 'var(--brand)' : 'var(--text-secondary)',
+                        border: on ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                         transition:'all 0.15s',
                       }}
                     >{s.name}</button>
@@ -4929,8 +5017,8 @@ ${shotsWithBeats.join('\n\n')}`
                 })}
               </div>
               {selectedHome && (
-                <div style={{display:'flex',gap:12,alignItems:'center',padding:'10px 12px',background:'var(--bg-tertiary)',borderRadius:10,marginBottom:10}}>
-                  <img src={selectedHome.image} alt={selectedHome.name} style={{width:72,height:54,objectFit:'cover',borderRadius:8,flexShrink:0}}/>
+                <div style={{display:'flex',gap:12,alignItems:'center',padding:'10px 12px',background:'var(--bg-tertiary)',borderRadius:'var(--radius-sm)',marginBottom:10}}>
+                  <img src={selectedHome.image} alt={selectedHome.name} style={{width:72,height:54,objectFit:'cover',borderRadius:'var(--radius-sm)',flexShrink:0}}/>
                   <div>
                     <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)'}}>{selectedHome.name}</div>
                     <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>Sent as location reference · scene will be set in this environment</div>
@@ -4960,7 +5048,7 @@ ${shotsWithBeats.join('\n\n')}`
             }}
             placeholder="or type a custom location — e.g. In a Dubai mall"
             style={{
-              width:'100%',padding:'10px 12px',borderRadius:10,marginTop:10,
+              width:'100%',padding:'10px 12px',borderRadius:'var(--radius-sm)',marginTop:10,
               border:'1.5px solid var(--border)',background:'var(--bg)',
               fontSize:13,color:'var(--text-primary)',boxSizing:'border-box',fontFamily:'inherit',
             }}
@@ -4978,9 +5066,9 @@ ${shotsWithBeats.join('\n\n')}`
               return (
                 <button key={c} onClick={() => {setCamera(c);localStorage.setItem('hf_camera',c)}} style={{
                   padding:'7px 14px',borderRadius:980,fontSize:12,fontWeight:600,
-                  background: on ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                  color: on ? '#8B5CF6' : 'var(--text-secondary)',
-                  border: on ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                  background: on ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                  color: on ? 'var(--brand)' : 'var(--text-secondary)',
+                  border: on ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                   transition:'all 0.15s',
                 }}>{meta.label}</button>
               )
@@ -5024,15 +5112,15 @@ ${shotsWithBeats.join('\n\n')}`
           {audioDataUrl ? (
             <div style={{
               display:'flex',alignItems:'center',gap:12,padding:'14px 16px',marginBottom:14,
-              borderRadius:12,background:'rgba(139,92,246,0.08)',border:'1.5px solid rgba(139,92,246,0.3)',
+              borderRadius:12,background:'rgba(199,242,78,0.08)',border:'1.5px solid rgba(199,242,78,0.3)',
             }}>
               <div style={{
-                width:40,height:40,borderRadius:10,flexShrink:0,
-                background:'linear-gradient(135deg,rgba(236,72,153,0.2),rgba(139,92,246,0.2))',
-                border:'1px solid rgba(139,92,246,0.3)',
+                width:40,height:40,borderRadius:'var(--radius-sm)',flexShrink:0,
+                background:'linear-gradient(135deg,rgba(199,242,78,0.2),rgba(199,242,78,0.2))',
+                border:'1px solid rgba(199,242,78,0.3)',
                 display:'flex',alignItems:'center',justifyContent:'center',
               }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
                 </svg>
               </div>
@@ -5040,7 +5128,7 @@ ${shotsWithBeats.join('\n\n')}`
                 <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{audioFileName}</div>
                 {audioDuration != null && audioDuration > 13.5
                   ? <div style={{fontSize:11,fontWeight:600,color:'#FF3B30',marginTop:2}}>⚠ {audioDuration.toFixed(1)}s — max 13s. Trim your audio before uploading.</div>
-                  : <div style={{fontSize:11,color:'rgba(139,92,246,0.8)',marginTop:2}}>{audioDuration != null ? `${audioDuration.toFixed(1)}s · ` : ''}Lip-sync via @audio_1 — voice presets ignored</div>
+                  : <div style={{fontSize:11,color:'rgba(199,242,78,0.8)',marginTop:2}}>{audioDuration != null ? `${audioDuration.toFixed(1)}s · ` : ''}Lip-sync via @audio_1 — voice presets ignored</div>
                 }
               </div>
               <button onClick={() => { setAudioDataUrl(null); setAudioFileName(''); setAudioDuration(null) }} style={{
@@ -5051,23 +5139,23 @@ ${shotsWithBeats.join('\n\n')}`
           ) : (
             <button onClick={() => audioFileRef.current?.click()} style={{
               width:'100%',marginBottom:14,padding:'16px',borderRadius:12,
-              border:'2px dashed rgba(139,92,246,0.35)',background:'rgba(139,92,246,0.04)',
+              border:'2px dashed rgba(199,242,78,0.35)',background:'rgba(199,242,78,0.04)',
               cursor:'pointer',transition:'all 0.15s',display:'flex',alignItems:'center',gap:14,
               boxSizing:'border-box',
             }}>
               <div style={{
-                width:40,height:40,borderRadius:10,flexShrink:0,
-                background:'linear-gradient(135deg,rgba(236,72,153,0.12),rgba(139,92,246,0.12))',
-                border:'1px solid rgba(139,92,246,0.2)',
+                width:40,height:40,borderRadius:'var(--radius-sm)',flexShrink:0,
+                background:'linear-gradient(135deg,rgba(199,242,78,0.12),rgba(199,242,78,0.12))',
+                border:'1px solid rgba(199,242,78,0.2)',
                 display:'flex',alignItems:'center',justifyContent:'center',
               }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 18.5a6.5 6.5 0 0 0 6.5-6.5V8a6.5 6.5 0 0 0-13 0v4a6.5 6.5 0 0 0 6.5 6.5z"/>
                   <line x1="12" y1="18.5" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/>
                 </svg>
               </div>
               <div style={{textAlign:'left'}}>
-                <div style={{fontSize:13,fontWeight:700,color:'#8B5CF6'}}>Upload your own audio</div>
+                <div style={{fontSize:13,fontWeight:700,color:'var(--brand)'}}>Upload your own audio</div>
                 <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>mp3, wav, m4a — your voice drives the lip-sync</div>
               </div>
             </button>
@@ -5086,7 +5174,7 @@ ${shotsWithBeats.join('\n\n')}`
                     value={voicePreset}
                     onChange={e => { setVoicePreset(e.target.value); setVoiceCustom(''); localStorage.setItem('hf_voice_preset',e.target.value); localStorage.setItem('hf_voice_custom','') }}
                     style={{
-                      width:'100%',padding:'9px 12px',borderRadius:10,boxSizing:'border-box',
+                      width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',boxSizing:'border-box',
                       border:'1.5px solid var(--border)',background:'var(--bg)',
                       fontSize:13,color: voicePreset ? 'var(--text-primary)' : 'var(--text-tertiary)',
                       fontFamily:'inherit',cursor:'pointer',appearance:'auto',
@@ -5107,7 +5195,7 @@ ${shotsWithBeats.join('\n\n')}`
                     onChange={e => { setVoiceCustom(e.target.value); setVoicePreset(''); localStorage.setItem('hf_voice_custom',e.target.value); localStorage.setItem('hf_voice_preset','') }}
                     placeholder="e.g. Young American woman, energetic and lively"
                     style={{
-                      width:'100%',padding:'9px 12px',borderRadius:10,boxSizing:'border-box',
+                      width:'100%',padding:'9px 12px',borderRadius:'var(--radius-sm)',boxSizing:'border-box',
                       border:'1.5px solid var(--border)',background:'var(--bg)',
                       fontSize:13,color:'var(--text-primary)',fontFamily:'inherit',
                     }}
@@ -5130,15 +5218,15 @@ ${shotsWithBeats.join('\n\n')}`
               return (
                 <button key={m.id} onClick={()=>{setShotMode(m.id);localStorage.setItem('hf_shot_mode',m.id)}} style={{
                   padding:'12px 14px',borderRadius:12,textAlign:'left',
-                  background: on ? 'linear-gradient(135deg,rgba(236,72,153,0.12),rgba(139,92,246,0.12))' : 'var(--bg-tertiary)',
-                  border: on ? '1.5px solid rgba(139,92,246,0.45)' : '1.5px solid transparent',
+                  background: on ? 'linear-gradient(135deg,rgba(199,242,78,0.12),rgba(199,242,78,0.12))' : 'var(--bg-tertiary)',
+                  border: on ? '1.5px solid rgba(199,242,78,0.45)' : '1.5px solid transparent',
                   transition:'all 0.15s',
                 }}>
                   <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:3}}>
                     <div style={{
                       width:8,height:8,borderRadius:'50%',flexShrink:0,
-                      background: on ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : 'var(--border)',
-                      boxShadow: on ? '0 0 6px rgba(139,92,246,0.5)' : 'none',
+                      background: on ? 'var(--brand)' : 'var(--border)',
+                      boxShadow: on ? '0 0 6px rgba(199,242,78,0.5)' : 'none',
                       transition:'all 0.15s',
                     }}/>
                     <span style={{fontSize:13,fontWeight:700,color: on ? 'var(--text-primary)' : 'var(--text-secondary)'}}>{m.label}</span>
@@ -5162,7 +5250,7 @@ ${shotsWithBeats.join('\n\n')}`
             spellCheck={false}
             rows={3}
             style={{
-              width:'100%',padding:'11px 13px',borderRadius:10,boxSizing:'border-box',
+              width:'100%',padding:'11px 13px',borderRadius:'var(--radius-sm)',boxSizing:'border-box',
               border:'1.5px solid var(--border)',background:'var(--bg)',
               fontSize:13,color:'var(--text-primary)',resize:'vertical',
               lineHeight:1.6,fontFamily:'inherit',
@@ -5174,6 +5262,27 @@ ${shotsWithBeats.join('\n\n')}`
         <Sec>
           <CSStepHeader n={11} title="Settings"/>
 
+          {/* Video model picker — chips match the Resolution buttons' visual language */}
+          <div style={{marginBottom:18}}>
+            <div style={{fontSize:11,fontWeight:600,color:'var(--text-tertiary)',marginBottom:8}}>Model</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {VIDEO_MODELS.map(m => (
+                <button key={m.id} title={`${m.hint} · ~${m.cost} cr/clip`}
+                  onClick={()=>{setVideoModel(m.id);try{localStorage.setItem('hf_video_model',m.id)}catch{}}}
+                  style={{
+                    padding:'8px 12px',borderRadius:9,textAlign:'left',
+                    background: videoModel===m.id ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                    color: videoModel===m.id ? 'var(--brand)' : 'var(--text-secondary)',
+                    border: videoModel===m.id ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
+                    transition:'all 0.15s',whiteSpace:'nowrap',cursor:'pointer',
+                  }}>
+                  <div style={{fontSize:11,fontWeight:700,lineHeight:1.3}}>{m.name}</div>
+                  <div style={{fontSize:9.5,fontWeight:500,opacity:0.75,lineHeight:1.3}}>{m.hint} · ~{m.cost} cr</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{display:'flex',gap:20,flexWrap:'wrap',alignItems:'flex-start'}}>
 
             <div style={{flex:'1 1 160px',minWidth:140}}>
@@ -5182,7 +5291,7 @@ ${shotsWithBeats.join('\n\n')}`
                 <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',fontVariantNumeric:'tabular-nums'}}>{duration}s</div>
               </div>
               <input type="range" min={4} max={15} step={1} value={duration} onChange={e=>{const v=Number(e.target.value);setDuration(v);localStorage.setItem('hf_duration',v)}}
-                style={{width:'100%',accentColor:'#8B5CF6',cursor:'pointer',height:4}}/>
+                style={{width:'100%',accentColor:'var(--brand)',cursor:'pointer',height:4}}/>
               <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
                 <span style={{fontSize:10,color:'var(--text-tertiary)'}}>4s</span>
                 <span style={{fontSize:10,color:'var(--text-tertiary)'}}>15s</span>
@@ -5198,9 +5307,9 @@ ${shotsWithBeats.join('\n\n')}`
                 ].map(({r, label}) => (
                   <button key={r} onClick={()=>{setAspect(r);localStorage.setItem('hf_aspect',r)}} style={{
                     padding:'7px 12px',borderRadius:9,fontSize:11,fontWeight:600,
-                    background: aspect===r ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                    color: aspect===r ? '#8B5CF6' : 'var(--text-secondary)',
-                    border: aspect===r ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                    background: aspect===r ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                    color: aspect===r ? 'var(--brand)' : 'var(--text-secondary)',
+                    border: aspect===r ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                     transition:'all 0.15s',whiteSpace:'nowrap',
                   }}>{label}</button>
                 ))}
@@ -5213,9 +5322,9 @@ ${shotsWithBeats.join('\n\n')}`
                 {['480p','720p','1080p'].map(r => (
                   <button key={r} onClick={()=>{setResolution(r);localStorage.setItem('hf_resolution',r)}} style={{
                     padding:'7px 12px',borderRadius:9,fontSize:11,fontWeight:600,
-                    background: resolution===r ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                    color: resolution===r ? '#8B5CF6' : 'var(--text-secondary)',
-                    border: resolution===r ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                    background: resolution===r ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                    color: resolution===r ? 'var(--brand)' : 'var(--text-secondary)',
+                    border: resolution===r ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                     transition:'all 0.15s',whiteSpace:'nowrap',
                   }}>{r}</button>
                 ))}
@@ -5228,9 +5337,9 @@ ${shotsWithBeats.join('\n\n')}`
                 {[1,2,3].map(n=>(
                   <button key={n} onClick={()=>{setOutputs(n);localStorage.setItem('hf_outputs',n)}} style={{
                     width:40,height:40,borderRadius:9,fontSize:14,fontWeight:700,
-                    background: outputs===n ? 'linear-gradient(135deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' : 'var(--bg-tertiary)',
-                    color: outputs===n ? '#8B5CF6' : 'var(--text-secondary)',
-                    border: outputs===n ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid transparent',
+                    background: outputs===n ? 'linear-gradient(135deg,rgba(199,242,78,0.15),rgba(199,242,78,0.15))' : 'var(--bg-tertiary)',
+                    color: outputs===n ? 'var(--brand)' : 'var(--text-secondary)',
+                    border: outputs===n ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid transparent',
                     transition:'all 0.15s',display:'flex',alignItems:'center',justifyContent:'center',
                   }}>{n}</button>
                 ))}
@@ -5245,7 +5354,7 @@ ${shotsWithBeats.join('\n\n')}`
       {/* Error */}
       {genError && (
         <div style={{
-          padding:'12px 14px',borderRadius:10,
+          padding:'12px 14px',borderRadius:'var(--radius-sm)',
           background:'rgba(255,59,48,0.06)',border:'1px solid rgba(255,59,48,0.2)',
           fontSize:13,color:'#FF3B30',lineHeight:1.5,
         }}>
@@ -5259,27 +5368,30 @@ ${shotsWithBeats.join('\n\n')}`
       {/* Generating + Results — unified N-card display */}
       {(generating || genResults.length > 0) && (
         <div ref={genCardRef}>
-          {/* Progress area — only while generating */}
+          {/* Progress area — only while generating.
+              role=status + aria-live: this is the one moment on the surface where feedback
+              matters most, and it was announcing nothing. Polite rather than assertive so
+              the stage updates don't interrupt whatever the user is reading. */}
           {generating && (
-            <div style={{marginBottom:10}}>
+            <div role="status" aria-live="polite" style={{marginBottom:10}}>
               {/* Main status card */}
               <div style={{
                 padding:'14px 16px',borderRadius:14,marginBottom:8,
-                background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.15)',
+                background:'rgba(199,242,78,0.06)',border:'1px solid rgba(199,242,78,0.15)',
               }}>
                 {/* Top row: pulse dot + stage label + timer + cancel */}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
                     <div style={{
-                      width:7,height:7,borderRadius:'50%',flexShrink:0,
-                      background:'linear-gradient(135deg,#EC4899,#8B5CF6)',
-                      boxShadow:'0 0 8px rgba(139,92,246,0.7)',
-                      animation:'cs-pulse 1.4s ease-in-out infinite',
+                      width:8,height:8,flexShrink:0,
+                      background:'var(--brand)',
+                      boxShadow:'0 0 8px rgba(199,242,78,0.7)',
+                      animation:'droplet-wobble 2.4s var(--ease-liquid) infinite, liquid-breath 1.6s ease-in-out infinite',
                     }}/>
                     <span style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>
                       {genProgress < 10 ? 'Connecting...'
                         : genProgress < 28 ? 'Uploading references...'
-                        : genProgress < 35 ? 'Submitting to Seedance...'
+                        : genProgress < 35 ? `Submitting to ${activeVideoModel.name}...`
                         : genProgress >= 95 ? 'Almost there...'
                         : lockedOutputs > 1 && genResults.length > 0
                           ? `Rendering · ${genResults.length}/${lockedOutputs} ready`
@@ -5288,7 +5400,7 @@ ${shotsWithBeats.join('\n\n')}`
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <div style={{display:'flex',alignItems:'baseline',gap:3}}>
-                      <span style={{fontSize:16,fontWeight:800,color:'#8B5CF6',fontVariantNumeric:'tabular-nums'}}>{fmtElapsed(elapsed)}</span>
+                      <span style={{fontSize:16,fontWeight:800,color:'var(--brand)',fontVariantNumeric:'tabular-nums'}}>{fmtElapsed(elapsed)}</span>
                       <span style={{fontSize:10,color:'var(--text-tertiary)'}}>/ ~8 min</span>
                     </div>
                     <button onClick={cancelGeneration} style={{
@@ -5303,7 +5415,7 @@ ${shotsWithBeats.join('\n\n')}`
                 <div style={{height:4,borderRadius:4,background:'var(--bg-tertiary)',overflow:'hidden',marginBottom:10}}>
                   <div style={{
                     height:'100%',borderRadius:4,
-                    background:'linear-gradient(90deg,#EC4899,#8B5CF6)',
+                    background:'var(--brand)',
                     width:`${Math.round(displayProgress)}%`,
                     transition:'width 1.2s ease',
                   }}/>
@@ -5371,15 +5483,15 @@ ${shotsWithBeats.join('\n\n')}`
                             const a=document.createElement('a');a.href=url;a.download=`video-${i+1}.mp4`;a.click()
                           }
                         }} style={{
-                          flex:1,padding:'8px',borderRadius:8,fontSize:12,fontWeight:600,textAlign:'center',
+                          flex:1,padding:'8px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:600,textAlign:'center',
                           background:'var(--bg-tertiary)',color:'var(--text-secondary)',
                           border:'1.5px solid var(--border)',cursor:'pointer',fontFamily:'inherit',
                         }}>Download</button>
                         {!generating && (
                           <button onClick={()=>regenerateSlot(i)} disabled={regenSlot!==null} style={{
-                            padding:'8px 10px',borderRadius:8,fontSize:12,fontWeight:600,
-                            background: regenSlot===i ? 'rgba(139,92,246,0.1)' : 'var(--bg-tertiary)',
-                            color: regenSlot===i ? '#8B5CF6' : 'var(--text-tertiary)',
+                            padding:'8px 10px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:600,
+                            background: regenSlot===i ? 'rgba(199,242,78,0.1)' : 'var(--bg-tertiary)',
+                            color: regenSlot===i ? 'var(--brand)' : 'var(--text-tertiary)',
                             border:'1.5px solid var(--border)',flexShrink:0,
                           }}>
                             {regenSlot===i ? '...' : '↺'}
@@ -5405,7 +5517,7 @@ ${shotsWithBeats.join('\n\n')}`
                         <div style={{
                           height:'100%',
                           width:`${Math.round(displayProgress)}%`,
-                          background:'linear-gradient(90deg,#EC4899,#8B5CF6)',
+                          background:'var(--brand)',
                           borderRadius:2,
                           transition:'width 0.4s linear',
                         }}/>
@@ -5509,19 +5621,24 @@ ${shotsWithBeats.join('\n\n')}`
           <button
             onClick={generate}
             disabled={!canAct || generating}
+            title={
+              shortfall
+                ? `Estimated ~${costEstimate} credits — your balance is ${creditBalance}. Extra seconds may add to this; the final charge is set server-side.`
+                : `Estimated ~${costEstimate} credits (${activeVideoModel.name} x${outputs}). Extra seconds may add to this; the final charge is set server-side.`
+            }
             style={{
               flex:1, padding:'12px 18px', borderRadius:12, fontSize:14, fontWeight:700,
-              background: generating ? 'rgba(139,92,246,0.12)' : (canAct ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : 'var(--bg-tertiary)'),
-              color: generating ? '#8B5CF6' : (canAct ? '#fff' : 'var(--text-tertiary)'),
-              border: generating ? '1.5px solid rgba(139,92,246,0.3)' : 'none',
+              background: generating ? 'rgba(199,242,78,0.12)' : (canAct ? 'var(--brand)' : 'var(--bg-tertiary)'),
+              color: generating ? 'var(--brand)' : (canAct ? 'var(--brand-ink)' : 'var(--text-tertiary)'),
+              border: generating ? '1.5px solid rgba(199,242,78,0.3)' : 'none',
               cursor: (generating || !canAct) ? 'default' : 'pointer',
               transition:'all 0.2s', letterSpacing:'-0.2px', fontFamily:'inherit',
-              boxShadow: (!generating && canAct) ? '0 4px 24px rgba(139,92,246,0.35)' : 'none',
+              boxShadow: (!generating && canAct) ? '0 4px 24px rgba(199,242,78,0.35)' : 'none',
             }}
           >
             {generating
               ? (genResults.length > 0 ? `${genResults.length}/${lockedOutputs} ready · ${fmtElapsed(elapsed)}` : `Generating… ${fmtElapsed(elapsed)}`)
-              : `✦ Generate${outputs > 1 ? ` ${outputs} Videos` : ' Video'}`}
+              : `✦ Generate${outputs > 1 ? ` ${outputs} Videos` : ' Video'} · ~${costEstimate} cr`}
             {!generating && <span style={{fontSize:10,opacity:0.5,marginLeft:8,fontWeight:400}}>⌘↵</span>}
           </button>
           {/* Save — appears only after generation completes */}
@@ -5551,9 +5668,9 @@ ${shotsWithBeats.join('\n\n')}`
               title="Inspect prompt"
               style={{
                 flexShrink:0, width:44, height:44, borderRadius:12, cursor:'pointer',
-                background: showPrompt ? 'rgba(139,92,246,0.12)' : 'var(--bg-tertiary)',
-                border: showPrompt ? '1.5px solid rgba(139,92,246,0.4)' : '1.5px solid var(--border)',
-                color: showPrompt ? '#8B5CF6' : 'var(--text-tertiary)',
+                background: showPrompt ? 'rgba(199,242,78,0.12)' : 'var(--bg-tertiary)',
+                border: showPrompt ? '1.5px solid rgba(199,242,78,0.4)' : '1.5px solid var(--border)',
+                color: showPrompt ? 'var(--brand)' : 'var(--text-tertiary)',
                 display:'flex', alignItems:'center', justifyContent:'center',
                 transition:'all 0.15s', position:'relative',
               }}
@@ -5562,7 +5679,7 @@ ${shotsWithBeats.join('\n\n')}`
                 <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
               </svg>
               {lastGeneratedPrompt && !showPrompt && (
-                <div style={{position:'absolute',top:7,right:7,width:5,height:5,borderRadius:'50%',background:'#8B5CF6'}}/>
+                <div style={{position:'absolute',top:7,right:7,width:5,height:5,borderRadius:'50%',background:'var(--brand)'}}/>
               )}
             </button>
           )}
@@ -5574,11 +5691,10 @@ ${shotsWithBeats.join('\n\n')}`
           const skeletons = generating ? lockedOutputs : 0
           return (
             <div style={{ padding: '0 10px 10px' }}>
-              <style>{`@keyframes hf-pulse{0%,100%{opacity:0.45}50%{opacity:1}}@keyframes hf-spin{to{transform:rotate(360deg)}}`}</style>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ flexShrink: 0 }}>History · {vids.length}</span>
                 {generating && (
-                  <span style={{ fontSize: 10, fontWeight: 600, color: '#8B5CF6', background: 'rgba(139,92,246,0.1)', padding: '2px 8px', borderRadius: 6, textTransform: 'none', letterSpacing: 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', background: 'rgba(199,242,78,0.1)', padding: '2px 8px', borderRadius: 6, textTransform: 'none', letterSpacing: 0 }}>
                     {genResults.length > 0 ? `${genResults.length}/${lockedOutputs} ready` : `Generating${lockedOutputs > 1 ? ` ${lockedOutputs} videos` : ''}…`}
                   </span>
                 )}
@@ -5588,9 +5704,9 @@ ${shotsWithBeats.join('\n\n')}`
                       onClick={() => setSelectedVidIds(selectedVidIds.size === vids.length ? new Set() : new Set(vids.map(v => v.id)))}
                       style={{
                         padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600,
-                        background: selectedVidIds.size === vids.length ? 'rgba(139,92,246,0.1)' : 'var(--bg-tertiary)',
-                        color: selectedVidIds.size === vids.length ? '#8B5CF6' : 'var(--text-tertiary)',
-                        border: selectedVidIds.size === vids.length ? '1px solid rgba(139,92,246,0.3)' : '1px solid var(--border)',
+                        background: selectedVidIds.size === vids.length ? 'rgba(199,242,78,0.1)' : 'var(--bg-tertiary)',
+                        color: selectedVidIds.size === vids.length ? 'var(--brand)' : 'var(--text-tertiary)',
+                        border: selectedVidIds.size === vids.length ? '1px solid rgba(199,242,78,0.3)' : '1px solid var(--border)',
                         cursor: 'pointer', fontFamily: 'inherit',
                       }}
                     >{selectedVidIds.size === vids.length ? 'Deselect all' : 'Select all'}</button>
@@ -5640,11 +5756,11 @@ ${shotsWithBeats.join('\n\n')}`
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {Array.from({ length: skeletons }).map((_, i) => (
-                  <div key={`skel-${i}`} style={{ width: 60, borderRadius: 9, overflow: 'hidden', outline: '2px solid rgba(139,92,246,0.28)', outlineOffset: -2 }}>
-                    <div style={{ width: '100%', height: 90, background: 'rgba(139,92,246,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'hf-pulse 1.6s ease-in-out infinite' }}>
-                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2.5px solid rgba(139,92,246,0.2)', borderTopColor: '#8B5CF6', animation: 'hf-spin 0.75s linear infinite' }}/>
+                  <div key={`skel-${i}`} style={{ width: 60, borderRadius: 9, overflow: 'hidden', outline: '2px solid rgba(199,242,78,0.28)', outlineOffset: -2 }}>
+                    <div style={{ width: '100%', height: 90, background: 'rgba(199,242,78,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'liquid-breath 1.8s ease-in-out infinite' }}>
+                      <div className="blob-loader" style={{ width: 20, height: 20 }}/>
                     </div>
-                    <div style={{ padding: '4px 6px', fontSize: 9, color: 'rgba(139,92,246,0.5)', fontWeight: 700, background: 'var(--surface)', letterSpacing: 1 }}>···</div>
+                    <div style={{ padding: '4px 6px', fontSize: 9, color: 'rgba(199,242,78,0.5)', fontWeight: 700, background: 'var(--glass-bg-strong)', backdropFilter:'blur(var(--blur-sm))', WebkitBackdropFilter:'blur(var(--blur-sm))', letterSpacing: 1 }}>···</div>
                   </div>
                 ))}
                 {vids.map((entry, i) => (
@@ -5680,9 +5796,9 @@ ${shotsWithBeats.join('\n\n')}`
               }}>
                 {ytId(v.videoUrl) ? (
                   <img src={`https://img.youtube.com/vi/${ytId(v.videoUrl)}/mqdefault.jpg`} alt=""
-                    style={{width:100,height:60,objectFit:'cover',borderRadius:8,flexShrink:0}}/>
+                    style={{width:100,height:60,objectFit:'cover',borderRadius:'var(--radius-sm)',flexShrink:0}}/>
                 ) : (
-                  <div style={{width:100,height:60,borderRadius:8,background:'rgba(139,92,246,0.1)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{width:100,height:60,borderRadius:'var(--radius-sm)',background:'rgba(199,242,78,0.1)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
                     <span style={{fontSize:22,opacity:0.4}}>▶</span>
                   </div>
                 )}
@@ -5691,7 +5807,7 @@ ${shotsWithBeats.join('\n\n')}`
                   {v.script && <div style={{fontSize:12,color:'var(--text-tertiary)',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{v.script}</div>}
                 </div>
                 <a href={v.videoUrl} target="_blank" rel="noreferrer" style={{
-                  padding:'8px 16px',borderRadius:8,fontSize:12,fontWeight:600,
+                  padding:'8px 16px',borderRadius:'var(--radius-sm)',fontSize:12,fontWeight:600,
                   background:'var(--bg-tertiary)',color:'var(--text-secondary)',textDecoration:'none',flexShrink:0,
                 }}>Watch →</a>
               </div>
@@ -5750,15 +5866,15 @@ ${shotsWithBeats.join('\n\n')}`
       )}
 
       {confirmVidClear && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', ...glassOverlay }}
           onClick={() => setConfirmVidClear(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 16, padding: '28px 32px', maxWidth: 340, width: '90%', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', border: '1px solid var(--border)', textAlign: 'center' }}>
+          <div onClick={e => e.stopPropagation()} className="reveal" style={{ ...glassModal, padding: '28px 32px', maxWidth: 340, width: '90%', textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🗑️</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>{confirmVidClear.label}?</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>This cannot be undone.</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button onClick={() => setConfirmVidClear(null)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={confirmVidClear.onConfirm} style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, background: '#FF3B30', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
+              <button onClick={() => setConfirmVidClear(null)} style={{ flex: 1, padding: '10px 0', borderRadius: 'var(--radius-sm)', fontSize: 13, fontWeight: 600, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={confirmVidClear.onConfirm} style={{ flex: 1, padding: '10px 0', borderRadius: 'var(--radius-sm)', fontSize: 13, fontWeight: 700, background: '#FF3B30', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
             </div>
           </div>
         </div>,
@@ -5771,13 +5887,19 @@ ${shotsWithBeats.join('\n\n')}`
 // ─────────────────────────────────────────────
 // Main export
 export default function Influencers() {
+  useSEO({ path: '/influencers' })
+
   const [influencers,setInfluencers]=useInfluencers()
   const { isDark } = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
   const [selectedId,setSelectedId]=useState(()=>localStorage.getItem('inf_last_selected')||null)
-  const [studioTab,setStudioTab]=useState('influencer')
-  const [activeTab,setActiveTab]=useState('Overview')
+  // Single flat view instead of the old two-level tab system (a `studioTab` pill group of
+  // Profile/Photos/Videos, where only Profile had six underline sub-tabs). That hierarchy was
+  // asymmetric - one branch carried six destinations and the other two carried none - and it
+  // buried the library, the actual output, six tabs deep. VIEWS is now flat and output-first.
+  const [view,setView]=useState(()=>localStorage.getItem('inf_view')||'library')
+  const goView=(v)=>{ setView(v); localStorage.setItem('inf_view', v) }
   const [videoRestoreKey, setVideoRestoreKey] = useState(0)
   const [photoRestoreKey, setPhotoRestoreKey] = useState(0)
   const [pendingStartFrame, setPendingStartFrame] = useState(null)
@@ -5795,12 +5917,11 @@ export default function Influencers() {
   const dragStartX=useRef(0)
   const dragStartW=useRef(0)
   const isMobile=useMobile()
-  const tabSecRef=useRef()
   const mainPaneRef=useRef()
   const [scriptsHighlightId,setScriptsHighlightId]=useState(null)
   const hasNavigatedToScripts=useRef(false)
   const prevInfIdRef=useRef(null)
-  const currentTabsRef=useRef({ studioTab, activeTab })
+  const currentTabsRef=useRef({ view })
   const [infOrder,setInfOrder]=useState(()=>{try{return JSON.parse(localStorage.getItem('inf_order')||'null')}catch{return null}})
   const [dragState,setDragState]=useState(null) // {srcId, overId, above}
   const orderedRef=useRef([])
@@ -5846,13 +5967,12 @@ export default function Influencers() {
   const pct=influencer?completeness(influencer):0
 
   // Keep currentTabsRef current so the switch useEffect can read tabs before restoring
-  currentTabsRef.current = { studioTab, activeTab }
+  currentTabsRef.current = { view }
 
   // Reset to profile tab on every influencer switch
   useEffect(() => {
     prevInfIdRef.current = influencer?.id
-    setStudioTab('influencer')
-    setActiveTab('Overview')
+    goView('library')
     setScriptsHighlightId(null)
     hasNavigatedToScripts.current = false
   }, [influencer?.id]) // eslint-disable-line
@@ -5891,11 +6011,8 @@ export default function Influencers() {
   function handleSaveToScripts(scriptId) {
     if (hasNavigatedToScripts.current) return
     hasNavigatedToScripts.current = true
-    setStudioTab('influencer')
-    localStorage.setItem('inf_studio_tab','influencer')
-    setActiveTab('Scripts')
+    goView('scripts')
     setScriptsHighlightId(scriptId)
-    setTimeout(() => tabSecRef.current?.scrollIntoView({ behavior:'smooth', block:'start' }), 120)
   }
 
   function dup(id) {
@@ -5922,7 +6039,7 @@ export default function Influencers() {
   }
 
   return (
-    <div style={{display:'flex',position:'fixed',top:'var(--nav-h)',left:0,right:0,bottom:0,background:'var(--bg)'}}>
+    <div style={{display:'flex',position:'fixed',top:'var(--nav-h)',left:0,right:0,bottom:0,background:'transparent'}}>
       {showNew&&<NewModal onClose={()=>setShowNew(false)} onSave={create}/>}
       {lightbox&&<Lightbox images={lightbox.images} startIndex={lightbox.index} onClose={()=>setLightbox(null)}/>}
       {ctxMenu&&(
@@ -5939,8 +6056,11 @@ export default function Influencers() {
       {(!isMobile || mobileView==='list') && <aside ref={asideRef} style={{
         width: isMobile?'100%': sidebarCollapsed?0:sidebarWidth,
         flexShrink:0, background:SD.bg,
+        backdropFilter:'blur(var(--blur-lg)) saturate(1.6)', WebkitBackdropFilter:'blur(var(--blur-lg)) saturate(1.6)',
+        borderRight:`1px solid ${SD.border}`,
+        boxShadow:'inset -1px 0 0 rgba(255,255,255,0.04)',
         display:'flex', flexDirection:'column', overflow:'hidden',
-        transition: sidebarCollapsed?'width 0.25s ease':'none',
+        transition: sidebarCollapsed?'width 0.45s var(--ease-liquid)':'none',
       }}>
         <div style={{padding:'16px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${SD.border}`,minWidth:160}}>
           <span style={{fontSize:11,fontWeight:700,color:SD.dim,textTransform:'uppercase',letterSpacing:'0.6px'}}>Influencers</span>
@@ -6008,7 +6128,7 @@ export default function Influencers() {
             return (
               <div key={inf.id} data-inf-id={inf.id} style={{width:'100%',transform:`translateY(${shift}px)`,transition:(dragState&&!isDraggingThis)?'transform 0.18s ease':'none',position:'relative',zIndex:isDraggingThis?99:1,pointerEvents:isDraggingThis?'none':'auto'}}>
                 <div style={{
-                  display:'flex',alignItems:'center',borderRadius:10,marginBottom:2,
+                  display:'flex',alignItems:'center',borderRadius:'var(--radius-sm)',marginBottom:2,
                   opacity: 1,
                   background: active ? SD.active : 'transparent',
                   cursor: dragState ? (isDraggingThis ? 'grabbing' : 'default') : 'grab',
@@ -6063,7 +6183,7 @@ export default function Influencers() {
                     }}
                     onContextMenu={e=>openCtx(e,inf.id)}
                     style={{
-                      flex:1,padding:'10px 10px 10px 10px',borderRadius:10,textAlign:'left',
+                      flex:1,padding:'10px 10px 10px 10px',borderRadius:'var(--radius-sm)',textAlign:'left',
                       background:'transparent',
                       display:'flex',alignItems:'center',gap:10,
                       transition:'background 0.15s',
@@ -6093,7 +6213,7 @@ export default function Influencers() {
                       ):(
                         <div style={{fontSize:13,fontWeight:600,color:SD.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{inf.name}</div>
                       )}
-                      <div style={{fontSize:11,color:inf.tag?'rgba(139,92,246,0.75)':inf.gender?gc:SD.dim,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                      <div style={{fontSize:11,color:inf.tag?'rgba(199,242,78,0.75)':inf.gender?gc:SD.dim,marginTop:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                         {inf.tag || inf.gender || 'Influencer'}
                       </div>
                     </div>
@@ -6119,7 +6239,7 @@ export default function Influencers() {
             document.body.style.userSelect='none'
           }}
           onMouseEnter={e=>{
-            e.currentTarget.querySelector('span').style.background='rgba(139,92,246,0.7)'
+            e.currentTarget.querySelector('span').style.background='rgba(199,242,78,0.7)'
             e.currentTarget.querySelector('span').style.width='3px'
           }}
           onMouseLeave={e=>{
@@ -6153,49 +6273,53 @@ export default function Influencers() {
             }}>← All Influencers</button>
           )}
 
-          {/* ── Studio tab switcher + sidebar toggle */}
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            {/* Expand sidebar button — only when collapsed */}
+          {/* ── Flat view nav ───────────────────────────────────────────────────
+              Replaces a pill group (Profile/Photos/Videos) stacked on top of a six-item
+              underline tab row that only existed under Profile. One level, seven peers,
+              library first: the work you made is the page, not a tab six deep. */}
+          {/* tablist semantics: the active view was signalled by colour and a 2px underline
+              only, so a screen-reader user had no way to tell which of the eight views they
+              were in. */}
+          <nav role="tablist" aria-label="Influencer views" style={{display:'flex',alignItems:'center',gap:2,flexWrap:'wrap',borderBottom:`1px solid ${SD.border}`,marginBottom:4}}>
             {sidebarCollapsed && !isMobile && (
-              <button onClick={()=>{setSidebarCollapsed(false);localStorage.setItem('inf_sidebar_collapsed','0')}} title="Show sidebar" style={{
-                width:34,height:34,borderRadius:10,border:'1.5px solid var(--border)',
-                background:'var(--surface)',color:'var(--text-secondary)',fontSize:15,
+              <button onClick={()=>{setSidebarCollapsed(false);localStorage.setItem('inf_sidebar_collapsed','0')}} title="Show influencers" style={{
+                width:30,height:30,borderRadius:8,border:`1px solid ${SD.border}`,background:'transparent',
+                color:'var(--text-secondary)',fontSize:15,cursor:'pointer',marginRight:8,
                 display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,
-                transition:'all 0.15s',
-              }}
-                onMouseEnter={e=>{e.currentTarget.style.background='var(--bg-tertiary)'}}
-                onMouseLeave={e=>{e.currentTarget.style.background='var(--surface)'}}
-              >›</button>
+              }}>›</button>
             )}
-            <div style={{display:'flex',gap:4,padding:4,borderRadius:14,background:'var(--bg-tertiary)',border:'1px solid var(--border-subtle)',alignSelf:'flex-start'}}>
-              <button onClick={()=>{ setStudioTab('influencer'); localStorage.setItem('inf_studio_tab','influencer') }} style={{
-                padding:'9px 22px',borderRadius:10,fontSize:13,fontWeight:600,border:'none',
-                background: studioTab==='influencer' ? 'var(--surface)' : 'transparent',
-                color: studioTab==='influencer' ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                boxShadow: studioTab==='influencer' ? '0 1px 6px rgba(0,0,0,0.10), 0 0 0 1px var(--border-subtle)' : 'none',
-                transition:'all 0.18s',
-              }}>Profile</button>
-              <button onClick={()=>{ setStudioTab('photo'); localStorage.setItem('inf_studio_tab','photo') }} style={{
-                padding:'9px 22px',borderRadius:10,fontSize:13,fontWeight:600,border:'none',
-                background: studioTab==='photo' ? 'var(--surface)' : 'transparent',
-                color: studioTab==='photo' ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                boxShadow: studioTab==='photo' ? '0 1px 6px rgba(0,0,0,0.10), 0 0 0 1px var(--border-subtle)' : 'none',
-                transition:'all 0.18s',
-              }}>Photos</button>
-              <button onClick={()=>{ setStudioTab('content'); localStorage.setItem('inf_studio_tab','content') }} style={{
-                padding:'9px 22px',borderRadius:10,fontSize:13,fontWeight:600,border:'none',
-                background: studioTab==='content' ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : 'transparent',
-                color: studioTab==='content' ? '#fff' : 'var(--text-tertiary)',
-                boxShadow: studioTab==='content' ? '0 2px 14px rgba(139,92,246,0.35)' : 'none',
-                transition:'all 0.18s',
-              }}>Videos</button>
-            </div>
-          </div>
+            {VIEWS.map(v=>{
+              const on = view===v.key
+              const count = v.count ? v.count(influencer) : 0
+              return (
+                <button key={v.key} onClick={()=>goView(v.key)} role="tab" aria-selected={on} style={{
+                  position:'relative',padding:'10px 14px 11px',background:'none',border:'none',cursor:'pointer',
+                  fontSize:13.5,fontWeight:on?700:550,letterSpacing:'-0.1px',
+                  color:on?'var(--text-primary)':'var(--text-tertiary)',
+                  display:'flex',alignItems:'center',gap:7,
+                  transition:'color 0.16s ease',
+                }}>
+                  {v.label}
+                  {count>0 && (
+                    <span style={{
+                      fontSize:10.5,fontWeight:700,padding:'1.5px 6px',borderRadius:999,
+                      background:on?ac:'var(--bg-tertiary)',
+                      color:on?accentText(ac):'var(--text-tertiary)',
+                      fontVariantNumeric:'tabular-nums',
+                    }}>{count}</span>
+                  )}
+                  {on && <span style={{position:'absolute',left:10,right:10,bottom:-1,height:2,borderRadius:2,background:ac}}/>}
+                </button>
+              )
+            })}
+          </nav>
 
-
-
-          <div style={{ display: studioTab==='content' ? 'block' : 'none' }}>
+          {/* Generators stay MOUNTED and hidden rather than unmounted: each owns a large
+              amount of in-flight state (prompt, model, queued jobs, polling) and remounting
+              on a view switch would silently discard a running generation. */}
+          <div style={{ display: view==='videos' ? 'block' : 'none' }}>
             <ContentStudio key={influencer.id} influencer={influencer} onUpdate={v=>upd(influencer.id,v)} onSaveToScripts={handleSaveToScripts} restoreKey={videoRestoreKey}
+              isActiveView={view==='videos'}
               pendingStartFrame={pendingStartFrame} onStartFrameConsumed={()=>setPendingStartFrame(null)}
               onGenerated={(urls, settings)=>{
                 const now = Date.now()
@@ -6213,176 +6337,155 @@ export default function Influencers() {
               }}/>
           </div>
 
-          <div style={{ display: studioTab==='photo' ? 'block' : 'none' }}>
-            <PhotoStudioPanel influencer={influencer} restoreKey={photoRestoreKey} onGoToWardrobe={() => {
-              setStudioTab('influencer')
-              localStorage.setItem('inf_studio_tab', 'influencer')
-              setActiveTab('Wardrobe')
-              setTimeout(() => tabSecRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
-            }} onUseAsStartFrame={url => {
-              setPendingStartFrame(url)
-              setStudioTab('content')
-              localStorage.setItem('inf_studio_tab', 'content')
-              setTimeout(() => mainPaneRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50)
-            }} />
+          <div style={{ display: view==='photos' ? 'block' : 'none' }}>
+            <PhotoStudioPanel influencer={influencer} restoreKey={photoRestoreKey}
+              onGoToWardrobe={() => goView('wardrobe')}
+              onUseAsStartFrame={url => {
+                setPendingStartFrame(url)
+                goView('videos')
+                setTimeout(() => mainPaneRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50)
+              }} />
           </div>
 
-          {studioTab==='influencer' && <>
-
-          {/* ── Empty state CTA — shown when influencer has no main image yet */}
-          {!influencer.mainImage && (
-            <div style={{
-              borderRadius:18,padding:'36px 28px',textAlign:'center',
-              background:'linear-gradient(135deg,rgba(236,72,153,0.06),rgba(139,92,246,0.08))',
-              border:'1.5px dashed rgba(139,92,246,0.3)',
-            }}>
-              <div style={{fontSize:38,marginBottom:12,lineHeight:1}}>✦</div>
-              <div style={{fontSize:20,fontWeight:700,color:'var(--text-primary)',marginBottom:6,letterSpacing:'-0.3px'}}>
-                {influencer.name} has no images yet
-              </div>
-              <div style={{fontSize:14,color:'var(--text-tertiary)',marginBottom:24,lineHeight:1.6}}>
-                Go through the creation flow to generate photos, set their appearance, and build their identity.
-              </div>
-              <button
-                onClick={() => navigate('/create', { state: { replaceId: influencer.id, prefillName: influencer.name, prefillGender: influencer.gender } })}
-                style={{
-                  display:'inline-flex',alignItems:'center',gap:10,
-                  padding:'13px 28px',borderRadius:12,fontSize:15,fontWeight:700,
-                  background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',
-                  border:'none',cursor:'pointer',
-                  boxShadow:'0 4px 20px rgba(139,92,246,0.4)',
-                  transition:'transform 0.15s,box-shadow 0.15s',
-                }}
-                onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 28px rgba(139,92,246,0.5)'}}
-                onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='0 4px 20px rgba(139,92,246,0.4)'}}
-              >
-                ✦ Generate your influencer
-              </button>
-            </div>
+          {/* Library is the default landing view: the generated work, not a config form. */}
+          {view==='library' && (
+            <HistoryTab influencer={influencer} onUpdate={v=>upd(influencer.id,v)}
+              onReuseSettings={(seg)=>{ if (seg === 'videos') { goView('videos'); setVideoRestoreKey(k => k+1) } else { goView('photos'); setPhotoRestoreKey(k => k+1) } }}/>
           )}
 
-          {/* Hero banner */}
-          <HeroBanner influencer={influencer} pct={pct} onDelete={()=>del(influencer.id)} onUpdate={v=>upd(influencer.id,v)}/>
+          {view==='wardrobe' && (<>
+            <WardrobeGenerator
+              influencer={influencer}
+              onAdd={slot => {
+                upd(influencer.id, { wardrobeSlots: [...(influencer.wardrobeSlots??[]), slot] })
+                if (slot.image) addToHistory(influencer.id, { type: 'image', label: `Wardrobe – ${slot.name}`, url: slot.image, date: Date.now() })
+              }}
+            />
+            <WorldDropSection drops={influencer.wardrobeSlots??[]} onChange={slots=>upd(influencer.id,{wardrobeSlots:slots})}/>
+          </>)}
 
-          {/* Three image sections */}
-          <Sec>
-            <div className="inf-img-grid">
-              <div>
-                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Image</div>
-                <MainImageSlot key={influencer.id} influencer={influencer} onChange={v=>upd(influencer.id,{mainImage:v})}
-                  onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.mainImage)})}/>
+          {view==='spaces' && (
+            <HomeSection slots={influencer.homeSlots??[]} onChange={slots=>upd(influencer.id,{homeSlots:slots})}/>
+          )}
+
+          <div style={{ display: view==='deals' ? 'block' : 'none' }}>
+            <BrandDealSection deals={influencer.brandDeals??[]} onChange={deals=>upd(influencer.id,{brandDeals:deals})}/>
+          </div>
+
+          {view==='scripts' && (
+            <ScriptsSection
+              scripts={influencer.scripts??[]}
+              influencerPrompt={influencer.prompt}
+              onChange={s=>upd(influencer.id,{scripts:s})}
+              initialExpanded={scriptsHighlightId}
+            />
+          )}
+
+          {view==='identity' && (<>
+            {!influencer.mainImage && (
+              <div style={{
+                borderRadius:14,padding:'32px 26px',textAlign:'center',
+                background:'var(--bg-tertiary)', border:`1px dashed ${ac}`,
+              }}>
+                <div style={{fontSize:19,fontWeight:700,color:'var(--text-primary)',marginBottom:6,letterSpacing:'-0.3px'}}>
+                  {influencer.name} has no images yet
+                </div>
+                <div style={{fontSize:14,color:'var(--text-tertiary)',marginBottom:22,lineHeight:1.6}}>
+                  Run the creation flow to generate photos and lock in their appearance.
+                </div>
+                <button
+                  onClick={() => navigate('/create', { state: { replaceId: influencer.id, prefillName: influencer.name, prefillGender: influencer.gender } })}
+                  style={{
+                    display:'inline-flex',alignItems:'center',gap:8,
+                    padding:'12px 26px',borderRadius:10,fontSize:14.5,fontWeight:700,
+                    background:'var(--brand)',color:'var(--brand-ink)',
+                    border:'none',cursor:'pointer',
+                  }}
+                >Generate your influencer</button>
               </div>
-              <div>
-                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Character Sheet</div>
-                <CharacterSheetSlot
-                  key={influencer.id}
-                  influencer={influencer}
-                  onSave={v=>{upd(influencer.id,{characterSheetImage:v});if(v){addToHistory(influencer.id,{type:'image',label:'Character Sheet',url:v,date:Date.now()})}}}
-                  onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.characterSheetImage)})}
-                />
-              </div>
-              <div>
-                <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Close Ups</div>
-                <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  <CloseUpSlot
-                    key={`${influencer.id}-cu1`}
-                    influencer={influencer} imageKey="closeUpImage1" label="Close up 1"
-                    onSave={v=>{upd(influencer.id,{closeUpImage1:v});if(v)addToHistory(influencer.id,{type:'image',label:'Close Up',url:v,date:Date.now()})}}
-                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage1)})}
-                  />
-                  <CloseUpSlot
-                    key={`${influencer.id}-cu2`}
-                    influencer={influencer} imageKey="closeUpImage2" label="Feature sheet"
-                    onSave={v=>{upd(influencer.id,{closeUpImage2:v});if(v)addToHistory(influencer.id,{type:'image',label:'Feature Sheet',url:v,date:Date.now()})}}
-                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage2)})}
-                    promptFn={buildFeatureSheetPrompt}
-                    genAspectRatio="2:3"
-                    fit="contain"
+            )}
+            <Sec>
+              <div className="inf-img-grid">
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Image</div>
+                  <MainImageSlot key={influencer.id} influencer={influencer} onChange={v=>upd(influencer.id,{mainImage:v})}
+                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.mainImage)})}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Character Sheet</div>
+                  <CharacterSheetSlot
+                    key={influencer.id}
+                    influencer={influencer}
+                    onSave={v=>{upd(influencer.id,{characterSheetImage:v});if(v){addToHistory(influencer.id,{type:'image',label:'Character Sheet',url:v,date:Date.now()})}}}
+                    onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.characterSheetImage)})}
                   />
                 </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-secondary)',marginBottom:8}}>Close Ups</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    <CloseUpSlot
+                      key={`${influencer.id}-cu1`}
+                      influencer={influencer} imageKey="closeUpImage1" label="Close up 1"
+                      onSave={v=>{upd(influencer.id,{closeUpImage1:v});if(v)addToHistory(influencer.id,{type:'image',label:'Close Up',url:v,date:Date.now()})}}
+                      onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage1)})}
+                    />
+                    <CloseUpSlot
+                      key={`${influencer.id}-cu2`}
+                      influencer={influencer} imageKey="closeUpImage2" label="Feature sheet"
+                      onSave={v=>{upd(influencer.id,{closeUpImage2:v});if(v)addToHistory(influencer.id,{type:'image',label:'Feature Sheet',url:v,date:Date.now()})}}
+                      onLightbox={()=>setLightbox({images:topImages,index:topImages.indexOf(influencer.closeUpImage2)})}
+                      promptFn={buildFeatureSheetPrompt}
+                      genAspectRatio="2:3"
+                      fit="contain"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </Sec>
-
-          {/* Prompt */}
-          <Sec>
-            <div style={{fontSize:11,fontWeight:700,color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:10}}>Prompt</div>
-            <textarea value={influencer.prompt} onChange={e=>upd(influencer.id,{prompt:e.target.value})}
-              placeholder="Paste your prompt here" rows={3}
-              style={{width:'100%',padding:'10px 14px',borderRadius:'var(--radius-sm)',border:'1.5px solid var(--border)',background:'var(--bg)',fontSize:14,color:'var(--text-primary)',resize:'vertical',lineHeight:1.6}}/>
-          </Sec>
-
-          {/* Detail tabs */}
-          <div ref={tabSecRef}><Sec style={{marginBottom:20}}>
-            <Tabs active={activeTab} onChange={tab=>{setActiveTab(tab);requestAnimationFrame(()=>tabSecRef.current?.scrollIntoView({behavior:'smooth',block:'start'}))}} ac={ac}/>
-
-            {activeTab==='Overview' && <DescriptionForm influencer={influencer} onUpdate={upd}/>}
-            {activeTab==='Scripts' && (
-              <ScriptsSection
-                scripts={influencer.scripts??[]}
-                influencerPrompt={influencer.prompt}
-                onChange={s=>upd(influencer.id,{scripts:s})}
-                initialExpanded={scriptsHighlightId}
-              />
-            )}
-            {activeTab==='Wardrobe' && (<>
-              <WardrobeGenerator
-                influencer={influencer}
-                onAdd={slot => {
-                  upd(influencer.id, { wardrobeSlots: [...(influencer.wardrobeSlots??[]), slot] })
-                  if (slot.image) addToHistory(influencer.id, { type: 'image', label: `Wardrobe – ${slot.name}`, url: slot.image, date: Date.now() })
-                }}
-              />
-              <WorldDropSection drops={influencer.wardrobeSlots??[]} onChange={slots=>upd(influencer.id,{wardrobeSlots:slots})}/>
-            </>)}
-            {activeTab==='Home' && (
-              <HomeSection slots={influencer.homeSlots??[]} onChange={slots=>upd(influencer.id,{homeSlots:slots})}/>
-            )}
-            <div style={{ display: activeTab==='Brand Deals' ? 'block' : 'none' }}>
-              <BrandDealSection deals={influencer.brandDeals??[]} onChange={deals=>upd(influencer.id,{brandDeals:deals})}/>
-            </div>
-            {activeTab==='History' && (
-              <HistoryTab influencer={influencer} onUpdate={v=>upd(influencer.id,v)}
-                onReuseSettings={(seg)=>{ if (seg === 'videos') { setStudioTab('content'); localStorage.setItem('inf_studio_tab','content'); setVideoRestoreKey(k => k+1) } else { setStudioTab('photo'); localStorage.setItem('inf_studio_tab','photo'); setPhotoRestoreKey(k => k+1) } }}/>
-            )}
-
-          </Sec></div>
-          </>}
+            </Sec>
+            <Sec>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--text-secondary)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:10}}>Prompt</div>
+              <textarea value={influencer.prompt} onChange={e=>upd(influencer.id,{prompt:e.target.value})}
+                placeholder="Paste your prompt here" rows={3}
+                style={{width:'100%',padding:'10px 14px',borderRadius:'var(--radius-sm)',border:'1.5px solid var(--border)',background:'var(--bg)',fontSize:14,color:'var(--text-primary)',resize:'vertical',lineHeight:1.6}}/>
+            </Sec>
+            <Sec style={{marginBottom:20}}>
+              <DescriptionForm influencer={influencer} onUpdate={upd}/>
+            </Sec>
+          </>)}
         </main>
       ) : isDark ? (
-        <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',background:'#07070E'}}>
-          <div style={{position:'absolute',width:700,height:700,top:'-20%',left:'-15%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(236,72,153,0.22) 0%, transparent 65%)',animation:'orb1 14s ease-in-out infinite'}}/>
-          <div style={{position:'absolute',width:580,height:580,top:'-12%',right:'-10%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(0,113,227,0.18) 0%, transparent 65%)',animation:'orb2 19s ease-in-out infinite'}}/>
-          <div style={{position:'absolute',width:700,height:700,bottom:'-28%',left:'20%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 65%)',animation:'orb3 23s ease-in-out infinite'}}/>
-          <div style={{position:'absolute',inset:0,pointerEvents:'none',backgroundImage:'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)',backgroundSize:'32px 32px'}}/>
-          <div style={{position:'absolute',inset:0,pointerEvents:'none',background:'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(7,7,14,0.75) 100%)'}}/>
+        <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',background:'transparent'}}>
+          <div style={{position:'absolute',width:'52vmax',height:'52vmax',top:'-20%',left:'-15%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(199,242,78,0.16) 0%, transparent 62%)',animation:'aurora-a 34s var(--ease-liquid) infinite',willChange:'transform'}}/>
+          <div style={{position:'absolute',width:'44vmax',height:'44vmax',top:'-12%',right:'-10%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(56,199,182,0.12) 0%, transparent 62%)',animation:'aurora-b 44s var(--ease-liquid) infinite',willChange:'transform'}}/>
+          <div style={{position:'absolute',width:'52vmax',height:'52vmax',bottom:'-28%',left:'20%',borderRadius:'50%',pointerEvents:'none',background:'radial-gradient(circle, rgba(199,242,78,0.10) 0%, transparent 60%)',animation:'aurora-c 52s var(--ease-liquid) infinite',willChange:'transform'}}/>
+          <div style={{position:'absolute',inset:0,pointerEvents:'none',background:'radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(7,7,14,0.55) 100%)'}}/>
           <div style={{position:'relative',zIndex:1,textAlign:'center'}}>
-            <div style={{width:72,height:72,borderRadius:20,margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(139,92,246,0.45)'}}>
+            <div style={{width:72,height:72,borderRadius:20,margin:'0 auto 24px',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 40px rgba(199,242,78,0.45)'}}>
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5.5" stroke="white" strokeWidth="2"/><path d="M4 28c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
             </div>
             <h2 style={{fontSize:26,fontWeight:800,letterSpacing:'-0.6px',color:'#fff',marginBottom:10,lineHeight:1.2}}>Build your first influencer</h2>
             <p style={{fontSize:14,color:'rgba(255,255,255,0.38)',marginBottom:28}}>Design a unique AI persona in minutes.</p>
-            <button onClick={()=>navigate('/create')} style={{padding:'13px 36px',borderRadius:980,background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',boxShadow:'0 0 32px rgba(139,92,246,0.4),0 4px 16px rgba(0,0,0,0.3)',transition:'transform 0.18s,box-shadow 0.18s'}}
-              onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-1px)';e.currentTarget.style.boxShadow='0 0 52px rgba(139,92,246,0.55),0 8px 24px rgba(0,0,0,0.4)'}}
-              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 32px rgba(139,92,246,0.4),0 4px 16px rgba(0,0,0,0.3)'}}>+ Create Influencer</button>
+            <button onClick={()=>navigate('/create')} className="liquid-press" style={{padding:'13px 38px',borderRadius:999,background:'var(--brand)',color:'var(--brand-ink)',fontSize:15,fontWeight:800,letterSpacing:'-0.2px',border:'1px solid rgba(255,255,255,0.35)',boxShadow:'inset 0 1px 0 rgba(255,255,255,0.55), 0 0 32px rgba(199,242,78,0.4)',transition:'box-shadow 0.5s var(--ease-liquid), transform 0.5s var(--ease-jelly)'}}
+              onMouseEnter={e=>{e.currentTarget.style.boxShadow='inset 0 1px 0 rgba(255,255,255,0.55), 0 0 56px rgba(199,242,78,0.6)'}}
+              onMouseLeave={e=>{e.currentTarget.style.boxShadow='inset 0 1px 0 rgba(255,255,255,0.55), 0 0 32px rgba(199,242,78,0.4)'}}>+ Create Influencer</button>
           </div>
         </main>
       ) : (
         <main style={{flex:1,position:'relative',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
           <div style={{position:'absolute',inset:0,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:3,opacity:0.18,pointerEvents:'none',transform:'scale(1.04)'}}>
-            {['/inf/i1.png','/inf/i4.jpg','/inf/i2.png','/inf/i5.png','/inf/i3.jpg','/inf/i6.jpg'].map((src,i)=>(
+            {['/inf/i1.webp','/inf/i4.jpg','/inf/i2.webp','/inf/i5.webp','/inf/i3.jpg','/inf/i6.jpg'].map((src,i)=>(
               <img key={i} src={src} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
             ))}
           </div>
           <div style={{position:'absolute',inset:0,backdropFilter:'blur(18px)',WebkitBackdropFilter:'blur(18px)',background:'rgba(255,255,255,0.82)',pointerEvents:'none'}}/>
           <div style={{position:'relative',zIndex:1,textAlign:'center'}}>
-            <div style={{width:72,height:72,borderRadius:20,margin:'0 auto 24px',background:'linear-gradient(135deg,#EC4899,#8B5CF6)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 32px rgba(139,92,246,0.4)'}}>
+            <div style={{width:72,height:72,borderRadius:20,margin:'0 auto 24px',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 32px rgba(199,242,78,0.4)'}}>
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5.5" stroke="white" strokeWidth="2"/><path d="M4 28c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
             </div>
             <h2 style={{fontSize:26,fontWeight:800,letterSpacing:'-0.6px',color:'var(--text-primary)',marginBottom:24}}>Build your first influencer</h2>
-            <button onClick={()=>navigate('/create')} style={{padding:'13px 36px',borderRadius:980,background:'linear-gradient(135deg,#EC4899,#8B5CF6)',color:'#fff',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',boxShadow:'0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)',transition:'transform 0.18s,box-shadow 0.18s'}}
-              onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-1px)';e.currentTarget.style.boxShadow='0 0 48px rgba(139,92,246,0.5),0 8px 24px rgba(0,0,0,0.14)'}}
-              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 28px rgba(139,92,246,0.35),0 4px 16px rgba(0,0,0,0.12)'}}>+ Create Influencer</button>
+            <button onClick={()=>navigate('/create')} style={{padding:'13px 36px',borderRadius:980,background:'var(--brand)',color:'var(--brand-ink)',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',boxShadow:'0 0 28px rgba(199,242,78,0.35),0 4px 16px rgba(0,0,0,0.12)',transition:'transform 0.18s,box-shadow 0.18s'}}
+              onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-1px)';e.currentTarget.style.boxShadow='0 0 48px rgba(199,242,78,0.5),0 8px 24px rgba(0,0,0,0.14)'}}
+              onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 28px rgba(199,242,78,0.35),0 4px 16px rgba(0,0,0,0.12)'}}>+ Create Influencer</button>
           </div>
         </main>
       ))}

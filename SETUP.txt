@@ -1,19 +1,15 @@
 ====================================================
-  AI INFLUENCER STUDIO — SETUP GUIDE
+  VYMOTION — SETUP GUIDE
 ====================================================
 
 Follow these steps in order. No tech experience needed.
 Just type exactly what you see in the boxes.
 
 
-STEP 1 — DOWNLOAD THE PROJECT
+STEP 1 — OPEN THE PROJECT
 --------------------------------------------------
-1. Go to: https://github.com/DaanKieft/ai-influencer
-2. Click the green "Code" button
-3. Click "Download ZIP"
-4. Find the downloaded ZIP (usually in your Downloads folder)
-   and double-click it to unzip
-5. Move the unzipped folder somewhere easy, like your Desktop
+1. Open the Vymotion project folder on your computer
+   (the folder that contains this SETUP.txt file)
 
 
 STEP 2 — INSTALL ANTIGRAVITY
@@ -24,11 +20,11 @@ STEP 2 — INSTALL ANTIGRAVITY
 (That's the only thing you install. Everything else is inside it.)
 
 
-STEP 3 — OPEN THE PROJECT
+STEP 3 — OPEN THE PROJECT IN ANTIGRAVITY
 --------------------------------------------------
 1. Open Antigravity
 2. Click: File → Open Folder
-3. Pick the unzipped project folder from Step 1
+3. Pick the Vymotion project folder from Step 1
 
 
 STEP 4 — ADD CLAUDE (your helper)

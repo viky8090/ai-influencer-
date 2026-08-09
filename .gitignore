@@ -3,3 +3,7 @@ dist
 .DS_Store
 *.local
 .claude/
+.claude/settings.local.json
+
+# Real Postiz secrets — only postiz.env.example is tracked.
+worker/postiz/postiz.env

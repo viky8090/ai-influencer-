@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { handleOAuthCallback } from '../utils/higgsfieldAuth'
+import { glassBtnPrimary } from '../ui/glass'
+import { useSEO } from '../ui/seo'
 
 export default function AuthCallback() {
+  useSEO({ path: '/auth/callback' })
+
   const navigate = useNavigate()
   const [error, setError] = useState(null)
   const ran = useRef(false)
@@ -48,21 +52,20 @@ export default function AuthCallback() {
   }, [])
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'transparent' }}>
       {error ? (
-        <div style={{ textAlign: 'center', maxWidth: 380, padding: 32 }}>
+        <div className="reveal glass" style={{ textAlign: 'center', maxWidth: 380, padding: 32 }}>
           <div style={{ fontSize: 32, marginBottom: 16 }}>⚠️</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Connection failed</div>
           <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>{error}</div>
-          <button onClick={() => navigate('/settings')} style={{ padding: '10px 24px', borderRadius: 8, background: 'var(--text-primary)', color: '#fff', fontSize: 14, fontWeight: 600 }}>
+          <button onClick={() => navigate('/settings')} className="liquid-press" style={{ ...glassBtnPrimary, padding: '10px 26px', fontSize: 14 }}>
             Back to Settings
           </button>
         </div>
       ) : (
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid var(--accent)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+        <div className="reveal" style={{ textAlign: 'center' }}>
+          <div className="blob-loader" style={{ width: 42, height: 42, margin: '0 auto 18px' }} />
           <div style={{ fontSize: 15, color: 'var(--text-secondary)' }}>Connecting your Higgsfield account…</div>
-          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
         </div>
       )}
     </div>

@@ -1,73 +1,207 @@
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Layer order: the universal reset lives in `vy-reset`, declared BEFORE Astryx's
+   `astryx-base` layer (declaration order = priority order, later wins). Keeping the
+   reset layered lets Astryx component padding/margin/gap apply; an unlayered
+   `* { padding: 0 }` would silently strip spacing from every Astryx component. */
+@layer vy-reset, astryx-base;
+
+@layer vy-reset {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 :root {
-  --bg: #F5F5F7;
+  /* ── Vymotion brand tokens — Editorial Studio ── */
+  --brand: #C7F24E;
+  --brand-hover: #D4F56B;
+  --brand-ink: #0A0A0B;
+  --accent-2: #FF3D8B;
+  --radius: 10px;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Headings run on Bricolage Grotesque, body/UI stays Inter.
+     Inter-everywhere is the most-cited "this was AI-generated" tell in current design
+     criticism (alongside blue-purple gradients and vague hero headlines) precisely because
+     it is the neutral default every generator reaches for. Bricolage is the opposite bet:
+     an intentionally non-neutral grotesque with real character in the counters and
+     terminals, which is what "Editorial Studio" was always claiming to be.
+     This token existed before but pointed back at Inter, so nothing ever used it. */
+  --font-display: 'Bricolage Grotesque', 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', system-ui, sans-serif;
+
+  /* Motion — functional, not liquid theatre */
+  --ease-liquid: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-jelly: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Legacy glass dial kept for Settings compatibility; Editorial surfaces ignore blur */
+  --glass-strength: 0;
+  --blur-sm: 0px;
+  --blur-md: 0px;
+  --blur-lg: 0px;
+
+  /* ── Light theme ── */
+  --bg: #F4F4F5;
   --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F0F0F2;
+  --bg-tertiary: #ECECEE;
   --surface: #FFFFFF;
-  --surface-hover: #F5F5F7;
-  --border: rgba(0, 0, 0, 0.08);
-  --border-subtle: rgba(0, 0, 0, 0.05);
-  --text-primary: #1D1D1F;
-  --text-secondary: #6E6E73;
-  --text-tertiary: #AEAEB2;
-  --accent: #0071E3;
-  --accent-hover: #0077ED;
-  --accent-light: rgba(0, 113, 227, 0.08);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
+  --surface-hover: #F0F0F2;
+  --border: rgba(10, 10, 11, 0.10);
+  --border-subtle: rgba(10, 10, 11, 0.06);
+  --text-primary: #0A0A0B;
+  --text-secondary: rgba(10, 10, 11, 0.58);
+  --text-tertiary: rgba(10, 10, 11, 0.40);
+  --accent: #18181B;
+  --accent-hover: #000000;
+  --accent-light: rgba(199, 242, 78, 0.22);
+  /* Solid panel aliases (export names still say glass*) */
+  --glass-bg: #FFFFFF;
+  --glass-bg-strong: #FFFFFF;
+  --glass-border: rgba(10, 10, 11, 0.10);
+  --glass-highlight: transparent;
+  --glow-brand: none;
+  --shadow-sm: 0 1px 2px rgba(10, 10, 11, 0.05);
+  --shadow-md: 0 4px 16px rgba(10, 10, 11, 0.08);
+  --shadow-lg: 0 12px 40px rgba(10, 10, 11, 0.12);
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --nav-h: 56px;
+
+  /* ── Marketing surface (LIGHT) ──────────────────────────────────────────────
+     Consumed via the `M` object in src/ui/marketing.jsx, which is spread into
+     inline styles across Landing / HowItWorks / Earnings / Contact / legal /
+     404 / Footer / charts. Those used to be hardcoded near-black hex, which is
+     why the marketing pages ignored the theme entirely.
+
+     Two brand tokens, deliberately: --m-brand is the lime FILL (CTA background,
+     dots) and always stays lime because it carries dark ink on top. --m-brand-text
+     is the same hue pushed dark enough to read as TEXT on a light canvas — lime
+     text on white is ~1.4:1 and effectively invisible. */
+  --m-bg: #FFFFFF;
+  --m-bg-top: #FAFAFA;
+  --m-ink: #0A0A0B;
+  --m-sub: rgba(10, 10, 11, 0.66);
+  /* 0.45 (the mirror of the dark value) only reaches ~3.1:1 on the light card colour, which
+     fails WCAG AA for body text. 0.55 lands at ~4.7:1. */
+  --m-faint: rgba(10, 10, 11, 0.58);
+  --m-line: rgba(10, 10, 11, 0.12);
+  --m-line-soft: rgba(10, 10, 11, 0.07);
+  --m-card: #FAFAFA;
+  --m-card-hi: #F1F1F2;
+  --m-brand: #C7F24E;
+  --m-brand-text: #4D7C0F;
+  --m-brand-ink: #0A0A0B;
+  --m-pink: #DB2777;
+  --m-teal: #0D9488;
+  /* Structural washes used by the Landing hero and section tints. */
+  --m-tint: rgba(10, 10, 11, 0.025);
+  --m-hero-veil: rgba(255, 255, 255, 0.82);
+  --m-accent-soft: rgba(77, 124, 15, 0.10);
+  --m-surface-soft: rgba(10, 10, 11, 0.04);
+  --m-trustbar: rgba(10, 10, 11, 0.02);
+  --m-media-border: rgba(10, 10, 11, 0.10);
+  --m-media-shadow: 0 16px 40px rgba(10, 10, 11, 0.14);
+  --m-ghost: rgba(10, 10, 11, 0.14);
+  --m-brand-border: rgba(77, 124, 15, 0.45);
+  --m-pink-soft: rgba(219, 39, 119, 0.08);
+  /* Lime CTA sits on a light canvas: a white hairline vanishes, so use a dark one and
+     swap the neon glow for a plain elevation shadow. */
+  --m-cta-border: rgba(10, 10, 11, 0.16);
+  --m-cta-glow: 0 6px 18px rgba(10, 10, 11, 0.10);
 }
 
+/* ── Dark theme — primary Editorial Studio expression ── */
 [data-theme="dark"] {
-  --bg: #07070E;
-  --bg-secondary: #0F0F1C;
-  --bg-tertiary: #1C1C2E;
-  --surface: #111120;
-  --surface-hover: #1A1A2E;
-  --border: rgba(255,255,255,0.14);
-  --border-subtle: rgba(255,255,255,0.07);
-  --text-primary: rgba(255,255,255,0.93);
-  --text-secondary: rgba(255,255,255,0.50);
-  --text-tertiary: rgba(255,255,255,0.28);
-  --accent: #A78BFA;
-  --accent-hover: #C4B5FD;
-  --accent-light: rgba(139,92,246,0.14);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.7), 0 4px 8px rgba(0,0,0,0.4);
+  --bg: #0A0A0B;
+  --bg-secondary: #151517;
+  --bg-tertiary: #1C1C1F;
+  --surface: #151517;
+  --surface-hover: #1C1C1F;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --text-primary: #F4F4F5;
+  --text-secondary: rgba(255, 255, 255, 0.58);
+  --text-tertiary: rgba(255, 255, 255, 0.40);
+  --accent: #C7F24E;
+  --accent-hover: #D4F56B;
+  --accent-light: rgba(199, 242, 78, 0.12);
+  --glass-bg: #151517;
+  --glass-bg-strong: #151517;
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-highlight: transparent;
+  --glow-brand: none;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.50);
+
+  /* ── Marketing surface (DARK) ───────────────────────────────────────────────
+     These are the literal values the `M` object hardcoded before it was
+     tokenised, so dark mode renders exactly as it always has. */
+  --m-bg: #0A0A0B;
+  --m-bg-top: #0A0A0B;
+  --m-ink: #F4F4F5;
+  --m-sub: rgba(255, 255, 255, 0.58);
+  /* Mirrors the light-theme correction above. 0.40 measures 3.77-3.83:1 against the dark
+     surfaces this token is used on, which fails WCAG AA for body text — and this token
+     carries the reassurance copy ("No card required", "not a guarantee of income") plus
+     every chart axis label. 0.58 lands at ~5.9:1. */
+  --m-faint: rgba(255, 255, 255, 0.58);
+  --m-line: rgba(255, 255, 255, 0.10);
+  --m-line-soft: rgba(255, 255, 255, 0.06);
+  --m-card: #151517;
+  --m-card-hi: #1C1C1F;
+  --m-brand: #C7F24E;
+  --m-brand-text: #C7F24E;
+  --m-brand-ink: #0A0A0B;
+  --m-pink: #FF3D8B;
+  --m-teal: #38C7B6;
+  --m-tint: rgba(199, 242, 78, 0.03);
+  --m-hero-veil: rgba(10, 10, 11, 0.88);
+  --m-accent-soft: rgba(199, 242, 78, 0.12);
+  --m-surface-soft: rgba(255, 255, 255, 0.05);
+  --m-trustbar: rgba(255, 255, 255, 0.015);
+  --m-media-border: rgba(255, 255, 255, 0.12);
+  --m-media-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --m-ghost: rgba(255, 255, 255, 0.16);
+  --m-brand-border: rgba(199, 242, 78, 0.45);
+  --m-pink-soft: rgba(255, 61, 139, 0.08);
+  --m-cta-border: rgba(255, 255, 255, 0.35);
+  --m-cta-glow: 0 0 26px rgba(199, 242, 78, 0.28);
 }
 
-@keyframes cs-pulse {
-  0%, 100% { opacity: 0.5; }
-  50%       { opacity: 1;   }
+/* ── Display type ────────────────────────────────────────────────────────────
+   Route every heading through --font-display. Deliberately UNLAYERED so it wins
+   over Astryx's own layered component typography - Astryx sets the size, weight
+   and rhythm (which we want to keep); this only swaps the family.
+
+   Scoped to headings on purpose. Body copy, labels, inputs and dense data stay on
+   Inter, which is genuinely better at small sizes - the goal is a distinctive
+   voice at display sizes, not novelty everywhere. */
+h1, h2,
+.astryx-heading,
+.astryx-text.display-1,
+.astryx-text.display-2,
+.astryx-text.display-3 {
+  font-family: var(--font-display);
 }
-@keyframes cs-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%);  }
-}
-@keyframes cs-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+
+html {
+  background: var(--bg);
 }
 
 html, body {
   height: 100%;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-  background: var(--bg);
+  font-family: var(--font-ui);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
+}
+
+body {
+  background: var(--bg);
 }
 
 #root {
@@ -78,25 +212,36 @@ button {
   font-family: inherit;
   cursor: pointer;
   border: none;
-  outline: none;
   background: none;
+}
+
+/* `button { outline: none }` used to live in the rule above, unlayered, which beat every
+   layered :focus-visible rule in the app including Astryx's. The result was that anchors
+   showed a focus ring and buttons showed nothing — and every CTA on the marketing pages is
+   a button, so keyboard users had no visible position anywhere. WCAG 2.4.7.
+   Unlayered on purpose: it has to win the same specificity fight the old reset was winning. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Anchored sections (#how, #earnings, #pricing, #faq …) are scrolled to by the hero's
+   "See how it works" button and by five footer links. Without this they land underneath the
+   fixed nav, clipping their own heading. */
+section[id] {
+  scroll-margin-top: calc(var(--nav-h) + 24px);
 }
 
 input, textarea, select {
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out), background 0.15s var(--ease-out);
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.10);
-}
-
-[data-theme="dark"] input:focus,
-[data-theme="dark"] textarea:focus,
-[data-theme="dark"] select:focus {
-  box-shadow: 0 0 0 3px rgba(167,139,250,0.15);
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 3px rgba(199, 242, 78, 0.18);
 }
 
 select {
@@ -118,34 +263,136 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.15);
+  background: rgba(0, 0, 0, 0.18);
   border-radius: 3px;
 }
 
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .dark-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .dark-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* view-transition overrides are injected dynamically in theme.jsx */
+/* ════════════════════════════════════════════════════════════════════
+   MOTION — short, functional
+   ════════════════════════════════════════════════════════════════════ */
 
-@keyframes theme-btn-press {
-  0%   { transform: scale(1) rotate(0deg); }
-  25%  { transform: scale(0.72) rotate(-20deg); }
-  100% { transform: scale(1) rotate(0deg); }
+@keyframes editorial-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.reveal   { animation: editorial-reveal 0.35s var(--ease-out) both; }
+.reveal-1 { animation: editorial-reveal 0.35s var(--ease-out) 0.04s both; }
+.reveal-2 { animation: editorial-reveal 0.35s var(--ease-out) 0.08s both; }
+.reveal-3 { animation: editorial-reveal 0.35s var(--ease-out) 0.12s both; }
+.reveal-4 { animation: editorial-reveal 0.35s var(--ease-out) 0.16s both; }
+.reveal-5 { animation: editorial-reveal 0.35s var(--ease-out) 0.20s both; }
+.reveal-6 { animation: editorial-reveal 0.35s var(--ease-out) 0.24s both; }
+
+/* Keep names used by existing markup; implementations simplified */
+@keyframes sheen-sweep {
+  from { transform: translateX(-130%); }
+  to   { transform: translateX(230%); }
 }
 
-@keyframes hf-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(236,72,153,0.0), 0 4px 24px rgba(139,92,246,0.25); }
-  50%       { box-shadow: 0 0 0 6px rgba(236,72,153,0.12), 0 4px 24px rgba(139,92,246,0.40); }
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+.blob-loader {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--brand);
+  background: transparent;
+  box-shadow: none;
+  animation: spinner-rotate 0.7s linear infinite;
 }
 
-@keyframes hf-float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-3px); }
+/* Breathing CTA / status dots: full-opacity at rest, soft dip mid-cycle.
+   Opacity-only — droplet-wobble owns transform so the two can be combined
+   on one element without the later animation clobbering the first. */
+@keyframes liquid-breath {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.72; }
+}
+
+/* Droplet wobble: squash-and-stretch with a border-radius morph.
+   Transform/border-radius only (no opacity) — see liquid-breath note. */
+@keyframes droplet-wobble {
+  0%, 100% { transform: scale(1) rotate(0deg); border-radius: 30%; }
+  25%       { transform: scale(1.14, 0.86) rotate(3deg); border-radius: 46%; }
+  50%       { transform: scale(0.9, 1.1) rotate(-2deg); border-radius: 38%; }
+  75%       { transform: scale(1.06, 0.94) rotate(1deg); border-radius: 50%; }
+}
+
+@keyframes liquid-flow {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Nav credit-chip loading dot */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.82); }
+}
+
+/* Studio skeleton shimmer: sweeps the gradient via background-position so the
+   inset:0 overlay never moves in layout (no clipping requirements on parents). */
+@keyframes ps-shimmer {
+  0%   { background-size: 250% 100%; background-position: 180% 0; }
+  100% { background-size: 250% 100%; background-position: -80% 0; }
+}
+
+/* Empty-state aurora blobs (Influencers dark empty state) — slow drifts */
+@keyframes aurora-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%       { transform: translate3d(4vw, 6vh, 0) scale(1.08); }
+  66%       { transform: translate3d(-3vw, -4vh, 0) scale(0.94); }
+}
+@keyframes aurora-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  40%       { transform: translate3d(-5vw, 5vh, 0) scale(1.1); }
+  75%       { transform: translate3d(2vw, -3vh, 0) scale(0.96); }
+}
+@keyframes aurora-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  30%       { transform: translate3d(3vw, -5vh, 0) scale(1.06); }
+  70%       { transform: translate3d(-4vw, 4vh, 0) scale(1.12); }
+}
+
+/* Surface utility classes (legacy .glass names) */
+.glass {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-md);
+}
+.glass-strong {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+}
+.glass-hover {
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+}
+.glass-hover:hover {
+  background: var(--surface-hover);
+  border-color: rgba(199, 242, 78, 0.35);
+}
+
+.liquid-press {
+  transition: transform 0.12s var(--ease-out), filter 0.15s var(--ease-out);
+}
+.liquid-press:active {
+  transform: scale(0.98);
 }
 
 /* ── Responsive grids ── */
@@ -158,35 +405,85 @@ a {
   .inf-img-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
 }
 
-
-/* ── Orb animations (shared across Landing + Influencers empty state) ── */
-@keyframes orb1 {
-  0%, 100% { transform: translate(0,0) scale(1); }
-  33%       { transform: translate(55px,-45px) scale(1.07); }
-  66%       { transform: translate(-35px,38px) scale(0.93); }
+/* Eyebrow kicker: lime square + tracked uppercase label + hairline */
+.vy-eyebrow {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 1.6px;
+  text-transform: uppercase; color: var(--text-tertiary);
+  min-width: 0; white-space: nowrap;
 }
-@keyframes orb2 {
-  0%, 100% { transform: translate(0,0) scale(1); }
-  50%       { transform: translate(-45px,55px) scale(1.11); }
+.vy-eyebrow::before {
+  content: ''; width: 7px; height: 7px; flex-shrink: 0;
+  background: var(--brand); border-radius: 2px;
 }
-@keyframes orb3 {
-  0%, 100% { transform: translate(0,0) scale(1); }
-  40%       { transform: translate(35px,-55px) scale(0.90); }
-  70%       { transform: translate(-55px,22px) scale(1.08); }
-}
-
-@keyframes progress-slide {
-  from { background-position: 100% 0; }
-  to   { background-position: -100% 0; }
+.vy-eyebrow::after {
+  content: ''; flex: 1; height: 1px; min-width: 24px;
+  background: var(--border);
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* Create wizard shell */
+.vy-wizard-shell {
+  display: grid; grid-template-columns: 210px minmax(0, 1fr);
+  gap: 40px; align-items: start;
+}
+.vy-step-rail { position: sticky; top: calc(var(--nav-h) + 20px); }
+@media (max-width: 900px) {
+  .vy-wizard-shell { grid-template-columns: 1fr; gap: 20px; }
+  .vy-step-rail { position: static; display: flex !important; flex-direction: row !important; gap: 4px !important; overflow-x: auto; padding-bottom: 4px; }
+  .vy-step-rail .vy-rail-line { display: none !important; }
+  .vy-step-rail .vy-rail-item { flex-direction: column !important; align-items: center !important; gap: 5px !important; padding: 8px 10px !important; flex: 1; }
 }
 
-/* ── Nav mobile ── */
-@media (max-width: 640px) {
-  .nav-root { padding: 0 12px !important; gap: 2px !important; }
-  .nav-link  { padding: 5px 8px !important; font-size: 12px !important; }
+/* Settings side-label sections */
+.vy-side-section { display: grid; grid-template-columns: 190px minmax(0, 1fr); }
+@media (max-width: 760px) {
+  .vy-side-section { grid-template-columns: 1fr; }
+  .vy-side-section > .vy-side-label { border-right: none !important; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px !important; }
+}
+
+/* ── Nav — sticky full-width editorial bar ── */
+.nav-hamburger { display: none !important; }
+@media (max-width: 820px) {
   .nav-brand-label { display: none !important; }
+  .nav-links-inline { display: none !important; }
+  .nav-desktop-only { display: none !important; }
+  .nav-create-label { display: none !important; }
+  .nav-hamburger { display: flex !important; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-1, .reveal-2, .reveal-3, .reveal-4, .reveal-5, .reveal-6 {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
+  }
+  .blob-loader { animation: none; border-top-color: var(--brand); opacity: 0.8; }
+}
+
+/* ── Morphic Navbar Utilities ── */
+.mx-auto { margin-left: auto; margin-right: auto; }
+.max-w-4xl { max-width: 56rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.p-1\.5 { padding: 0.375rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.overflow-hidden { overflow: hidden; }
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-l-xl { border-top-left-radius: 0.75rem; border-bottom-left-radius: 0.75rem; }
+.rounded-r-xl { border-top-right-radius: 0.75rem; border-bottom-right-radius: 0.75rem; }
+.mx-2 { margin-left: 0.5rem; margin-right: 0.5rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.font-semibold { font-weight: 600; }
+.transition-all { transition-property: all; timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+.duration-300 { transition-duration: 300ms; }
+
+.bg-black { background-color: #0F0F11; }
+.text-white { color: #FFFFFF; }
+
+[data-theme="dark"] .dark\:bg-white { background-color: #FFFFFF !important; }
+[data-theme="dark"] .dark\:text-black { color: #0F0F11 !important; }
+
+

@@ -1,3 +1,5 @@
+import { isVymotionSession, serverPrompt } from '../api/serverGenerate'
+
 const CLAUDE_KEY = 'claude_api_key'
 
 const SYSTEM = `You are a visual prompt assistant for an AI influencer image generator.
@@ -11,40 +13,55 @@ Respond with a JSON object only — no explanation, no markdown:
 {"styleSignal":"tag1, tag2","sceneNiche":"lifestyle"}`
 
 export async function analyzeBackstory(backstory, physicalDesc) {
-  const apiKey = localStorage.getItem(CLAUDE_KEY)
-  if (!apiKey) { console.log('[Claude] no API key in localStorage — skipping backstory analysis'); return null }
   if (!backstory?.trim()) { console.log('[Claude] no backstory — skipping'); return null }
+
+  const vymotion = isVymotionSession()
+  const apiKey = vymotion ? null : localStorage.getItem(CLAUDE_KEY)
+  // Signed-out users still need their own key; signed-in Vymotion users go through the
+  // metered server path (no key in the browser).
+  if (!vymotion && !apiKey) { console.log('[Claude] no API key in localStorage — skipping backstory analysis'); return null }
 
   console.log('[Claude] analyzing backstory...')
   const userMsg = `Backstory: ${backstory.trim()}\nPhysical description: ${physicalDesc?.trim() || 'not specified'}`
 
   try {
-    const res = await fetch('/api/claude', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
+    let text
+    if (vymotion) {
+      const out = await serverPrompt({
         system: SYSTEM,
         messages: [{ role: 'user', content: userMsg }],
-      }),
-    })
+        maxTokens: 150,
+        model: 'claude-haiku-4-5-20251001',
+      })
+      text = out.text?.trim()
+    } else {
+      const res = await fetch('/api/claude', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 150,
+          system: SYSTEM,
+          messages: [{ role: 'user', content: userMsg }],
+        }),
+      })
 
-    if (!res.ok) {
-      console.error('[Claude] HTTP error', res.status, await res.text().catch(() => ''))
-      return null
+      if (!res.ok) {
+        console.error('[Claude] HTTP error', res.status, await res.text().catch(() => ''))
+        return null
+      }
+
+      const data = await res.json()
+      if (data.error) {
+        console.error('[Claude] API error:', data.error)
+        return null
+      }
+      text = data.content?.[0]?.text?.trim()
     }
 
-    const data = await res.json()
-    if (data.error) {
-      console.error('[Claude] API error:', data.error)
-      return null
-    }
-
-    const text = data.content?.[0]?.text?.trim()
     if (!text) { console.error('[Claude] empty response'); return null }
 
     const jsonText = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()

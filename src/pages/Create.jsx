@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { flushSync } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth, useClerk } from '@clerk/react'
+import { Button, Text, Badge } from '@astryxdesign/core'
 import { useInfluencers, generateId } from '../store'
 import { buildThreeVariationPrompts } from '../utils/systemPrompt'
 import { analyzeBackstory } from '../utils/backstoryAnalysis'
 import { generateThreeImages } from '../utils/higgsfieldGenerate'
-import { isHFConnected, startHiggsfieldOAuthPopup } from '../utils/higgsfieldAuth'
 import { compressImage } from '../utils/imageUtils'
 import { gColor } from '../utils/influencerUtils'
+import { glassPanel, glassInput, glassBtnPrimary, pressHandlers } from '../ui/glass'
+import AIAssist from '../components/AIAssist'
+import AstryxScope from '../ui/ax/AstryxScope'
+import { useSEO } from '../ui/seo'
 
 const NICHES = ['Fashion', 'Beauty', 'Lifestyle', 'Fitness', 'Travel', 'Food & Dining', 'Tech', 'Gaming', 'Finance', 'Entertainment', 'Wellness', 'Sports', 'Other']
 const VIBE_OPTIONS = [
@@ -30,9 +35,11 @@ const STEPS = ['Basics', 'References', 'Story', 'Look', 'Generate']
 
 const MODELS = [
   { id: 'soul_2',            name: 'Higgsfield Soul', tag: 'Influencer-Native',   tagColor: '#EC4899', provider: 'higgsfield',              desc: 'Native model for fashion and UGC.',          maxRefs: 1 },
-  { id: 'gpt_image_2',       name: 'GPT Image 2',     tag: 'Max Quality',         tagColor: '#10B981', provider: 'openai',                  desc: 'Highest quality output, maximum realism.',   maxRefs: 2 },
-  { id: 'nano_banana_2',     name: 'Nano Banana Pro', tag: 'Sharpest Detail',     tagColor: '#8B5CF6', provider: 'banana', version: 'Pro', desc: 'Maximum detail and portrait precision.',     maxRefs: 2 },
-  { id: 'nano_banana_flash', name: 'Nano Banana 2',   tag: 'Fastest',             tagColor: '#0EA5E9', provider: 'banana', version: '2',   desc: 'Rapid results, still premium quality.',      maxRefs: 2 },
+  { id: 'gpt_image_2',       name: 'GPT Image 2',     tag: 'Max Quality',         tagColor: '#10B981', provider: 'openai',                  desc: 'OpenAI — highest quality, maximum realism.', maxRefs: 2 },
+  { id: 'nano_banana_2',     name: 'Nano Banana Pro', tag: 'Sharpest Detail',     tagColor: 'var(--brand)', provider: 'banana', version: 'Pro', desc: 'Google Gemini Pro — max detail & precision.', maxRefs: 2 },
+  { id: 'nano_banana_flash', name: 'Nano Banana 2',   tag: 'Fastest',             tagColor: '#0EA5E9', provider: 'banana', version: '2',   desc: 'Google Gemini Flash — rapid, still premium.', maxRefs: 2 },
+  { id: 'seedream_4',        name: 'Seedream 4',      tag: 'Cinematic',           tagColor: '#8B5CF6', provider: 'bytedance',               desc: 'ByteDance flagship — cinematic color & light.', maxRefs: 2 },
+  { id: 'flux_krea',         name: 'FLUX Krea',       tag: 'Aesthetic',           tagColor: '#F59E0B', provider: 'krea',                    desc: 'Krea-tuned realism — zero “AI look”. No refs.', maxRefs: 0 },
 ]
 const MODEL_PREF_KEY = 'aiis_model_pref'
 
@@ -53,7 +60,7 @@ const HAIR_COLORS = [
   { id: 'auburn',   label: 'Auburn',    swatch: '#9B3A2A' },
   { id: 'red',      label: 'Red',       swatch: '#C0392B' },
   { id: 'silver',   label: 'Silver',    swatch: '#A8A8A8' },
-  { id: 'dyed',     label: 'Dyed',      swatch: 'linear-gradient(135deg,#EC4899,#8B5CF6)' },
+  { id: 'dyed',     label: 'Dyed',      swatch: 'var(--brand)' },
 ]
 const HAIR_LENGTHS_FEMALE = ['Short', 'Medium', 'Long', 'Extra long']
 const HAIR_LENGTHS_MALE   = ['Buzz cut', 'Short', 'Medium', 'Long']
@@ -84,7 +91,7 @@ function buildPhysicalDescString(d) {
 }
 
 // Floating card configuration
-const ALL_IMGS = ['/inf/i1.png', '/inf/i2.png', '/inf/i3.jpg', '/inf/i4.jpg', '/inf/i5.png', '/inf/i6.jpg', '/inf/i7.png', '/inf/i8.png', '/inf/i9.png', '/inf/i10.png', '/inf/i11.png', '/inf/i12.png', '/inf/i13.png', '/inf/i14.png', '/inf/i15.png', '/inf/i16.png']
+const ALL_IMGS = ['/inf/i1.webp', '/inf/i2.webp', '/inf/i3.jpg', '/inf/i4.jpg', '/inf/i5.webp', '/inf/i6.jpg', '/inf/i7.webp', '/inf/i8.webp', '/inf/i9.webp', '/inf/i10.webp', '/inf/i11.webp', '/inf/i12.webp', '/inf/i13.webp', '/inf/i14.webp', '/inf/i15.webp', '/inf/i16.webp']
 const CARD_CONFIG = [
   { left: '1%',  top: '15%', w: 162, rot: '-9deg',  op: 0.48, period: 9,  sway: 12, delay: 0.0 },
   { left: '5%',  top: '58%', w: 140, rot:  '5deg',  op: 0.34, period: 11, sway: 15, delay: 1.9 },
@@ -95,15 +102,22 @@ const CARD_CONFIG = [
 // Theme tokens — map to CSS variables so dark mode is automatic
 const L = {
   bg: 'var(--bg)',
-  surface: 'var(--surface)',
-  surfaceAlt: 'var(--bg-tertiary)',
-  border: 'var(--border)',
-  borderFocus: '#8B5CF6',
+  surface: 'var(--glass-bg)',
+  surfaceAlt: 'var(--bg-secondary)',
+  border: 'var(--glass-border)',
+  borderFocus: 'var(--brand)',
   text: 'var(--text-primary)',
   textSub: 'var(--text-secondary)',
   textFaint: 'var(--text-tertiary)',
-  card: 'var(--shadow-md)',
-  cardHover: 'var(--shadow-lg)',
+  card: 'inset 0 1px 0 var(--glass-highlight), var(--shadow-md)',
+  cardHover: 'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg), var(--glow-brand)',
+}
+
+// Shared frosted-glass panel container used by the wizard step cards.
+const panel = {
+  ...glassPanel,
+  borderRadius: 'var(--radius-xl)',
+  padding: '22px',
 }
 
 const CREATION_PARAMS_KEY = 'hf_creation_params'
@@ -119,19 +133,25 @@ function saveCreationParams(influencerId, params) {
 
 const inputCls = 'create-input'
 const inputStyle = {
-  width: '100%', padding: '13px 16px', borderRadius: 12,
-  border: `1.5px solid ${L.border}`, background: L.surfaceAlt,
-  fontSize: 15, color: L.text, boxSizing: 'border-box',
+  ...glassInput,
+  width: '100%', padding: '13px 16px',
+  fontSize: 15, boxSizing: 'border-box',
   outline: 'none', fontFamily: 'inherit',
-  transition: 'border-color 0.15s, box-shadow 0.15s',
+  transition: 'border-color 0.4s var(--ease-liquid), box-shadow 0.4s var(--ease-liquid), background 0.4s var(--ease-liquid)',
 }
 const taStyle = { ...inputStyle, resize: 'vertical', lineHeight: 1.65 }
 
 function Lbl({ children, optional }) {
   return (
-    <div style={{ fontSize: 11.5, fontWeight: 700, color: L.textFaint, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 9, display: 'flex', gap: 7, alignItems: 'center' }}>
-      {children}
-      {optional && <span style={{ fontSize: 10, fontWeight: 500, color: L.textFaint, textTransform: 'none', letterSpacing: 0 }}>optional</span>}
+    <div style={{ marginBottom: 9, display: 'flex', gap: 7, alignItems: 'center' }}>
+      <Text type="supporting" size="xsm" weight="bold" color="secondary" style={{ textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+        {children}
+      </Text>
+      {optional && (
+        <Text type="supporting" size="xsm" color="secondary" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
+          optional
+        </Text>
+      )}
     </div>
   )
 }
@@ -170,11 +190,11 @@ function FloatingCards() {
           ...(c.left ? { left: c.left } : { right: c.right }),
           width: c.w, transform: `rotate(${c.rot})`,
           opacity: 0, '--t-op': c.op,
-          animation: `cAppear 0.9s ease ${c.delay + 0.2}s forwards`,
+          animation: `cCondense 1.1s var(--ease-liquid) ${c.delay + 0.2}s forwards`,
           pointerEvents: 'none', zIndex: 0,
         }}>
           <div style={{
-            animation: `cFloat ${c.period}s ease-in-out ${c.delay}s infinite, cSway ${c.sway}s ease-in-out ${c.delay * 0.6}s infinite`,
+            animation: `cDrift ${c.period * 1.4}s var(--ease-liquid) ${c.delay}s infinite`,
             borderRadius: 18, overflow: 'hidden',
             boxShadow: '0 24px 64px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04)',
             opacity: fading[i] ? 0 : 1, transition: 'opacity 0.7s ease',
@@ -187,29 +207,47 @@ function FloatingCards() {
   )
 }
 
-// ── Step indicator ────────────────────────────────────────────
-function StepIndicator({ current }) {
+// ── Step rail (Phase 10 remix) ────────────────────────────────
+// Vertical ledger rail on desktop (sticky, numbered rows on a hairline spine);
+// collapses to a horizontal chip strip on mobile via .vy-step-rail CSS.
+function StepRail({ current }) {
+  // Position comes from .vy-step-rail CSS (sticky on desktop) — sticky is a positioned
+  // ancestor, so the absolute spine below still anchors correctly.
   return (
-    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 52 }}>
+    <div className="vy-step-rail" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* spine */}
+      <div className="vy-rail-line" style={{ position: 'absolute', left: 13, top: 14, bottom: 14, width: 1, background: 'var(--glass-border)' }} />
       {STEPS.map((label, i) => {
         const n = i + 1; const done = n < current; const active = n === current
         return (
-          <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < STEPS.length - 1 ? 1 : 'none' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: '50%', fontSize: 12, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                background: done ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : active ? 'var(--text-primary)' : L.surfaceAlt,
-                color: done ? '#fff' : active ? 'var(--bg)' : L.textFaint,
-                border: done || active ? 'none' : `1.5px solid ${L.border}`,
-                transition: 'all 0.25s',
-                boxShadow: active ? '0 0 0 5px rgba(139,92,246,0.12)' : 'none',
-              }}>{done ? '✓' : n}</div>
-              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: active ? L.text : L.textFaint, whiteSpace: 'nowrap', transition: 'color 0.2s' }}>{label}</span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div style={{ flex: 1, height: 1.5, background: done ? 'linear-gradient(90deg,#EC4899,#8B5CF6)' : L.border, margin: '0 6px', marginBottom: 22, transition: 'background 0.3s' }} />
-            )}
+          <div key={n} className="vy-rail-item" style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px 10px 4px',
+            borderRadius: '4px 12px 12px 4px', position: 'relative',
+            background: active ? 'var(--glass-bg)' : 'transparent',
+            border: active ? '1px solid var(--glass-border)' : '1px solid transparent',
+            boxShadow: active ? 'inset 0 1px 0 var(--glass-highlight)' : 'none',
+            transition: 'background 0.5s var(--ease-liquid), border-color 0.5s var(--ease-liquid)',
+          }}>
+            <span style={{
+              width: 20, height: 20, borderRadius: 6, flexShrink: 0, zIndex: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 800, fontVariantNumeric: 'tabular-nums',
+              background: done ? 'var(--brand)' : active ? 'var(--text-primary)' : 'var(--bg-secondary)',
+              color: done ? 'var(--brand-ink)' : active ? 'var(--bg)' : L.textFaint,
+              border: done || active ? '1px solid rgba(255,255,255,0.3)' : `1px solid ${L.border}`,
+              boxShadow: done ? '0 0 12px rgba(199,242,78,0.4)' : 'none',
+              transition: 'all 0.5s var(--ease-liquid)',
+            }}>{done ? '✓' : n}</span>
+            <Text
+              type="supporting"
+              size="xsm"
+              weight={active ? 'bold' : 'semibold'}
+              color={active ? 'primary' : done ? 'accent' : 'secondary'}
+              style={{ letterSpacing: '0.6px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}
+            >
+              {label}
+            </Text>
+            {active && <Badge label="Now" variant="success" />}
           </div>
         )
       })}
@@ -235,7 +273,7 @@ function Step1({ data, set, onGenderChange, ageErrorPulse }) {
         <Lbl>Gender</Lbl>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
           {[
-            { g: 'Female', color: '#EC4899', glow: 'rgba(236,72,153,0.10)', icon: '♀' },
+            { g: 'Female', color: '#EC4899', glow: 'rgba(199,242,78,0.10)', icon: '♀' },
             { g: 'Male',   color: '#3B82F6', glow: 'rgba(59,130,246,0.10)', icon: '♂' },
           ].map(({ g, color, glow, icon }) => {
             const on = data.gender === g
@@ -267,7 +305,7 @@ function Step1({ data, set, onGenderChange, ageErrorPulse }) {
         </div>
         {data.age !== '' && Number(data.age) < 18 && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '9px 13px', borderRadius: 10,
+            display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '9px 13px', borderRadius: 'var(--radius-sm)',
             background: ageErrorPulse ? 'rgba(255,59,48,0.10)' : 'rgba(255,59,48,0.05)',
             border: `1px solid ${ageErrorPulse ? 'rgba(255,59,48,0.35)' : 'rgba(255,59,48,0.14)'}`,
             animation: ageErrorPulse ? 'agePulse 0.4s ease' : 'none',
@@ -290,11 +328,11 @@ function Step1({ data, set, onGenderChange, ageErrorPulse }) {
                 set('niches', on ? cur.filter(x => x !== n) : [...cur, n])
               }} style={{
                 padding: '8px 17px', borderRadius: 22, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
-                background: on ? 'rgba(139,92,246,0.09)' : L.surface,
-                color: on ? '#7C3AED' : L.textSub,
+                border: `1.5px solid ${on ? 'var(--brand)' : L.border}`,
+                background: on ? 'rgba(199,242,78,0.09)' : L.surface,
+                color: on ? 'var(--brand)' : L.textSub,
                 transition: 'all 0.15s',
-                boxShadow: on ? '0 0 0 1px #8B5CF655' : 'none',
+                boxShadow: on ? '0 0 0 1px rgba(199,242,78,0.33)' : 'none',
               }}>{n}</button>
             )
           })}
@@ -345,12 +383,12 @@ function RefSlot({ label, hint, value, onChange, note, onNoteChange, notePlaceho
       {value ? (
         <div
           {...dropProps}
-          style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', aspectRatio: '3/4', boxShadow: L.card, outline: dragging ? '2.5px dashed #8B5CF6' : 'none', transition: 'outline 0.15s' }}
+          style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', aspectRatio: '3/4', boxShadow: L.card, outline: dragging ? '2.5px dashed var(--brand)' : 'none', transition: 'outline 0.15s' }}
         >
           <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: dragging ? 0.5 : 1, transition: 'opacity 0.15s' }} />
           {dragging && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.15)', pointerEvents: 'none' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#7C3AED' }}>Drop to replace</span>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(199,242,78,0.15)', pointerEvents: 'none' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--brand)' }}>Drop to replace</span>
             </div>
           )}
           <button
@@ -364,18 +402,18 @@ function RefSlot({ label, hint, value, onChange, note, onNoteChange, notePlaceho
           onClick={() => fileRef.current.click()}
           style={{
             aspectRatio: '3/4', borderRadius: 16, cursor: 'pointer', transition: 'all 0.18s', padding: 16,
-            border: dragging ? '2px dashed #8B5CF6' : '2px dashed var(--border)',
-            background: dragging ? 'rgba(139,92,246,0.08)' : L.surfaceAlt,
+            border: dragging ? '2px dashed var(--brand)' : '2px dashed var(--border)',
+            background: dragging ? 'rgba(199,242,78,0.08)' : L.surfaceAlt,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           }}
-          onMouseEnter={e => { if (!dragging) { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.50)'; e.currentTarget.style.background = 'rgba(139,92,246,0.06)' } }}
+          onMouseEnter={e => { if (!dragging) { e.currentTarget.style.borderColor = 'rgba(199,242,78,0.50)'; e.currentTarget.style.background = 'rgba(199,242,78,0.06)' } }}
           onMouseLeave={e => { if (!dragging) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = L.surfaceAlt } }}
         >
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: L.surface, boxShadow: L.card, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: dragging ? '#8B5CF6' : L.textFaint, transition: 'color 0.15s' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: L.surface, boxShadow: L.card, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: dragging ? 'var(--brand)' : L.textFaint, transition: 'color 0.15s' }}>
             {dragging ? '↓' : '+'}
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: dragging ? '#7C3AED' : L.textSub, marginBottom: 3, transition: 'color 0.15s' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: dragging ? 'var(--brand)' : L.textSub, marginBottom: 3, transition: 'color 0.15s' }}>
               {dragging ? 'Drop image' : 'Upload photo'}
             </div>
             <div style={{ fontSize: 12, color: L.textFaint, lineHeight: 1.4 }}>{hint}</div>
@@ -391,7 +429,7 @@ function RefSlot({ label, hint, value, onChange, note, onNoteChange, notePlaceho
             onChange={e => onNoteChange?.(e.target.value)}
             placeholder={notePlaceholder || 'e.g. jawline, skin tone'}
             style={{
-              width: '100%', padding: '8px 10px', borderRadius: 8,
+              width: '100%', padding: '8px 10px', borderRadius: 'var(--radius-sm)',
               border: '1.5px solid var(--border)', background: L.surfaceAlt,
               fontSize: 12.5, color: L.text, boxSizing: 'border-box',
               outline: 'none', fontFamily: 'inherit',
@@ -440,7 +478,7 @@ function Step2({ data, set }) {
 function Step3({ data, set }) {
   const pv = data.personality ?? 50
   const mood = pv < 35 ? 'Thoughtful & introspective' : pv > 65 ? 'Bold & outgoing' : 'Balanced & versatile'
-  const moodColor = pv < 35 ? '#3B82F6' : pv > 65 ? '#EC4899' : '#8B5CF6'
+  const moodColor = pv < 35 ? '#3B82F6' : pv > 65 ? '#EC4899' : 'var(--brand)'
 
   return (
     <div>
@@ -449,8 +487,17 @@ function Step3({ data, set }) {
         <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>Their story, vibe, what makes them different.</p>
       </div>
 
-      <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card, marginBottom: 16 }}>
-        <Lbl optional>Backstory</Lbl>
+      <div style={{ ...panel, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Lbl optional>Backstory</Lbl>
+          <AIAssist
+            purpose="backstory"
+            title="Write a backstory with AI"
+            context={data}
+            draft={data.backstory}
+            onAccept={v => set('backstory', v)}
+          />
+        </div>
         <textarea
           className={inputCls}
           value={data.backstory}
@@ -461,7 +508,7 @@ function Step3({ data, set }) {
         />
       </div>
 
-      <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card }}>
+      <div style={{ ...panel }}>
         <Lbl>Personality</Lbl>
         <input
           type="range" min={0} max={100} value={pv}
@@ -493,13 +540,13 @@ function PhysicalBuilder({ data, set, gender }) {
       <button onClick={() => set(field, on ? '' : item.id)} style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '6px 12px 6px 7px', borderRadius: 22, cursor: 'pointer',
-        border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
-        background: on ? 'rgba(139,92,246,0.09)' : L.surfaceAlt,
-        boxShadow: on ? '0 0 0 1px #8B5CF655' : 'none',
+        border: `1.5px solid ${on ? 'var(--brand)' : L.border}`,
+        background: on ? 'rgba(199,242,78,0.09)' : L.surfaceAlt,
+        boxShadow: on ? '0 0 0 1px rgba(199,242,78,0.33)' : 'none',
         transition: 'all 0.15s',
       }}>
         <div style={{ width: 13, height: 13, borderRadius: '50%', flexShrink: 0, background: item.swatch, border: '1.5px solid rgba(0,0,0,0.10)' }} />
-        <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? '#7C3AED' : L.textSub, lineHeight: 1 }}>{item.label}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 500, color: on ? 'var(--brand)' : L.textSub, lineHeight: 1 }}>{item.label}</span>
       </button>
     )
   }
@@ -509,11 +556,11 @@ function PhysicalBuilder({ data, set, gender }) {
     return (
       <button onClick={() => set(field, on ? '' : label)} style={{
         padding: '6px 14px', borderRadius: 22, cursor: 'pointer',
-        border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
-        background: on ? 'rgba(139,92,246,0.09)' : L.surfaceAlt,
-        color: on ? '#7C3AED' : L.textSub,
+        border: `1.5px solid ${on ? 'var(--brand)' : L.border}`,
+        background: on ? 'rgba(199,242,78,0.09)' : L.surfaceAlt,
+        color: on ? 'var(--brand)' : L.textSub,
         fontSize: 12.5, fontWeight: 500, lineHeight: 1,
-        boxShadow: on ? '0 0 0 1px #8B5CF655' : 'none',
+        boxShadow: on ? '0 0 0 1px rgba(199,242,78,0.33)' : 'none',
         transition: 'all 0.15s',
       }}>{label}</button>
     )
@@ -522,15 +569,15 @@ function PhysicalBuilder({ data, set, gender }) {
   function SegmentPicker({ options, field }) {
     const val = data[field]
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: 3, background: L.surfaceAlt, borderRadius: 10, padding: 3 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: 3, background: L.surfaceAlt, borderRadius: 'var(--radius-sm)', padding: 3 }}>
         {options.map(opt => {
           const on = val === opt
           return (
             <button key={opt} onClick={() => set(field, opt)} style={{
-              padding: '7px 4px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              padding: '7px 4px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: on ? 700 : 500,
               background: on ? L.surface : 'transparent',
-              color: on ? '#7C3AED' : L.textFaint,
+              color: on ? 'var(--brand)' : L.textFaint,
               boxShadow: on ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
               transition: 'all 0.15s',
               whiteSpace: 'nowrap',
@@ -564,7 +611,7 @@ function PhysicalBuilder({ data, set, gender }) {
           background: L.surfaceAlt, color: L.textSub, fontSize: 12, fontWeight: 600,
           cursor: 'pointer', transition: 'all 0.15s',
         }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.color = '#7C3AED' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = L.border; e.currentTarget.style.color = L.textSub }}
         >
           🎲 Randomize
@@ -657,7 +704,7 @@ function Step4({ data, set }) {
 
       <PhysicalBuilder data={data} set={set} gender={gender} />
 
-      <div style={{ background: L.surface, borderRadius: 18, padding: '22px', boxShadow: L.card }}>
+      <div style={{ ...panel }}>
         <Lbl optional>Aesthetic vibe</Lbl>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
           {visibleVibes.map(v => {
@@ -667,20 +714,20 @@ function Step4({ data, set }) {
                 set('vibeWords', on ? [] : [v.id])
               }} style={{
                 padding: '11px 13px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-                background: on ? 'rgba(139,92,246,0.09)' : L.surfaceAlt,
-                border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
+                background: on ? 'rgba(199,242,78,0.09)' : L.surfaceAlt,
+                border: `1.5px solid ${on ? 'var(--brand)' : L.border}`,
                 transition: 'all 0.15s',
-                boxShadow: on ? '0 0 0 1px #8B5CF655' : 'none',
+                boxShadow: on ? '0 0 0 1px rgba(199,242,78,0.33)' : 'none',
                 display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8,
               }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: on ? '#7C3AED' : L.text, marginBottom: 3 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: on ? 'var(--brand)' : L.text, marginBottom: 3 }}>
                     <span style={{ marginRight: 6 }}>{v.icon}</span>{v.label}
                   </div>
                   <div style={{ fontSize: 11, color: on ? 'rgba(124,58,237,0.6)' : L.textFaint, lineHeight: 1.35 }}>{v.sub}</div>
                 </div>
                 {on && (
-                  <div style={{ width: 17, height: 17, borderRadius: '50%', background: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                  <div style={{ width: 17, height: 17, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                     <svg width="8" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
                 )}
@@ -871,7 +918,7 @@ const FAKE_WAYPOINTS = [
   [205000, 78], [225000, 85], [250000, 89], [300000, 93], [360000, 95],
 ]
 
-const MODEL_EST_MS = { soul_2: 60000, nano_banana_flash: 60000, nano_banana_2: 90000, gpt_image_2: 120000 }
+const MODEL_EST_MS = { soul_2: 60000, nano_banana_flash: 60000, nano_banana_2: 90000, gpt_image_2: 120000, seedream_4: 75000, flux_krea: 45000 }
 
 function estLabel(model, aspectRatio, hasRef = false) {
   const base = MODEL_EST_MS[model] ?? 90000
@@ -949,8 +996,8 @@ function GeneratingScreen({ genProgress, model, aspectRatio, landscape, hasRef =
     return () => clearInterval(id)
   }, [])
 
-  const barGradient = isDipping ? 'linear-gradient(90deg,#F59E0B,#EF4444)' : 'linear-gradient(90deg,#EC4899,#8B5CF6)'
-  const textGradient = isDipping ? 'linear-gradient(135deg,#F59E0B,#EF4444)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)'
+  const barGradient = isDipping ? 'linear-gradient(90deg,#F59E0B,#EF4444)' : 'var(--brand)'
+  const textGradient = isDipping ? 'linear-gradient(135deg,#F59E0B,#EF4444)' : 'var(--brand)'
   const statusLabel = isDipping ? 'recalibrating...' : fakeProgress >= 88 ? 'almost there...' : 'generating...'
 
   return (
@@ -958,10 +1005,10 @@ function GeneratingScreen({ genProgress, model, aspectRatio, landscape, hasRef =
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
         <div style={{
           width: 46, height: 46, borderRadius: 13, flexShrink: 0,
-          background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+          background: 'var(--brand)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           animation: 'genSpin 4s linear infinite',
-          boxShadow: '0 4px 18px rgba(139,92,246,0.45)',
+          boxShadow: '0 4px 18px rgba(199,242,78,0.45)',
         }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
             <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
@@ -976,7 +1023,7 @@ function GeneratingScreen({ genProgress, model, aspectRatio, landscape, hasRef =
       <div style={{ textAlign: 'center', marginBottom: 16 }}>
         <span style={{
           display: 'inline-block', fontSize: 80, fontWeight: 900, lineHeight: 1, letterSpacing: '-4px',
-          color: isDipping ? '#F59E0B' : '#8B5CF6', transition: 'color 0.5s',
+          color: isDipping ? '#F59E0B' : 'var(--brand)', transition: 'color 0.5s',
         }}>{fakeProgress}%</span>
         <div style={{
           fontSize: 11, fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase',
@@ -1005,25 +1052,25 @@ function GeneratingScreen({ genProgress, model, aspectRatio, landscape, hasRef =
           <div key={i} style={{
             aspectRatio: landscape ? '16/9' : '2/3', borderRadius: 18,
             background: 'linear-gradient(160deg, #16082e 0%, #1d0c3a 55%, #120820 100%)',
-            border: '1.5px solid rgba(139,92,246,0.18)',
+            border: '1.5px solid rgba(199,242,78,0.18)',
             position: 'relative', overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(139,92,246,0.18)',
+            boxShadow: '0 8px 32px rgba(199,242,78,0.18)',
           }}>
             {/* sweep shimmer */}
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'linear-gradient(105deg, transparent 30%, rgba(139,92,246,0.13) 50%, transparent 70%)',
+              background: 'linear-gradient(105deg, transparent 30%, rgba(199,242,78,0.13) 50%, transparent 70%)',
               animation: `shimmerSlide 2.6s ease-in-out ${i * 0.55}s infinite`,
             }} />
             {/* bottom pink glow */}
             <div style={{
               position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
-              background: 'linear-gradient(to top, rgba(236,72,153,0.16), transparent)',
+              background: 'linear-gradient(to top, rgba(199,242,78,0.16), transparent)',
               pointerEvents: 'none',
             }} />
             {/* spinning star */}
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(139,92,246,0.28)" style={{ animation: `genSpin ${9 + i * 2.5}s linear infinite` }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(199,242,78,0.28)" style={{ animation: `genSpin ${9 + i * 2.5}s linear infinite` }}>
                 <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
               </svg>
             </div>
@@ -1088,14 +1135,14 @@ function Lightbox({ url, index, onClose }) {
         }}>×</button>
         <button onClick={dl} style={{
           position: 'absolute', bottom: 14, right: 14,
-          padding: '9px 16px', borderRadius: 10,
+          padding: '9px 16px', borderRadius: 'var(--radius-sm)',
           background: 'rgba(0,0,0,0.68)', border: '1px solid rgba(255,255,255,0.16)',
           color: '#fff', fontSize: 13, fontWeight: 600,
           display: 'flex', alignItems: 'center', gap: 7,
           cursor: 'pointer', backdropFilter: 'blur(12px)',
         }}>
           {downloading
-            ? <div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite' }} />
+            ? <div className="blob-loader" style={{ width: 14, height: 14, boxShadow: 'none', background: 'linear-gradient(135deg, rgba(10,10,11,0.85), rgba(10,10,11,0.4))' }} />
             : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           }
           Download
@@ -1150,7 +1197,7 @@ function VariationCard({ url, selected, gc, onSelect, index, landscape, onExpand
       {!selected && (
         <div style={{
           position: 'absolute', top: 10, left: 10,
-          width: 24, height: 24, borderRadius: 8,
+          width: 24, height: 24, borderRadius: 'var(--radius-sm)',
           background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(8px)',
           border: '1px solid rgba(255,255,255,0.18)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1184,13 +1231,13 @@ function VariationCard({ url, selected, gc, onSelect, index, landscape, onExpand
       {hovered && (
         <button onClick={dl} title="Download" style={{
           position: 'absolute', bottom: 10, right: 10,
-          width: 34, height: 34, borderRadius: 10,
+          width: 34, height: 34, borderRadius: 'var(--radius-sm)',
           background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.18)',
           backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: '#fff', cursor: 'pointer',
         }}>
           {downloading
-            ? <div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite' }} />
+            ? <div className="blob-loader" style={{ width: 14, height: 14, boxShadow: 'none', background: 'linear-gradient(135deg, rgba(10,10,11,0.85), rgba(10,10,11,0.4))' }} />
             : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           }
         </button>
@@ -1200,7 +1247,7 @@ function VariationCard({ url, selected, gc, onSelect, index, landscape, onExpand
       {selected && (
         <div style={{
           position: 'absolute', top: 10, left: 10,
-          width: 26, height: 26, borderRadius: 8,
+          width: 26, height: 26, borderRadius: 'var(--radius-sm)',
           background: gc, display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: `0 2px 12px ${gc}66`,
         }}>
@@ -1214,29 +1261,35 @@ function VariationCard({ url, selected, gc, onSelect, index, landscape, onExpand
 function ProviderIcon({ provider, version }) {
   if (provider === 'banana') return (
     <div style={{ position: 'relative', width: 36, height: 36, flexShrink: 0 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, lineHeight: 1 }}>🍌</div>
+      <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, lineHeight: 1 }}>🍌</div>
       <div style={{ position: 'absolute', bottom: -3, right: -5, background: '#D97706', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 6, lineHeight: 1.6, whiteSpace: 'nowrap', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>{version}</div>
     </div>
   )
+  if (provider === 'bytedance') return (
+    <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1, flexShrink: 0 }}>🌊</div>
+  )
+  if (provider === 'krea') return (
+    <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1, flexShrink: 0 }}>🎨</div>
+  )
   if (provider === 'openai') return (
-    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'var(--text-primary)' }}>
         <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
       </svg>
     </div>
   )
-  return <img src="/hf-icon.png" alt="" style={{ width: 36, height: 36, borderRadius: 10, display: 'block', flexShrink: 0 }} />
+  return <img src="/hf-icon.png" alt="" style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', display: 'block', flexShrink: 0 }} />
 }
 
 // ── Step 5: Generate ──────────────────────────────────────────
-function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
+function Step5({ data, onFinish, onReset, isSignedIn }) {
+  const clerk = useClerk()
   const [phase, setPhase] = useState('idle')
   const [genProgress, setGenProgress] = useState(0)
   const [genError, setGenError] = useState(null)
   const [variations, setVariations] = useState([])
   const [selected, setSelected] = useState(null)
   const [lightboxUrl, setLightboxUrl] = useState(null)
-  const [connectingHF, setConnectingHF] = useState(false)
   const [generatedPrompts, setGeneratedPrompts] = useState([])
   const [aspectRatio, setAspectRatio] = useState('9:16')
   const backstoryCtxRef = useRef(null)
@@ -1255,10 +1308,11 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
   const hasRef = !!(data.faceRef || data.styleRef)
 
   useEffect(() => {
-    if (hasRef && model === 'soul_2') {
+    const noRefSupport = model === 'soul_2' || MODELS.find(m => m.id === model)?.maxRefs === 0
+    if (hasRef && noRefSupport) {
       setModel('gpt_image_2')
-    } else if (!hasRef && userModelRef.current === 'soul_2' && model !== 'soul_2') {
-      setModel('soul_2')
+    } else if (!hasRef && userModelRef.current !== model && MODELS.find(m => m.id === userModelRef.current)) {
+      setModel(userModelRef.current) // restore the user's real pick once refs are removed
     }
   }, [hasRef]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1291,38 +1345,19 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
 
   const displayName = data.name?.trim() || 'your influencer'
 
-  async function doConnect() {
-    setConnectingHF(true)
-    try {
-      await startHiggsfieldOAuthPopup()
-      onConnected?.()
-    } catch (e) {
-      if (e.message !== 'cancelled') alert('Failed to connect Higgsfield: ' + e.message)
-    } finally {
-      setConnectingHF(false)
-    }
-  }
-
-  if (!hfConnected) {
+  if (!isSignedIn) {
     return (
       <div>
         <div style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: L.text, marginBottom: 8 }}>Connect Higgsfield to generate</h2>
+          <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-1px', color: L.text, marginBottom: 8 }}>Sign up to generate</h2>
+          <p style={{ fontSize: 15, color: L.textSub, lineHeight: 1.55 }}>Create a free Vymotion account to generate {displayName} — no API keys, credits included.</p>
         </div>
-        <div style={{ background: 'rgba(201,255,0,0.06)', border: '1.5px solid rgba(201,255,0,0.35)', borderRadius: 18, padding: '24px' }}>
+        <div style={{ ...glassPanel, padding: '24px' }}>
           <button
-            onClick={doConnect}
-            disabled={connectingHF}
-            style={{ padding: '10px 22px', borderRadius: 10, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: connectingHF ? 'default' : 'pointer', opacity: connectingHF ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 8 }}
-          >
-            {connectingHF ? (
-              <>
-                <div style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite' }} />
-                Connecting…
-              </>
-            ) : 'Connect Higgsfield'}
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-          </button>
+            onClick={() => clerk.openSignUp?.()}
+            className="liquid-press"
+            style={{ ...glassBtnPrimary, padding: '11px 26px', fontSize: 14 }}
+          >Sign up free →</button>
         </div>
       </div>
     )
@@ -1348,23 +1383,23 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
             {MODELS.map(m => {
               const on = model === m.id
-              const blocked = m.id === 'soul_2' && hasRef
+              const blocked = hasRef && (m.id === 'soul_2' || m.maxRefs === 0)
               return (
                 <button key={m.id} onClick={() => !blocked && pickModel(m.id)} style={{
                   padding: '12px 14px', borderRadius: 12, textAlign: 'left', position: 'relative',
                   cursor: blocked ? 'not-allowed' : 'pointer',
                   opacity: blocked ? 0.45 : 1,
-                  border: `1.5px solid ${blocked ? 'rgba(255,59,48,0.22)' : on ? '#8B5CF6' : L.border}`,
-                  background: blocked ? 'rgba(255,59,48,0.04)' : on ? 'rgba(139,92,246,0.08)' : L.surfaceAlt,
-                  boxShadow: on && !blocked ? '0 0 0 1px rgba(139,92,246,0.15), 0 2px 12px rgba(139,92,246,0.10)' : 'none',
+                  border: `1.5px solid ${blocked ? 'rgba(255,59,48,0.22)' : on ? 'var(--brand)' : L.border}`,
+                  background: blocked ? 'rgba(255,59,48,0.04)' : on ? 'rgba(199,242,78,0.08)' : L.surfaceAlt,
+                  boxShadow: on && !blocked ? '0 0 0 1px rgba(199,242,78,0.15), 0 2px 12px rgba(199,242,78,0.10)' : 'none',
                   display: 'flex', alignItems: 'flex-start', gap: 11, transition: 'all 0.15s',
                 }}>
                   {m.id === 'gpt_image_2' && (
                     <>
-                      <style>{`@keyframes rec-pulse{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,0.55)}60%{box-shadow:0 0 0 5px rgba(139,92,246,0)}}`}</style>
+                      <style>{`@keyframes rec-pulse{0%,100%{box-shadow:0 0 0 0 rgba(199,242,78,0.55)}60%{box-shadow:0 0 0 5px rgba(199,242,78,0)}}`}</style>
                       <div style={{
                         position: 'absolute', top: -7, right: -7,
-                        background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+                        background: 'var(--brand)',
                         borderRadius: 20, padding: '3px 8px',
                         fontSize: 9, fontWeight: 800, color: '#fff',
                         letterSpacing: '0.5px', textTransform: 'uppercase',
@@ -1375,7 +1410,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
                   )}
                   <ProviderIcon provider={m.provider} version={m.version} />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: blocked ? '#FF3B30' : on ? '#8B5CF6' : L.text, marginBottom: 4, lineHeight: 1.2 }}>{m.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: blocked ? '#FF3B30' : on ? 'var(--brand)' : L.text, marginBottom: 4, lineHeight: 1.2 }}>{m.name}</div>
                     {blocked
                       ? <div style={{ fontSize: 10.5, color: '#FF3B30', fontWeight: 600, lineHeight: 1.3 }}>Not compatible with references</div>
                       : <div style={{ fontSize: 10.5, color: L.textFaint, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.desc}</div>
@@ -1395,29 +1430,39 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
                 <button key={r} onClick={() => setAspectRatio(r)} style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
-                  border: `1.5px solid ${on ? '#8B5CF6' : L.border}`,
-                  background: on ? 'rgba(139,92,246,0.10)' : 'transparent',
+                  border: `1.5px solid ${on ? 'var(--brand)' : L.border}`,
+                  background: on ? 'rgba(199,242,78,0.10)' : 'transparent',
                   transition: 'all 0.12s',
                 }}>
-                  <div style={{ width: r === '9:16' ? 7 : 12, height: r === '9:16' ? 12 : 7, borderRadius: 1.5, background: on ? '#8B5CF6' : L.textFaint, opacity: on ? 1 : 0.5, transition: 'all 0.12s', flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: on ? '#8B5CF6' : L.textFaint }}>{label}</span>
+                  <div style={{ width: r === '9:16' ? 7 : 12, height: r === '9:16' ? 12 : 7, borderRadius: 1.5, background: on ? 'var(--brand)' : L.textFaint, opacity: on ? 1 : 0.5, transition: 'all 0.12s', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: on ? 'var(--brand)' : L.textFaint }}>{label}</span>
                 </button>
               )
             })}
           </div>
 
-          <button onClick={generate} style={{
+          <button onClick={generate} className="liquid-press" style={{
             width: '100%', padding: '22px', borderRadius: 16, fontSize: 17, fontWeight: 800,
-            background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff',
-            border: 'none', cursor: 'pointer', letterSpacing: '-0.3px',
-            boxShadow: '0 6px 36px rgba(139,92,246,0.45)',
-            animation: 'gen-float 3s ease-in-out infinite',
-            transition: 'box-shadow 0.15s',
+            background: 'var(--brand)', color: 'var(--brand-ink)',
+            border: '1px solid rgba(255,255,255,0.35)', cursor: 'pointer', letterSpacing: '-0.3px',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 36px rgba(199,242,78,0.45)',
+            animation: 'liquid-breath 3.4s ease-in-out infinite',
+            transition: 'box-shadow 0.45s var(--ease-liquid)',
           }}
-            onMouseEnter={e => { e.currentTarget.style.animationPlayState = 'paused'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 10px 48px rgba(139,92,246,0.60)' }}
-            onMouseLeave={e => { e.currentTarget.style.animationPlayState = 'running'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 6px 36px rgba(139,92,246,0.45)' }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.6), 0 10px 52px rgba(199,242,78,0.62)' }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 36px rgba(199,242,78,0.45)' }}
           >Generate 3 looks →</button>
-          <style>{`@keyframes gen-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }`}</style>
+
+          {/* What happens next, said before the click rather than after it.
+              The visitor has walked five steps and made up to 62 choices with no mention of
+              credits or an account anywhere in the flow; discovering the boundary by hitting
+              it is the most expensive possible moment to learn it. Signed-in users get the
+              cost framing, signed-out users get the account ask — both up front. */}
+          <p style={{ margin: '14px 0 0', fontSize: 12.5, lineHeight: 1.5, color: L.textFaint, textAlign: 'center' }}>
+            {isSignedIn
+              ? <>Uses credits from your balance. You’re only charged for delivered images — failed generations are always refunded.</>
+              : <>You’ll sign in first — it’s free, no card required, and your answers are kept. Free credits on sign-up cover your first looks.</>}
+          </p>
         </div>
       )}
 
@@ -1431,8 +1476,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
         return (
           <div>
             <div style={{ fontSize: 13, color: L.textFaint, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', animation: 'genSpin 1.2s linear infinite' }} />
-              <style>{`@keyframes genSpin{to{transform:rotate(360deg)}}`}</style>
+              <div style={{ width: 9, height: 9, background: 'var(--brand)', boxShadow: '0 0 8px rgba(199,242,78,0.6)', animation: 'droplet-wobble 2.4s var(--ease-liquid) infinite, liquid-breath 1.6s ease-in-out infinite' }} />
               {variations.length} of {total} ready…
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: isLandscape ? '1fr' : `repeat(${total},1fr)`, gap: 16, marginBottom: 20 }}>
@@ -1442,7 +1486,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
                   <VariationCard key={i} url={url} selected={false} gc={gc} onSelect={() => {}} index={i} landscape={isLandscape} onExpand={u => setLightboxUrl(u)} />
                 ) : (
                   <div key={i} style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-tertiary)', aspectRatio: isLandscape ? '16/9' : '9/16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2.5px solid rgba(139,92,246,0.3)', borderTopColor: '#8B5CF6', animation: 'genSpin 0.8s linear infinite' }} />
+                    <div className="blob-loader" style={{ width: 24, height: 24 }} />
                   </div>
                 )
               })}
@@ -1493,20 +1537,20 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
           {/* Primary CTA — always visible, morphs on selection */}
           <button
             onClick={selected !== null ? () => onFinish(variations, selected, model, aspectRatio, generatedPrompts, backstoryCtxRef.current) : undefined}
+            className="liquid-press"
             style={{
-              width: '100%', padding: '17px', borderRadius: 14, fontSize: 15, fontWeight: 700,
-              border: 'none', cursor: selected !== null ? 'pointer' : 'default',
+              width: '100%', padding: '17px', borderRadius: 999, fontSize: 15, fontWeight: 800,
+              border: selected !== null ? '1px solid rgba(255,255,255,0.3)' : `1px solid ${L.border}`, cursor: selected !== null ? 'pointer' : 'default',
               marginBottom: 10,
               background: selected !== null
                 ? `linear-gradient(135deg,${gc},${gc}bb)`
                 : 'var(--bg-tertiary)',
               color: selected !== null ? '#fff' : L.textFaint,
-              boxShadow: selected !== null ? `0 4px 28px ${gc}45` : 'none',
-              transition: 'all 0.25s ease',
-              transform: 'translateY(0)',
+              boxShadow: selected !== null ? `inset 0 1px 0 rgba(255,255,255,0.4), 0 0 34px ${gc}45` : 'inset 0 1px 0 var(--glass-highlight)',
+              transition: 'background 0.5s var(--ease-liquid), box-shadow 0.5s var(--ease-liquid), transform 0.5s var(--ease-jelly)',
             }}
-            onMouseEnter={e => { if (selected !== null) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 38px ${gc}65` } }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = selected !== null ? `0 4px 28px ${gc}45` : 'none' }}
+            onMouseEnter={e => { if (selected !== null) { e.currentTarget.style.boxShadow = `inset 0 1px 0 rgba(255,255,255,0.4), 0 0 50px ${gc}70` } }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = selected !== null ? `inset 0 1px 0 rgba(255,255,255,0.4), 0 0 34px ${gc}45` : 'inset 0 1px 0 var(--glass-highlight)' }}
           >
             {selected !== null ? `Create ${displayName}'s profile →` : 'Select a look to continue'}
           </button>
@@ -1519,7 +1563,7 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
               border: `1.5px solid ${L.border}`, cursor: 'pointer', transition: 'all 0.15s',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
-              onMouseEnter={e => { e.currentTarget.style.color = L.textSub; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.30)' }}
+              onMouseEnter={e => { e.currentTarget.style.color = L.textSub; e.currentTarget.style.borderColor = 'rgba(199,242,78,0.30)' }}
               onMouseLeave={e => { e.currentTarget.style.color = L.textFaint; e.currentTarget.style.borderColor = L.border }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
@@ -1527,12 +1571,12 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
             </button>
             <button onClick={generate} style={{
               flex: 1, padding: '11px', borderRadius: 11, fontSize: 13, fontWeight: 600,
-              background: 'rgba(139,92,246,0.07)', color: '#7C3AED',
-              border: '1.5px solid rgba(139,92,246,0.20)', cursor: 'pointer', transition: 'all 0.15s',
+              background: 'rgba(199,242,78,0.07)', color: 'var(--brand)',
+              border: '1.5px solid rgba(199,242,78,0.20)', cursor: 'pointer', transition: 'all 0.15s',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.13)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.40)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.07)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.20)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(199,242,78,0.13)'; e.currentTarget.style.borderColor = 'rgba(199,242,78,0.40)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(199,242,78,0.07)'; e.currentTarget.style.borderColor = 'rgba(199,242,78,0.20)' }}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
               Regenerate
@@ -1550,23 +1594,65 @@ function Step5({ data, onFinish, onReset, hfConnected, onConnected }) {
 
 // ── Main wizard ───────────────────────────────────────────────
 export default function Create() {
+  useSEO({ path: '/create' })
+
   const navigate = useNavigate()
   const location = useLocation()
   const [, setInfluencers] = useInfluencers()
-  const [step, setStep] = useState(1)
   const prefill = location.state || {}
-  const [data, setData] = useState({
+
+  const EMPTY_DRAFT = {
     name: prefill.prefillName || '', gender: prefill.prefillGender || '', age: '', niches: [], nicheCustom: '',
     backstory: '', personality: 50,
     ethnicity: '', skinTone: '', hairColor: '', hairLength: 'Long', hairTexture: 'Straight',
     eyeColor: '', build: '', uniqueFeatures: '',
     vibeWords: [], faceRef: null, styleRef: null,
     faceRefNote: '', styleRefNote: '',
-  })
+  }
 
+  // Draft persistence.
+  //
+  // This wizard held everything in memory only, so a refresh — or a phone backgrounding the
+  // tab — at step 3 dropped the user back to step 1 with every field blank. That is the
+  // worst place in the product to lose work: it is the activation flow, the user has spent
+  // real effort (step 4 alone offers 62 choices), and they have nothing invested yet to make
+  // them retype it. Everything else in this app is local-first; this screen was the exception.
+  //
+  // Reference images are deliberately NOT persisted: they are data URLs and would blow the
+  // ~5 MB localStorage budget. Restoring without them is still far better than restoring
+  // nothing, and the slots are optional by design.
+  const DRAFT_KEY = 'create_wizard_draft'
+  const restored = (() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (!raw) return null
+      const d = JSON.parse(raw)
+      // A prefill from another screen is an explicit fresh start; it wins over an old draft.
+      if (prefill.prefillName || prefill.prefillGender) return null
+      return d && typeof d === 'object' ? d : null
+    } catch { return null }
+  })()
+
+  const [step, setStep] = useState(() => Math.min(Math.max(restored?.step ?? 1, 1), 5))
+  const [data, setData] = useState(() => ({ ...EMPTY_DRAFT, ...(restored?.data || {}), faceRef: null, styleRef: null }))
+  const [draftRestored, setDraftRestored] = useState(!!restored)
+
+  const { isSignedIn } = useAuth()
   const [shakeContinue, setShakeContinue] = useState(false)
   const [ageErrorPulse, setAgeErrorPulse] = useState(false)
-  const [hfConnected, setHfConnected] = useState(isHFConnected)
+
+  // Persist on every change. Cheap: the draft is small once refs are stripped, and writing
+  // eagerly is what makes an interrupted session recoverable rather than nearly-recoverable.
+  useEffect(() => {
+    try {
+      const { faceRef, styleRef, ...persistable } = data
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, data: persistable, savedAt: Date.now() }))
+    } catch { /* quota or private mode — the wizard still works, it just won't resume */ }
+  }, [step, data])
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
+  }
 
   function set(k, v) { setData(prev => ({ ...prev, [k]: v })) }
 
@@ -1596,15 +1682,6 @@ export default function Create() {
       return
     }
     setStep(s => s + 1)
-  }
-
-  async function connectFromBanner() {
-    try {
-      await startHiggsfieldOAuthPopup()
-      setHfConnected(true)
-    } catch (e) {
-      if (e.message !== 'cancelled') alert('Failed to connect: ' + e.message)
-    }
   }
 
   function resetAll() {
@@ -1674,6 +1751,8 @@ export default function Create() {
         }
       })
 
+      // The draft has become a real influencer — drop it so the next visit starts clean.
+      clearDraft()
       navigate('/influencers', { state: { selectId: newInf.id } })
     } catch (e) {
       console.error('finish() failed:', e)
@@ -1684,143 +1763,113 @@ export default function Create() {
   const isLastStep = step === STEPS.length
 
   return (
-    <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: L.bg, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-
-      {/* Subtle atmosphere orbs */}
-      <div style={{ position: 'absolute', width: 700, height: 700, top: '-20%', left: '-14%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 65%)', pointerEvents: 'none', animation: 'orbA 18s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', width: 600, height: 600, top: '-14%', right: '-12%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 65%)', pointerEvents: 'none', animation: 'orbB 22s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', width: 500, height: 500, bottom: '-20%', left: '22%', borderRadius: '50%', background: 'radial-gradient(circle, rgba(96,165,250,0.06) 0%, transparent 65%)', pointerEvents: 'none', animation: 'orbC 26s ease-in-out infinite' }} />
+    <AstryxScope>
+    <div style={{ paddingTop: 'var(--nav-h)', minHeight: '100vh', background: 'transparent', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
 
       <FloatingCards />
 
-      {/* Edge vignette to blend cards into bg */}
+      {/* Edge vignette to blend cards into the ambient canvas */}
       <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 42%, transparent 28%, var(--bg) 100%)', pointerEvents: 'none', zIndex: 1 }} />
 
-      <div style={{ width: '100%', maxWidth: 548, padding: '40px 24px 100px', position: 'relative', zIndex: 2 }}>
-        <StepIndicator current={step} />
+      <div style={{ width: '100%', maxWidth: 880, padding: '48px 24px 100px', position: 'relative', zIndex: 2 }}>
+        <Text
+          type="supporting"
+          size="xsm"
+          weight="bold"
+          color="secondary"
+          display="block"
+          style={{ textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 26 }}
+        >
+          Step {step} of {STEPS.length} · New influencer
+        </Text>
 
-        {!hfConnected && step < 5 && (
+        <div className="vy-wizard-shell">
+          <StepRail current={step} />
+
+          <div style={{ minWidth: 0 }}>
+        {/* Silently reappearing on step 3 with fields already filled is disorienting — say
+            why, and give an explicit way out. Dismissing only hides the notice; the draft
+            stays, because "I don't need the banner" is not "throw my work away". */}
+        {draftRestored && (
           <div style={{
-            marginBottom: 32, borderRadius: 14, padding: '1.5px',
-            background: '#C9FF00',
-            animation: 'hf-float 3s ease-in-out infinite',
-            boxShadow: '0 4px 24px rgba(201,255,0,0.25)',
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            padding: '10px 14px', marginBottom: 18, borderRadius: 'var(--radius-sm)',
+            background: 'rgba(199,242,78,0.07)', border: '1px solid rgba(199,242,78,0.28)',
+            fontSize: 13, color: 'var(--text-secondary)',
           }}>
-            <div style={{
-              borderRadius: 13, padding: '11px 14px',
-              background: 'color-mix(in srgb, var(--bg) 92%, #C9FF00 8%)',
-              backdropFilter: 'blur(12px)',
-              display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <img src="/hf-icon.png" alt="" style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, boxShadow: '0 2px 8px rgba(201,255,0,0.5)', display: 'block' }} />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>Connect to Higgsfield</span>
-              <button onClick={connectFromBanner} style={{
-                flexShrink: 0, padding: '7px 14px', borderRadius: 8,
-                background: '#C9FF00',
-                color: '#0A0A0A', fontSize: 12, fontWeight: 800, border: 'none', cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(201,255,0,0.4)',
-                whiteSpace: 'nowrap', transition: 'opacity 0.15s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-              >Connect →</button>
-            </div>
+            <span style={{ flex: 1, minWidth: 200 }}>Picked up where you left off.</span>
+            <button
+              onClick={() => { clearDraft(); setData(EMPTY_DRAFT); setStep(1); setDraftRestored(false) }}
+              style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
+            >Start over</button>
+            <button
+              onClick={() => setDraftRestored(false)}
+              aria-label="Dismiss"
+              style={{ fontSize: 13, color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '6px 8px' }}
+            >✕</button>
           </div>
         )}
-
-        {/* Claude API key nudge — same card DNA as HF, visually secondary */}
-        {step === 1 && !localStorage.getItem('claude_api_key') && (
-          <div style={{
-            marginBottom: 32, borderRadius: 14, padding: '1.5px',
-            background: 'rgba(245,158,11,0.45)',
-          }}>
-            <div style={{
-              borderRadius: 13, padding: '11px 14px',
-              background: 'color-mix(in srgb, var(--bg) 94%, #F59E0B 6%)',
-              backdropFilter: 'blur(12px)',
-              display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-                background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-              </div>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Connect Claude for smarter prompts</span>
-              <button onClick={() => navigate('/settings')} style={{
-                flexShrink: 0, padding: '7px 14px', borderRadius: 8,
-                background: 'transparent',
-                color: '#D97706', fontSize: 12, fontWeight: 800,
-                border: '1.5px solid rgba(245,158,11,0.4)',
-                cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.12)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-              >Connect →</button>
-            </div>
-          </div>
-        )}
-
         {step === 1 && <Step1 data={data} set={set} onGenderChange={handleGenderChange} ageErrorPulse={ageErrorPulse} />}
         {step === 2 && <Step2 data={data} set={set} />}
         {step === 3 && <Step3 data={data} set={set} />}
         {step === 4 && <Step4 data={data} set={set} />}
-        {step === 5 && <Step5 data={data} onFinish={finish} onReset={resetAll} hfConnected={hfConnected} onConnected={() => setHfConnected(true)} />}
+        {step === 5 && <Step5 data={data} onFinish={finish} onReset={resetAll} isSignedIn={isSignedIn} />}
 
         {!isLastStep && (
           <div style={{ display: 'flex', gap: 10, marginTop: 36 }}>
             {step > 1 && (
-              <button onClick={() => setStep(s => s - 1)} style={{ flexShrink: 0, padding: '13px 22px', borderRadius: 12, border: `1.5px solid ${L.border}`, fontSize: 14, fontWeight: 600, color: L.textSub, background: L.surface, cursor: 'pointer', transition: 'all 0.15s', boxShadow: L.card }}
-                onMouseEnter={e => { e.currentTarget.style.color = L.text; e.currentTarget.style.boxShadow = L.cardHover }}
-                onMouseLeave={e => { e.currentTarget.style.color = L.textSub; e.currentTarget.style.boxShadow = L.card }}
-              >← Back</button>
+              <Button
+                label="← Back"
+                variant="secondary"
+                size="lg"
+                onClick={() => setStep((s) => s - 1)}
+                style={{ flexShrink: 0, borderRadius: 999 }}
+              />
             )}
-            <button onClick={handleContinue} disabled={!canAdvance()} style={{
-              flex: 1, padding: '13px 22px', borderRadius: 12, fontSize: 14, fontWeight: 700, border: 'none',
-              background: canAdvance() ? 'linear-gradient(135deg,#EC4899,#8B5CF6)' : L.surfaceAlt,
-              color: canAdvance() ? '#fff' : L.textFaint,
-              boxShadow: canAdvance() ? '0 4px 22px rgba(139,92,246,0.35)' : 'none',
-              transition: 'all 0.2s', cursor: canAdvance() ? 'pointer' : 'default',
-              animation: shakeContinue ? 'shake 0.45s ease' : 'none',
-            }}
-              onMouseEnter={e => { if (canAdvance()) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 30px rgba(139,92,246,0.50)' } }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = canAdvance() ? '0 4px 22px rgba(139,92,246,0.35)' : 'none' }}
-            >{step === 4 ? 'Continue to Generate →' : 'Continue →'}</button>
+            <Button
+              label={step === 4 ? 'Continue to Generate →' : 'Continue →'}
+              variant="primary"
+              size="lg"
+              isDisabled={!canAdvance()}
+              onClick={handleContinue}
+              style={{
+                flex: 1, borderRadius: 999, fontWeight: 800,
+                animation: shakeContinue ? 'shake 0.45s ease' : 'none',
+              }}
+            />
           </div>
         )}
 
         {isLastStep && step > 1 && (
           <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 14 }}>
-            <button onClick={() => setStep(s => s - 1)} style={{ padding: '11px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, color: L.textSub, background: 'transparent', border: `1.5px solid ${L.border}`, cursor: 'pointer', transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.35)'; e.currentTarget.style.color = 'var(--text-primary)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = L.border; e.currentTarget.style.color = L.textSub }}
-            >← Back</button>
+            <Button
+              label="← Back"
+              variant="ghost"
+              size="md"
+              onClick={() => setStep((s) => s - 1)}
+            />
           </div>
         )}
+          </div>{/* /wizard content column */}
+        </div>{/* /vy-wizard-shell */}
       </div>
 
       <style>{`
         @media (max-width: 980px) { .create-bg-card { display: none !important; } }
-        @keyframes orbA { 0%,100%{transform:translate(0,0)scale(1)} 40%{transform:translate(50px,-40px)scale(1.05)} 70%{transform:translate(-30px,28px)scale(0.96)} }
-        @keyframes orbB { 0%,100%{transform:translate(0,0)scale(1)} 50%{transform:translate(-38px,48px)scale(1.08)} }
-        @keyframes orbC { 0%,100%{transform:translate(0,0)scale(1)} 35%{transform:translate(28px,-48px)scale(0.93)} 70%{transform:translate(-38px,18px)scale(1.06)} }
-        @keyframes cFloat { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-16px)} }
-        @keyframes cSway  { 0%,100%{transform:translateX(0px)} 25%{transform:translateX(5px)} 75%{transform:translateX(-4px)} }
-        @keyframes cAppear { from{opacity:0} to{opacity:var(--t-op,0.45)} }
-        @keyframes shimmer { 0%,100%{opacity:.45} 50%{opacity:.85} }
+        @keyframes cDrift { 0%,100%{transform:translate(0,0)rotate(0deg)scale(1)} 33%{transform:translate(-9px,-14px)rotate(-1.2deg)scale(1.015)} 66%{transform:translate(7px,10px)rotate(0.8deg)scale(0.99)} }
+        @keyframes cCondense { from{opacity:0;filter:blur(12px);transform:scale(0.94)} to{opacity:var(--t-op,0.45);filter:blur(0);transform:scale(1)} }
         @keyframes genSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes spin { to{transform:rotate(360deg)} }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
         @keyframes lbIn { from{opacity:0;transform:scale(0.86)} to{opacity:1;transform:scale(1)} }
         @keyframes shimmerSlide { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
         @keyframes shake { 0%,100%{transform:translateX(0)} 18%{transform:translateX(-7px)} 36%{transform:translateX(7px)} 54%{transform:translateX(-5px)} 72%{transform:translateX(5px)} 88%{transform:translateX(-2px)} }
         @keyframes agePulse { 0%{transform:scale(1)} 40%{transform:scale(1.015)} 100%{transform:scale(1)} }
-        .create-input:focus { border-color: #8B5CF6 !important; box-shadow: 0 0 0 3px rgba(139,92,246,0.12) !important; background: var(--surface) !important; }
+        .create-input:focus { border-color: var(--brand) !important; box-shadow: 0 0 0 3px rgba(199,242,78,0.12) !important; background: var(--glass-bg) !important; }
         .create-input::placeholder { color: var(--text-tertiary) !important; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:#fff; border:2.5px solid #8B5CF6; box-shadow:0 2px 8px rgba(0,0,0,0.18); cursor:pointer; transition:transform 0.1s, box-shadow 0.1s; }
-        input[type=range]::-webkit-slider-thumb:active { transform:scale(1.15); box-shadow:0 0 0 5px rgba(139,92,246,0.18); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:#fff; border:2.5px solid var(--brand); box-shadow:0 2px 8px rgba(0,0,0,0.18); cursor:pointer; transition:transform 0.1s, box-shadow 0.1s; }
+        input[type=range]::-webkit-slider-thumb:active { transform:scale(1.15); box-shadow:0 0 0 5px rgba(199,242,78,0.18); }
       `}</style>
     </div>
+    </AstryxScope>
   )
 }

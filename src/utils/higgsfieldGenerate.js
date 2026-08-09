@@ -1,4 +1,5 @@
 import { getHFToken, refreshHFToken, disconnectHF } from './higgsfieldAuth'
+import { isVymotionSession, serverGenerateNImages, serverGenerateSingleImage, serverGenerateThreeImages, serverGenerateVideoStudio } from '../api/serverGenerate'
 
 const MCP_URL = '/api/hf/mcp'
 const PENDING_KEY = 'hf_pending_gens'
@@ -228,7 +229,7 @@ export async function initSession() {
     params: {
       protocolVersion: '2024-11-05',
       capabilities: { tools: {} },
-      clientInfo: { name: 'AI Influencer Studio', version: '1.0' },
+      clientInfo: { name: 'Vymotion', version: '1.0' },
     },
   })
 }
@@ -461,7 +462,12 @@ const uploadAudioFile = dataUrl => uploadMedia(dataUrl, {
   prefix: 'audio',
 })
 
-export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8, count = 1, referenceImages = [], audioRef = null, startFrameUrl = null, model = 'seedance_2_0', resolution = '1080p', onProgress, onPartialResults, isCancelled, pendingKey = null }) {
+export async function generateVideo({ prompt, aspectRatio = '9:16', duration = 8, count = 1, referenceImages = [], audioRef = null, startFrameUrl = null, model = 'seedance_lite', resolution = '1080p', onProgress, onPartialResults, isCancelled, pendingKey = null }) {
+  // Phase 3 cutover: signed-in → server-side metered video. The server path takes one start
+  // image (startFrameUrl or the first reference) — extra product refs + audio are MCP-only.
+  if (isVymotionSession()) {
+    return serverGenerateVideoStudio({ prompt, aspectRatio, duration, resolution, count, startFrameUrl, referenceImages, model, onProgress, onPartialResults, isCancelled })
+  }
   await initSession()
   onProgress?.(5)
 
@@ -712,23 +718,6 @@ function modelBaseParams(model, aspectRatio) {
 }
 
 export async function generateThreeImages({ prompts, aspectRatio = '9:16', model = 'gpt_image_2', faceRef = null, styleRef = null, physicalDesc = '', faceRefNote = '', styleRefNote = '', onProgress, onPartialResults }) {
-  await initSession()
-  onProgress?.(5)
-
-  const medias = []
-  let refInstruction = ''
-
-  if (faceRef) {
-    hflog('[HF] uploading face reference...')
-    medias.push({ value: await uploadRefImage(faceRef), role: 'image' })
-    onProgress?.(12)
-  }
-  if (styleRef) {
-    hflog('[HF] uploading style reference...')
-    medias.push({ value: await uploadRefImage(styleRef), role: 'image' })
-    onProgress?.(15)
-  }
-
   const hasDesc = !!(physicalDesc?.trim())
   const faceNote = faceRefNote?.trim()
   const styleNote = styleRefNote?.trim()
@@ -749,6 +738,7 @@ export async function generateThreeImages({ prompts, aspectRatio = '9:16', model
     return `${imgTag} is a visual style reference — do NOT copy the face or identity of any person in ${imgTag}. Match the pose and body positioning, outfit aesthetic (silhouette, layering, fabric, styling), color palette, scene and background, lighting mood, and overall photographic vibe.`
   }
 
+  let refInstruction = ''
   if (faceRef && styleRef) {
     refInstruction = ` ${buildFaceInstruction('@image1')} ${buildStyleInstruction('@image2')}`
   } else if (faceRef) {
@@ -757,13 +747,41 @@ export async function generateThreeImages({ prompts, aspectRatio = '9:16', model
     refInstruction = ` ${buildStyleInstruction('@image1')} The subject's face and identity come entirely from the text description above.`
   }
 
-  const baseParams = modelBaseParams(model, aspectRatio)
-  if (medias.length) baseParams.medias = medias
-
   // If the style note targets pose or scene/location, replace those text sections
   // so the detailed text descriptions no longer fight the style image reference
   const styleImg = (faceRef && styleRef) ? '@image2' : '@image1'
   const finalPrompts = styleRef ? applyStyleNoteOverrides(prompts, styleNote, styleImg) : prompts
+
+  // Phase 3 cutover: signed-in → server-side with the picked model honored (no refs → the
+  // real model on the metered backend; refs → the multi-ref consistency engine).
+  if (isVymotionSession()) {
+    return serverGenerateThreeImages({
+      prompts: finalPrompts.map(p => p + refInstruction),
+      model,
+      refs: [faceRef, styleRef],
+      aspectRatio,
+      onProgress,
+      onPartialResults,
+    })
+  }
+
+  await initSession()
+  onProgress?.(5)
+
+  const medias = []
+  if (faceRef) {
+    hflog('[HF] uploading face reference...')
+    medias.push({ value: await uploadRefImage(faceRef), role: 'image' })
+    onProgress?.(12)
+  }
+  if (styleRef) {
+    hflog('[HF] uploading style reference...')
+    medias.push({ value: await uploadRefImage(styleRef), role: 'image' })
+    onProgress?.(15)
+  }
+
+  const baseParams = modelBaseParams(model, aspectRatio)
+  if (medias.length) baseParams.medias = medias
 
   const UUID_RE_3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const mediaUUIDs3 = new Set(
@@ -813,6 +831,10 @@ export async function generateThreeImages({ prompts, aspectRatio = '9:16', model
 
 // Single image generation — uploads base64 ref images properly before generating
 export async function generateSingleImage({ prompt, aspectRatio = '16:9', resolution = '4k', referenceImage = null, outfitImage = null, onProgress, pendingKey = null, onJobIds = null, isCancelled = null }) {
+  // Phase 3 cutover: signed-in → server-side (credit-metered); signed-out → original MCP path.
+  if (isVymotionSession()) {
+    return serverGenerateSingleImage({ prompt, aspectRatio, resolution, referenceImage, outfitImage, onProgress, isCancelled })
+  }
   await initSession()
   onProgress?.(5)
 
@@ -876,7 +898,12 @@ export async function generateSingleImage({ prompt, aspectRatio = '16:9', resolu
 // ── Photo Studio batch generation ────────────────────────────────────────────
 // Uploads refs once, launches all N jobs in parallel, polls together, and streams
 // results via onResult(url) as each image completes.
-export async function generateNImages({ prompt, count = 1, aspectRatio = '9:16', resolution = '4k', referenceImage = null, outfitImage = null, closeUpImage1 = null, closeUpImage2 = null, propImages = [], onProgress, onResult, isCancelled, pendingKey = null }) {
+export async function generateNImages({ prompt, count = 1, aspectRatio = '9:16', resolution = '4k', model = 'gpt_image_2', referenceImage = null, outfitImage = null, closeUpImage1 = null, closeUpImage2 = null, propImages = [], onProgress, onResult, isCancelled, pendingKey = null }) {
+  // Phase 3 cutover: signed-in Vymotion users generate server-side (credit-metered, R2-stored).
+  // Signed-out falls through to the original client-side MCP path (BYO Higgsfield) unchanged.
+  if (isVymotionSession()) {
+    return serverGenerateNImages({ prompt, count, aspectRatio, resolution, model, referenceImage, outfitImage, closeUpImage1, closeUpImage2, propImages, onProgress, onResult, isCancelled })
+  }
   await initSession()
   onProgress?.(5)
 
@@ -986,10 +1013,35 @@ const POSE_PREVIEW_DESCS_STANDING = {
 
 export async function generatePosePreviews(influencer, onPoseComplete, { stance = 'standing' } = {}) {
   try {
-    await initSession()
     const gender = influencer.gender === 'Male' ? 'man' : 'woman'
     const physDesc = (influencer.physicalDesc || '').trim()
     const subjectLine = physDesc ? `${gender}, ${physDesc}` : gender
+
+    // Phase 3 cutover: signed-in → one metered 'pose' generation per pose, identity refs
+    // driving the multi-ref consistency engine. Streams results via onPoseComplete like MCP.
+    if (isVymotionSession()) {
+      await Promise.all(Object.keys(POSE_PREVIEW_DESCS_STANDING).map(async (poseId) => {
+        const stancedId = `${stance}_${poseId}`
+        const poseDesc = POSE_PREVIEW_DESCS_STANDING[poseId]
+        const prompt = stance === 'sitting'
+          ? `${subjectLine}. Pure white seamless studio backdrop. Clean flat even studio lighting, no shadows on background. The subject is seated on a white stool or low chair, chest-up framing, closer to camera. Same pose energy as: ${poseDesc} — adapted to a seated position. Photorealistic, 4K.`
+          : `${subjectLine}. Pure white seamless studio backdrop. Clean flat even studio lighting, no shadows on background, no lighting equipment visible. Full body visible head to toe, standing. ${poseDesc} Photorealistic, 4K.`
+        const references = [
+          influencer.mainImage,
+          influencer.characterSheetImage,
+          stance === 'sitting' ? (influencer.posePreviews?.[`standing_${poseId}`] || influencer.posePreviews?.[poseId]) : null,
+        ].filter(Boolean)
+        try {
+          const url = await serverGenerateSingleImage({ prompt, aspectRatio: '9:16', resolution: '4k', kind: 'pose', references })
+          if (url) onPoseComplete(stancedId, url)
+        } catch (e) {
+          console.warn(`[vymotion] pose preview failed (${stancedId}):`, e.message)
+        }
+      }))
+      return
+    }
+
+    await initSession()
     const baseParams = {
       model: 'gpt_image_2',
       aspect_ratio: '9:16',

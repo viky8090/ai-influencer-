@@ -1,146 +1,267 @@
+import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { Show, SignInButton, SignUpButton, useAuth } from '@clerk/react'
+import { Menu, X, Plus, Settings, Sun, Moon } from 'lucide-react'
+import {
+  Button,
+  IconButton,
+  Popover,
+  Divider,
+  VStack,
+} from '@astryxdesign/core'
 import { useTheme } from '../context/theme'
+import AstryxScope from '../ui/ax/AstryxScope'
+import RouterLink from '../ui/ax/RouterLink'
+import ProfileMenu from './ProfileMenu'
+import CreditChip from './CreditChip'
 
-const links = [
-  { to: '/influencers', label: 'Influencers' },
-  { to: '/inspiration', label: 'Inspiration' },
-  { to: '/brand-deals', label: 'Brand Deals' },
-]
+import MorphicNavbar from './MorphicNavbar'
+
+// Pricing lives INSIDE both sets rather than floating on its own in the right-hand
+// actions. Signed out it was the only nav item on the bar and read as an orphan; it also
+// left the segmented control with a single segment, which has nothing to morph against.
+// Paired with home it forms a real two-segment bar.
+const SIGNED_OUT_ITEMS = {
+  '/': { name: 'home' },
+  '/pricing': { name: 'pricing' },
+}
+
+const SIGNED_IN_ITEMS = {
+  '/dashboard': { name: 'home' },
+  '/influencers': { name: 'influencers' },
+  '/publish': { name: 'publish' },
+  '/pricing': { name: 'pricing' },
+}
+
+function LogoMark({ dark }) {
+  return (
+    <svg width="26" height="26" viewBox="0 0 28 28" fill="none" style={{ flexShrink: 0, display: 'block' }} aria-hidden="true">
+      <rect width="28" height="28" rx="7" fill={dark ? '#151517' : '#FFFFFF'} stroke={dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)'} />
+      <g stroke="#C7F24E" strokeWidth="3.05" strokeLinecap="round">
+        <line x1="8.1" y1="7.4" x2="12.9" y2="20.4" />
+        <line x1="12.9" y1="7.4" x2="17.7" y2="20.4" />
+        <line x1="17.7" y1="7.4" x2="22.5" y2="20.4" />
+      </g>
+    </svg>
+  )
+}
 
 export default function Nav() {
   const { pathname } = useLocation()
   const { isDark, toggle } = useTheme()
-  const landing = pathname === '/'
-  const dark = landing || isDark
+  const { isSignedIn } = useAuth()
+  const dark = isDark
 
-  const navBg = landing
-    ? 'transparent'
-    : isDark
-    ? 'rgba(7,7,14,0.88)'
-    : 'rgba(255,255,255,0.80)'
+  const items = isSignedIn ? SIGNED_IN_ITEMS : SIGNED_OUT_ITEMS
 
-  const navBorder = landing
-    ? 'none'
-    : isDark
-    ? '1px solid rgba(255,255,255,0.07)'
-    : '1px solid rgba(0,0,0,0.06)'
+  const isActiveLink = (path) => {
+    if (path === '/') {
+      return pathname === '/'
+    }
+    return pathname.startsWith(path)
+  }
 
-  return (
-    <nav className="nav-root" style={{
-      position: 'fixed',
-      top: 0, left: 0, right: 0,
-      height: 'var(--nav-h)',
-      background: navBg,
-      backdropFilter: landing ? 'none' : 'blur(24px) saturate(1.8)',
-      WebkitBackdropFilter: landing ? 'none' : 'blur(24px) saturate(1.8)',
-      borderBottom: navBorder,
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 28px',
-      zIndex: 100,
-      gap: 2,
-      transition: 'background 0.4s, border-color 0.4s',
-    }}>
+  const [menuOpen, setMenuOpen] = useState(false)
+  // First-lifetime visit → "Start for free"; return visits → "Sign up"
+  const [isFirstVisit] = useState(() => {
+    try {
+      const first = !localStorage.getItem('vm_visited')
+      if (first) localStorage.setItem('vm_visited', String(Date.now()))
+      return first
+    } catch {
+      return true
+    }
+  })
+  const primaryCta = isFirstVisit ? 'Start for free' : 'Sign up'
 
-      {/* Logo */}
-      <NavLink to="/" style={{ marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-        <span style={{
-          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-          background: dark ? 'rgba(255,255,255,0.10)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-          border: dark ? '1px solid rgba(255,255,255,0.12)' : 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: dark ? 'none' : '0 2px 8px rgba(139,92,246,0.35)',
-          transition: 'background 0.5s',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <circle cx="7" cy="5" r="3" fill="white" opacity="0.95"/>
-            <path d="M1 13c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" opacity="0.95"/>
-          </svg>
-        </span>
-        <span className="nav-brand-label" style={{
-          fontWeight: 700, fontSize: 15, letterSpacing: '-0.4px',
-          color: dark ? 'rgba(255,255,255,0.90)' : 'var(--text-primary)',
-          transition: 'color 0.5s',
-        }}>Influencer Studio</span>
-      </NavLink>
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
-      {/* Nav links */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        {links.map(l => (
-          <NavLink key={l.to} to={l.to} className="nav-link" style={({ isActive }) => ({
-            padding: '6px 14px',
-            borderRadius: 8,
-            fontSize: 14,
-            fontWeight: isActive ? 600 : 500,
-            color: dark
-              ? (isActive ? 'rgba(255,255,255,0.93)' : 'rgba(255,255,255,0.45)')
-              : (isActive ? '#EC4899' : 'var(--text-secondary)'),
-            background: dark
-              ? (isActive ? 'rgba(255,255,255,0.08)' : 'transparent')
-              : (isActive ? 'rgba(236,72,153,0.08)' : 'transparent'),
-            transition: 'all 0.15s',
-          })}>
-            {l.label}
-          </NavLink>
-        ))}
-      </div>
+  const ink = dark ? '#F4F4F5' : 'var(--text-primary)'
+  const barBg = dark ? 'rgba(10, 10, 11, 0.92)' : 'rgba(244, 244, 245, 0.92)'
+  const barBorder = dark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,11,0.08)'
 
-      {/* Right actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-        <NavLink to="/create" style={({ isActive }) => ({
-          padding: '7px 16px', borderRadius: 980,
-          background: isActive ? (dark ? 'rgba(255,255,255,0.14)' : '#1D1D1F') : dark ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-          color: '#fff', fontSize: 13, fontWeight: 700,
-          textDecoration: 'none', letterSpacing: '-0.1px',
-          boxShadow: dark ? 'none' : '0 2px 8px rgba(139,92,246,0.3)',
-          transition: 'all 0.15s',
-        })}>+ Create</NavLink>
-
-        <button
-          onClick={e => toggle(e.clientX, e.clientY)}
-          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+  const mobileMenu = (
+    <VStack gap={0.5} style={{ padding: 4 }}>
+      {Object.entries(items).map(([path, { name }]) => (
+        <Button
+          key={path}
+          label={name}
+          variant="ghost"
+          size="md"
+          href={path}
+          as={RouterLink}
+          onClick={() => setMenuOpen(false)}
           style={{
-            width: 40, height: 40, borderRadius: 10, border: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', cursor: 'pointer',
-            color: dark ? 'rgba(255,255,255,0.65)' : 'var(--text-secondary)',
-            transition: 'all 0.15s',
+            width: '100%',
+            justifyContent: 'flex-start',
+            fontWeight: isActiveLink(path) ? 700 : 500,
+            color: isActiveLink(path)
+              ? 'var(--m-brand-text)'
+              : undefined,
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.10)' : 'var(--bg-tertiary)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-        >
-          {isDark ? (
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-            </svg>
-          ) : (
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="5"/>
-              <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-              <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-            </svg>
-          )}
-        </button>
+        />
+      ))}
+      {/* Same reasoning as the dashboard link: Settings is an account surface, so offering
+          it to someone without an account is a dead end. */}
+      <Show when="signed-in">
+        <Divider variant="subtle" style={{ margin: '4px 0' }} />
+        <Button
+          label="Settings"
+          variant="ghost"
+          size="md"
+          href="/settings"
+          as={RouterLink}
+          icon={<Settings size={18} strokeWidth={1.8} aria-hidden />}
+          onClick={() => setMenuOpen(false)}
+          style={{ width: '100%', justifyContent: 'flex-start' }}
+        />
+      </Show>
 
-        <NavLink to="/settings" title="Settings" style={({ isActive }) => ({
-          width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: isActive
-            ? (dark ? 'rgba(255,255,255,0.12)' : 'var(--bg-tertiary)')
-            : 'transparent',
-          color: dark ? 'rgba(255,255,255,0.65)' : 'var(--text-secondary)',
-          textDecoration: 'none', transition: 'all 0.15s',
-        })}
-          onMouseEnter={e => { e.currentTarget.style.background = dark ? 'rgba(255,255,255,0.10)' : 'var(--bg-tertiary)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = pathname === '/settings' ? (dark ? 'rgba(255,255,255,0.12)' : 'var(--bg-tertiary)') : 'transparent' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-        </NavLink>
-      </div>
-    </nav>
+      <Show when="signed-out">
+        <Divider variant="subtle" style={{ margin: '4px 0' }} />
+        <SignInButton mode="modal">
+          <Button
+            label="Log in"
+            variant="ghost"
+            size="md"
+            onClick={() => setMenuOpen(false)}
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+          />
+        </SignInButton>
+        <SignUpButton mode="modal">
+          <Button
+            label={primaryCta}
+            variant="primary"
+            size="md"
+            onClick={() => setMenuOpen(false)}
+            style={{ width: '100%', marginTop: 4 }}
+          />
+        </SignUpButton>
+      </Show>
+    </VStack>
+  )
+
+  // Force Astryx dark tokens when the bar is dark (marketing pages) so CTAs match chrome.
+  return (
+    <AstryxScope mode={dark ? 'dark' : 'light'}>
+      <nav
+        className="nav-root"
+        style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0,
+          height: 'var(--nav-h)',
+          background: barBg,
+          backdropFilter: dark ? 'blur(12px) saturate(1.2)' : 'blur(10px) saturate(1.1)',
+          WebkitBackdropFilter: dark ? 'blur(12px) saturate(1.2)' : 'blur(10px) saturate(1.1)',
+          borderBottom: `1px solid ${barBorder}`,
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 18px',
+          zIndex: 100,
+          gap: 4,
+        }}
+      >
+        <div style={{
+          width: '100%', maxWidth: 1280, margin: '0 auto',
+          display: 'flex', alignItems: 'center', gap: 4, height: '100%',
+          position: 'relative',
+        }}>
+
+          {/* Logo */}
+          <NavLink to={isSignedIn ? '/dashboard' : '/'} style={{ marginRight: 12, display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0 }}>
+            <LogoMark dark={dark} />
+            <span className="nav-brand-label" style={{
+              fontWeight: 800, fontSize: 15, letterSpacing: '-0.3px', color: ink,
+            }}>
+              vy<span style={{ color: 'var(--m-brand-text)' }}>motion</span>
+            </span>
+          </NavLink>
+
+          {/* Desktop Morphic Navbar */}
+          <div className="nav-links-inline" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}>
+            <MorphicNavbar items={items} />
+          </div>
+
+          {/* Right actions are CTAs only. Pricing moved into the segmented bar above. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', flexShrink: 0 }}>
+            <Button
+              label="Create"
+              variant="primary"
+              size="sm"
+              href="/create"
+              as={RouterLink}
+              icon={<Plus size={15} strokeWidth={2.4} aria-hidden />}
+              style={{ whiteSpace: 'nowrap', flexShrink: 0, borderRadius: 8 }}
+            >
+              <span className="nav-create-label">Create</span>
+            </Button>
+
+            {/* Theme toggle. Previously the only way to change theme was Settings, which is
+                behind sign-in — so a signed-out visitor on the marketing pages had no way to
+                reach light mode at all. `toggle` takes the click point to originate the
+                view-transition droplet from the button. */}
+            <IconButton
+              label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              variant="ghost"
+              size="md"
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect()
+                toggle(r.left + r.width / 2, r.top + r.height / 2)
+              }}
+              icon={isDark
+                ? <Sun size={18} strokeWidth={1.9} aria-hidden />
+                : <Moon size={18} strokeWidth={1.9} aria-hidden />}
+            />
+
+            <Show when="signed-out">
+              <span className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
+                <SignInButton mode="modal">
+                  <Button
+                    label="Log in"
+                    variant="ghost"
+                    size="sm"
+                    style={{
+                      color: dark ? 'var(--m-brand-text)' : 'var(--text-primary)',
+                      fontWeight: 700,
+                    }}
+                  />
+                </SignInButton>
+              </span>
+              <SignUpButton mode="modal">
+                <Button label={primaryCta} variant="primary" size="sm" style={{ borderRadius: 8 }} />
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <span className="nav-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
+                <CreditChip />
+              </span>
+              <ProfileMenu />
+            </Show>
+
+            <span className="nav-hamburger">
+              <Popover
+                isOpen={menuOpen}
+                onOpenChange={setMenuOpen}
+                placement="below"
+                alignment="end"
+                width={260}
+                label="Main menu"
+                hasAutoFocus={false}
+                content={mobileMenu}
+              >
+                <IconButton
+                  label={menuOpen ? 'Close menu' : 'Menu'}
+                  variant="ghost"
+                  size="md"
+                  icon={menuOpen
+                    ? <X size={18} strokeWidth={1.9} aria-hidden />
+                    : <Menu size={18} strokeWidth={1.9} aria-hidden />}
+                />
+              </Popover>
+            </span>
+          </div>
+        </div>
+      </nav>
+    </AstryxScope>
   )
 }

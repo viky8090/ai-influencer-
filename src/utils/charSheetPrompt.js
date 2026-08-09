@@ -1,3 +1,5 @@
+import { isVymotionSession, serverPrompt } from '../api/serverGenerate'
+
 export function buildInfluencerSheetPrompt(inf) {
   const phys = inf.physicalDesc ? `The character: ${inf.physicalDesc}. ` : ''
   const style = inf.clothingStyle ? `Outfit: ${inf.clothingStyle}. ` : ''
@@ -36,22 +38,12 @@ export async function buildCharSheetPromptWithClaude(images, brand, category, ap
   })
 
   const imageCount = imageBlocks.length
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      system: `You are a luxury product expert and photography director. You have deep knowledge of designer brands, product lines, and how they look from every angle. You study product images and use your training knowledge to produce detailed, accurate descriptions. Output JSON only — nothing else.`,
-      messages: [{
-        role: 'user',
-        content: [
-          ...imageBlocks,
-          { type: 'text', text: `Brand: ${brand}${category ? `\nCategory: ${category}` : ''}
+  const system = `You are a luxury product expert and photography director. You have deep knowledge of designer brands, product lines, and how they look from every angle. You study product images and use your training knowledge to produce detailed, accurate descriptions. Output JSON only — nothing else.`
+  const messages = [{
+    role: 'user',
+    content: [
+      ...imageBlocks,
+      { type: 'text', text: `Brand: ${brand}${category ? `\nCategory: ${category}` : ''}
 
 You have been given ${imageCount} image${imageCount > 1 ? 's' : ''} of this product from different angles. Study all of them and identify exactly what product this is. Use what you can see across all images AND your training knowledge to describe it accurately from every angle.
 
@@ -62,16 +54,31 @@ Output a JSON object with exactly two fields:
 "angles" — exactly 6 panel descriptions for a professional character sheet, each with specific visual details for that angle. Use your product knowledge to describe what is actually on each surface — the real back closure, real side panels, real sole or lining — not generic guesses. Example for a cap: "front view showing embroidered H logo on structured crown, left profile showing side panel seam and brim edge, right profile showing matching side panel, rear view showing metal Hermès clasp and tonal strap, top-down view showing crown stitching pattern, underside of brim showing contrast lining color and stitching"
 
 Output only valid JSON. No explanation, no markdown.` },
-        ],
-      }],
-    }),
-  })
+    ],
+  }]
 
-  if (!res.ok) throw new Error(`Claude analysis failed (${res.status})`)
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.message)
+  let text
+  if (isVymotionSession()) {
+    // Signed-in Vymotion: metered server path (no key in the browser). Omit the model so the
+    // Worker uses its verified vision-capable default (claude-opus-4-8).
+    const out = await serverPrompt({ system, messages, maxTokens: 2000 })
+    text = out.text?.trim()
+  } else {
+    const res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, system, messages }),
+    })
+    if (!res.ok) throw new Error(`Claude analysis failed (${res.status})`)
+    const data = await res.json()
+    if (data.error) throw new Error(data.error.message)
+    text = data.content?.[0]?.text?.trim()
+  }
 
-  const text = data.content?.[0]?.text?.trim()
   if (!text) throw new Error('Claude returned empty response')
 
   // Try to extract JSON from anywhere in the response

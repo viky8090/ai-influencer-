@@ -1,7 +1,7 @@
 export function gColor(gender) {
   if (gender === 'Female') return '#EC4899'
   if (gender === 'Male')   return '#3B82F6'
-  return '#8B5CF6'
+  return 'var(--brand)'
 }
 
 export function pLabel(v) {

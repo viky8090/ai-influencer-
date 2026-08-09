@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vymotion — Pricing (mockup)</title>
+<style>
+  :root{
+    --bg:#0A0A0B;--surface:#151517;--surface-2:#1c1c1f;
+    --border:rgba(255,255,255,0.07);--border-2:rgba(255,255,255,0.12);
+    --text:#F4F4F5;--text-2:rgba(255,255,255,0.58);--text-3:rgba(255,255,255,0.40);
+    --brand:#C7F24E;--brand-ink:#0A0A0B;--promo:#FF3D8B;
+    --radius:9px;--nav-h:56px;
+    --font-ui:'Helvetica Neue',Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+
+  .nav{position:sticky;top:0;z-index:50;height:var(--nav-h);display:flex;align-items:center;gap:6px;padding:0 18px;background:rgba(10,10,11,0.86);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+  .brand{display:flex;align-items:center;gap:9px;margin-right:14px}
+  .wordmark{font-weight:800;font-size:15px;letter-spacing:-0.3px}
+  .wordmark b{color:var(--brand)}
+  .links{display:flex;align-items:center;gap:2px;overflow:hidden;flex:1;min-width:0}
+  .link{padding:7px 11px;border-radius:7px;font-size:13.5px;font-weight:500;color:var(--text-2);white-space:nowrap;transition:.15s}
+  .link:hover{color:var(--text);background:rgba(255,255,255,0.05)}
+  .link.active{color:var(--brand);font-weight:700}
+  .right{display:flex;align-items:center;gap:8px;margin-left:auto}
+  .login{font-size:13.5px;font-weight:700;color:var(--brand);padding:7px 8px}
+  .signup{font-size:13.5px;font-weight:800;color:var(--brand-ink);background:var(--brand);padding:8px 16px;border-radius:8px}
+
+  .hero{text-align:center;padding:44px 20px 8px}
+  .hero h1{font-size:30px;font-weight:800;letter-spacing:-0.8px;margin:0}
+  .hero p{color:var(--text-2);font-size:15px;margin:10px auto 0;max-width:560px;line-height:1.55}
+
+  .toggle{display:flex;align-items:center;justify-content:center;gap:10px;margin:22px 0 4px}
+  .seg{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px}
+  .seg button{font-family:inherit;font-size:13px;font-weight:700;color:var(--text-2);background:transparent;border:none;padding:8px 16px;border-radius:999px;cursor:pointer;transition:.15s}
+  .seg button.on{color:var(--brand-ink);background:var(--brand)}
+  .promo{font-size:11px;font-weight:800;color:#fff;background:var(--promo);border-radius:6px;padding:3px 7px}
+
+  .wrap{max-width:1140px;margin:0 auto;padding:18px 24px 30px}
+  .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:980px){.plans{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.plans{grid-template-columns:1fr}}
+  .plan{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 20px;display:flex;flex-direction:column}
+  .plan.feat{border:2px solid var(--brand)}
+  .pop{position:absolute;top:-11px;left:20px;font-size:11px;font-weight:800;letter-spacing:.3px;color:var(--brand-ink);background:var(--brand);padding:3px 10px;border-radius:999px}
+  .pname{font-size:14px;font-weight:800;letter-spacing:.2px}
+  .price{display:flex;align-items:baseline;gap:4px;margin:12px 0 2px}
+  .price .amt{font-size:34px;font-weight:800;letter-spacing:-1px}
+  .price .per{font-size:13px;color:var(--text-3);font-weight:600}
+  .cr{font-size:13px;color:var(--brand);font-weight:800;margin-bottom:14px}
+  .cta{font-family:inherit;font-size:13.5px;font-weight:800;text-align:center;padding:11px;border-radius:9px;cursor:pointer;transition:.13s;border:1px solid var(--border-2);background:transparent;color:var(--text)}
+  .cta:hover{background:var(--surface-2);border-color:rgba(255,255,255,.22)}
+  .cta.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+  .cta.primary:hover{filter:brightness(1.05);transform:translateY(-1px)}
+  .feats{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:9px}
+  .feats li{display:flex;gap:9px;font-size:12.8px;color:var(--text-2);line-height:1.35}
+  .feats svg{flex-shrink:0;margin-top:1px;color:var(--brand)}
+  .feats .mut{color:var(--text-3)}
+
+  .note{max-width:1140px;margin:0 auto;padding:6px 24px}
+  .crbar{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:13px;color:var(--text-2)}
+  .crbar b{color:var(--text)}
+  .crbar span{display:flex;align-items:center;gap:7px}
+  .crbar .d{width:5px;height:5px;border-radius:50%;background:var(--brand)}
+
+  .packs-h{text-align:center;margin:38px 0 4px}
+  .packs-h h2{font-size:20px;font-weight:800;letter-spacing:-0.4px;margin:0}
+  .packs-h p{color:var(--text-2);font-size:13.5px;margin:7px 0 0}
+  .packs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:1140px;margin:16px auto 0;padding:0 24px 70px}
+  @media(max-width:760px){.packs{grid-template-columns:repeat(2,1fr)}.links{display:none}}
+  .pack{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:.15s}
+  .pack:hover{transform:translateY(-3px);border-color:rgba(199,242,78,.5)}
+  .pack .pc{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+  .pack .pp{font-size:13.5px;color:var(--text);font-weight:700;margin-top:4px}
+  .pack .pe{font-size:11.5px;color:var(--text-3);margin-top:3px}
+</style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <rect width="28" height="28" rx="7" fill="#151517" stroke="rgba(255,255,255,0.12)"/>
+        <g stroke="#C7F24E" stroke-width="3.05" stroke-linecap="round">
+          <line x1="8.1" y1="7.4" x2="12.9" y2="20.4"/>
+          <line x1="12.9" y1="7.4" x2="17.7" y2="20.4"/>
+          <line x1="17.7" y1="7.4" x2="22.5" y2="20.4"/>
+        </g>
+      </svg>
+      <span class="wordmark">vy<b>motion</b></span>
+    </div>
+    <div class="links">
+      <a class="link" href="#">Explore</a>
+      <a class="link" href="#">Image</a>
+      <a class="link" href="#">Video</a>
+      <a class="link" href="#">AI Influencer</a>
+      <a class="link active" href="#">Pricing</a>
+    </div>
+    <div class="right">
+      <a class="login" href="#">Login</a>
+      <a class="signup" href="#">Sign up</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>Simple, transparent pricing</h1>
+    <p>Credits power everything — prompts, images, and video. No API keys, no surprises. Failed or filtered generations are never charged.</p>
+  </div>
+
+  <div class="toggle">
+    <div class="seg">
+      <button>Monthly</button>
+      <button class="on">Annual</button>
+    </div>
+    <span class="promo">30% OFF</span>
+  </div>
+
+  <div class="wrap">
+    <div class="plans">
+
+      <div class="plan">
+        <div class="pname">FREE</div>
+        <div class="price"><span class="amt">$0</span><span class="per">/mo</span></div>
+        <div class="cr">30 credits / mo</div>
+        <button class="cta">Start free</button>
+        <ul class="feats">
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>1 influencer</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>1K images, watermarked</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Standard model set</li>
+          <li class="mut"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>Video</li>
+        </ul>
+      </div>
+
+      <div class="plan feat">
+        <div class="pop">Most popular</div>
+        <div class="pname">CREATOR</div>
+        <div class="price"><span class="amt">$190</span><span class="per">/yr</span></div>
+        <div class="cr">1,200 credits / mo</div>
+        <button class="cta primary">Choose Creator</button>
+        <ul class="feats">
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>5 influencers</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>2K, no watermark</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Video at 1080p</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Commercial license</li>
+        </ul>
+      </div>
+
+      <div class="plan">
+        <div class="pname">PRO</div>
+        <div class="price"><span class="amt">$490</span><span class="per">/yr</span></div>
+        <div class="cr">3,500 credits / mo</div>
+        <button class="cta">Choose Pro</button>
+        <ul class="feats">
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>25 influencers</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>4K + video upscale</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>High priority queue</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>1-month rollover</li>
+        </ul>
+      </div>
+
+      <div class="plan">
+        <div class="pname">STUDIO</div>
+        <div class="price"><span class="amt">$1,490</span><span class="per">/yr</span></div>
+        <div class="cr">12,000 credits / mo</div>
+        <button class="cta">Choose Studio</button>
+        <ul class="feats">
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Unlimited influencers</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>4K, highest priority</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>2-month rollover</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Priority onboarding</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="note">
+    <div class="crbar">
+      <span><span class="d"></span>1 prompt ≈ <b>1 credit</b></span>
+      <span><span class="d"></span>1 image ≈ <b>4 credits</b></span>
+      <span><span class="d"></span>1 pose preview ≈ <b>3 credits</b></span>
+      <span><span class="d"></span>1 video clip ≈ <b>20 credits</b></span>
+    </div>
+  </div>
+
+  <div class="packs-h">
+    <h2>Need more? Top up anytime</h2>
+    <p>One-off credit packs — available on any plan, including Free. Top-up credits last 12 months.</p>
+  </div>
+  <div class="packs">
+    <div class="pack"><div class="pc">500</div><div class="pp">$12</div><div class="pe">$0.024 / credit</div></div>
+    <div class="pack"><div class="pc">1,500</div><div class="pp">$30</div><div class="pe">$0.020 / credit</div></div>
+    <div class="pack"><div class="pc">5,000</div><div class="pp">$90</div><div class="pe">$0.018 / credit</div></div>
+    <div class="pack"><div class="pc">15,000</div><div class="pp">$240</div><div class="pe">$0.016 / credit</div></div>
+  </div>
+
+</body>
+</html>

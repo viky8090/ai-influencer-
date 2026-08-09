@@ -1,0 +1,21 @@
+{
+  "name": "vymotion-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create vymotion",
+    "db:migrate:local": "wrangler d1 migrations apply vymotion --local",
+    "db:migrate:remote": "wrangler d1 migrations apply vymotion --remote",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.8.5",
+    "hono": "^4.6.14",
+    "svix": "^1.96.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4.110.0"
+  }
+}

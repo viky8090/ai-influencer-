@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Lightbox from './Lightbox'
 import { compressImage, downloadImage } from '../utils/imageUtils'
 
@@ -9,6 +10,7 @@ export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add ima
   const [lightbox, setLightbox] = useState(null) // index
   const imagesRef = useRef(images)
   imagesRef.current = images
+  const navigate = useNavigate()
 
   function handleFiles(files) {
     const readers = Array.from(files).map(f => new Promise(res => {
@@ -68,19 +70,23 @@ export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add ima
             onDragEnd={onDragEnd}
             style={{
               position: 'relative',
-              borderRadius: 10,
+              borderRadius: 'var(--radius-md)',
               overflow: 'hidden',
               aspectRatio: '1',
               background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-subtle)',
               cursor: 'grab',
               opacity: dragIdx === i ? 0.45 : 1,
-              outline: overIdx === i && dragIdx !== i ? '2px solid var(--accent)' : 'none',
-              transition: 'opacity 0.15s, outline 0.1s',
+              outline: overIdx === i && dragIdx !== i ? '2px solid var(--brand)' : 'none',
+              boxShadow: overIdx === i && dragIdx !== i ? 'var(--glow-brand)' : 'none',
+              transition: 'opacity 0.3s var(--ease-liquid), outline 0.1s',
             }}
           >
             <img
               src={src}
               alt=""
+              loading="lazy"
+              decoding="async"
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
             />
 
@@ -100,38 +106,61 @@ export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add ima
             {/* Download button */}
             <button
               onClick={e => { e.stopPropagation(); downloadImage(src, `image-${i + 1}.jpg`) }}
+              className="liquid-press"
               style={{
                 position: 'absolute', bottom: 6, left: 6,
                 width: 22, height: 22, borderRadius: '50%',
-                background: 'rgba(0,0,0,0.6)', color: '#fff',
+                background: 'rgba(10,10,15,0.55)', color: '#fff',
                 fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                lineHeight: 1, zIndex: 2, border: '1px solid rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(4px)',
+                lineHeight: 1, zIndex: 2, border: '1px solid rgba(255,255,255,0.18)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+                backdropFilter: 'blur(8px) saturate(1.5)', WebkitBackdropFilter: 'blur(8px) saturate(1.5)',
               }}
             >↓</button>
 
             {/* Delete button */}
             <button
               onClick={e => { e.stopPropagation(); remove(i) }}
+              className="liquid-press"
               style={{
                 position: 'absolute', bottom: 6, right: 6,
                 width: 22, height: 22, borderRadius: '50%',
-                background: 'rgba(0,0,0,0.6)', color: '#fff',
+                background: 'rgba(10,10,15,0.55)', color: '#fff',
                 fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                lineHeight: 1, zIndex: 2, border: '1px solid rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(4px)',
-                transition: 'background 0.15s',
+                lineHeight: 1, zIndex: 2, border: '1px solid rgba(255,255,255,0.18)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+                backdropFilter: 'blur(8px) saturate(1.5)', WebkitBackdropFilter: 'blur(8px) saturate(1.5)',
+                transition: 'background 0.3s var(--ease-liquid)',
               }}
               onMouseEnter={e => { e.stopPropagation(); e.currentTarget.style.background = 'rgba(220,50,50,0.85)' }}
-              onMouseLeave={e => { e.stopPropagation(); e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+              onMouseLeave={e => { e.stopPropagation(); e.currentTarget.style.background = 'rgba(10,10,15,0.55)' }}
             >×</button>
+
+            {/* Post to socials — server-hosted public assets only */}
+            {typeof src === 'string' && src.includes('/public/') && (
+              <button
+                onClick={e => { e.stopPropagation(); navigate(`/publish?media=${encodeURIComponent(src)}`) }}
+                className="liquid-press"
+                title="Post to socials"
+                style={{
+                  position: 'absolute', top: 6, right: 6,
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: 'rgba(10,10,15,0.55)', color: '#fff',
+                  fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  lineHeight: 1, zIndex: 2, border: '1px solid rgba(255,255,255,0.18)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+                  backdropFilter: 'blur(8px) saturate(1.5)', WebkitBackdropFilter: 'blur(8px) saturate(1.5)',
+                }}
+              >↗</button>
+            )}
 
             {/* Drag handle */}
             <div style={{
               position: 'absolute', top: 6, left: 6,
               width: 18, height: 18,
-              background: 'rgba(0,0,0,0.4)',
-              borderRadius: 4, backdropFilter: 'blur(4px)',
+              background: 'rgba(10,10,15,0.55)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)',
+              borderRadius: 4, backdropFilter: 'blur(8px) saturate(1.5)', WebkitBackdropFilter: 'blur(8px) saturate(1.5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               opacity: 0.6,
             }}>
@@ -148,15 +177,16 @@ export default function ImageGrid({ images = [], onChange, emptyLabel = 'Add ima
         <div
           onClick={() => fileRef.current.click()}
           style={{
-            aspectRatio: '1', borderRadius: 10,
+            aspectRatio: '1', borderRadius: 'var(--radius-md)',
             border: '1.5px dashed var(--border)',
-            background: 'var(--bg-tertiary)',
+            background: 'var(--bg-secondary)',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', gap: 6, transition: 'border-color 0.15s',
+            cursor: 'pointer', gap: 6,
+            transition: 'border-color 0.45s var(--ease-liquid), box-shadow 0.45s var(--ease-liquid)',
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.boxShadow = 'var(--glow-brand)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none' }}
         >
           <span style={{ fontSize: 20, opacity: 0.3 }}>+</span>
           <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, textAlign: 'center' }}>{emptyLabel}</span>

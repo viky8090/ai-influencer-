@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { generateNImages, generatePosePreviews, generateSingleImage, savePendingPhoto, clearPendingPhoto, getPendingPhoto, pollAllJobs, hasPhotoGenSession } from '../utils/higgsfieldGenerate'
-import { isHFConnected } from '../utils/higgsfieldAuth'
+import { isVymotionSession, promptSignUp } from '../api/serverGenerate'
 import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/charSheetPrompt'
 import { useInfluencers, useBrandDeals } from '../store'
 import WardrobeDrawer from '../components/WardrobeDrawer'
@@ -10,6 +10,7 @@ import {
   getPoses, buildPhotoStudioPrompt, randomParams, getOutfitPresets,
 } from '../utils/photoStudioPrompt'
 import LOC_PREVIEWS from '../utils/locationPreviews'
+import { glassPanel, glassModal, glassOverlay, glassBtnPrimary } from '../ui/glass'
 
 const _CDN = 'https://d8j0ntlcm91z4.cloudfront.net/user_2z5tOA1YxOBG2p6w9RhgcS5yRLO/'
 const CAMILA_POSE_PREVIEWS = {
@@ -145,19 +146,19 @@ function PhotoHistoryThumb({ item, isSelected, onToggle, onUseAsStartFrame }) {
           flexShrink: 0, width: thumbW, height: 96,
           borderRadius: 9, overflow: 'hidden', cursor: 'pointer',
           position: 'relative',
-          outline: isSelected ? '2.5px solid #8B5CF6' : hovered ? '2px solid rgba(139,92,246,0.4)' : '2px solid transparent',
+          outline: isSelected ? '2.5px solid var(--brand)' : hovered ? '2px solid rgba(199,242,78,0.4)' : '2px solid transparent',
           outlineOffset: 2,
         }}
       >
         <img src={item.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        {isSelected && <div style={{ position: 'absolute', inset: 0, background: 'rgba(139,92,246,0.18)' }} />}
+        {isSelected && <div style={{ position: 'absolute', inset: 0, background: 'rgba(199,242,78,0.18)' }} />}
 
         {/* Checkmark — top right */}
         <div style={{
           position: 'absolute', top: 5, right: 5,
           width: 16, height: 16, borderRadius: '50%',
-          background: isSelected ? '#8B5CF6' : 'rgba(0,0,0,0.45)',
-          border: `2px solid ${isSelected ? '#8B5CF6' : 'rgba(255,255,255,0.7)'}`,
+          background: isSelected ? 'var(--brand)' : 'rgba(0,0,0,0.45)',
+          border: `2px solid ${isSelected ? 'var(--brand)' : 'rgba(255,255,255,0.7)'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           opacity: isSelected || hovered ? 1 : 0,
           transition: 'opacity 0.12s',
@@ -177,10 +178,10 @@ function PhotoHistoryThumb({ item, isSelected, onToggle, onUseAsStartFrame }) {
               position: 'absolute', bottom: 5, left: 5,
               fontSize: 8, fontWeight: 700, letterSpacing: '0.05em',
               color: '#fff',
-              background: 'linear-gradient(135deg,#EC4899,#8B5CF6)',
+              background: 'var(--brand)',
               border: 'none', borderRadius: 5, padding: '3px 6px',
               cursor: 'pointer', zIndex: 3,
-              boxShadow: '0 1px 6px rgba(139,92,246,0.45)',
+              boxShadow: '0 1px 6px rgba(199,242,78,0.45)',
               fontFamily: 'inherit',
             }}
           >Animate</button>
@@ -194,9 +195,9 @@ function PhotoHistoryThumb({ item, isSelected, onToggle, onUseAsStartFrame }) {
           style={{
             position: 'fixed', zIndex: 9998,
             left: popup.left, top: popup.top, width: popup.width,
-            borderRadius: 14, overflow: 'hidden',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08)',
-            background: 'var(--surface)', cursor: 'zoom-in',
+            borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+            boxShadow: 'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)',
+            background: 'var(--glass-bg-strong)', backdropFilter: 'blur(var(--blur-lg)) saturate(1.7)', WebkitBackdropFilter: 'blur(var(--blur-lg)) saturate(1.7)', cursor: 'zoom-in',
           }}
           onClick={() => { setLightbox(true); clearPopup() }}
         >
@@ -227,10 +228,11 @@ function PhotoHistoryThumb({ item, isSelected, onToggle, onUseAsStartFrame }) {
           <button onClick={() => setLightbox(false)} style={{ position: 'fixed', top: 20, right: 20, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 18, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>×</button>
           <div onClick={e => e.stopPropagation()} style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.9)', background: '#000', maxWidth: 'min(680px, 90vw)', cursor: 'default' }}>
             <img src={item.url} alt="" style={{ width: '100%', display: 'block', objectFit: 'contain', maxHeight: '82vh' }} />
-            <div style={{ padding: '10px 12px', display: 'flex', gap: 8, background: 'var(--surface)' }}>
+            <div style={{ padding: '10px 12px', display: 'flex', gap: 8, background: 'var(--glass-bg-strong)', backdropFilter: 'blur(var(--blur-md)) saturate(1.7)', WebkitBackdropFilter: 'blur(var(--blur-md)) saturate(1.7)', boxShadow: 'inset 0 1px 0 var(--glass-highlight)' }}>
               <button
                 onClick={() => { const date = item.createdAt ? new Date(item.createdAt).toISOString().slice(0,10) : 'photo'; downloadImage(item.url, `photo-${date}.jpg`) }}
-                style={{ flex: 1, padding: '9px', borderRadius: 10, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff' }}
+                className="liquid-press"
+                style={{ ...glassBtnPrimary, flex: 1, padding: '9px', fontSize: 12 }}
               >↓ Download</button>
             </div>
           </div>
@@ -271,9 +273,9 @@ function OutfitCard({ image, label, active, onClick }) {
         style={{ padding: 0, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flexShrink: 0 }}
       >
         <div style={{
-          width: 64, height: 86, borderRadius: 10, overflow: 'hidden',
-          border: `2px solid ${active ? '#8B5CF6' : 'var(--border)'}`,
-          boxShadow: active ? '0 0 0 2px rgba(139,92,246,0.25)' : 'none',
+          width: 64, height: 86, borderRadius: 'var(--radius-sm)', overflow: 'hidden',
+          border: `2px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+          boxShadow: active ? '0 0 0 2px rgba(199,242,78,0.25)' : 'none',
           background: image ? 'transparent' : 'var(--bg-tertiary)',
           transition: 'border-color 0.15s, box-shadow 0.15s',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -283,7 +285,7 @@ function OutfitCard({ image, label, active, onClick }) {
             : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" opacity="0.5"><circle cx="12" cy="8" r="3"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
           }
         </div>
-        <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? '#8B5CF6' : 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.2, minHeight: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+        <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? 'var(--brand)' : 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.2, minHeight: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
           {label}
         </span>
       </button>
@@ -295,9 +297,9 @@ function OutfitCard({ image, label, active, onClick }) {
           style={{
             position: 'fixed', zIndex: 99999,
             left: popup.left, top: popup.top, width: popup.width,
-            borderRadius: 10, overflow: 'hidden',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.07)',
-            background: 'var(--surface)',
+            borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+            boxShadow: 'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)',
+            background: 'var(--glass-bg-strong)', backdropFilter: 'blur(var(--blur-lg)) saturate(1.7)', WebkitBackdropFilter: 'blur(var(--blur-lg)) saturate(1.7)',
           }}
         >
           <img src={image} alt={label} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
@@ -340,14 +342,14 @@ function PropGeneratingSlot({ apiProgress, claudeStatus }) {
     : displayPct < 15 ? 'Starting…' : 'Generating…'
 
   return (
-    <div style={{ width: 100, height: 100, borderRadius: 12, border: '1.5px solid rgba(139,92,246,0.35)', background: 'var(--bg-tertiary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden', position: 'relative' }}>
-      <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid rgba(139,92,246,0.2)', borderTopColor: '#8B5CF6', animation: 'spin 0.75s linear infinite' }} />
-      <div style={{ fontSize: 11, fontWeight: 700, color: '#8B5CF6' }}>{displayPct}%</div>
-      <div style={{ fontSize: 8, fontWeight: 600, color: claudeStatus === 'done' ? '#34C759' : claudeStatus === 'analyzing' ? '#8B5CF6' : 'var(--text-tertiary)', textAlign: 'center', letterSpacing: '0.2px', padding: '0 6px' }}>{statusLabel}</div>
+    <div style={{ width: 100, height: 100, borderRadius: 12, border: '1.5px solid rgba(199,242,78,0.35)', background: 'var(--bg-tertiary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden', position: 'relative' }}>
+      <div className="blob-loader" style={{ width: 20, height: 20 }} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)' }}>{displayPct}%</div>
+      <div style={{ fontSize: 8, fontWeight: 600, color: claudeStatus === 'done' ? '#34C759' : claudeStatus === 'analyzing' ? 'var(--brand)' : 'var(--text-tertiary)', textAlign: 'center', letterSpacing: '0.2px', padding: '0 6px' }}>{statusLabel}</div>
       <div style={{ fontSize: 8, color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{elapsedLabel}</div>
       {/* Progress bar */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'var(--border)' }}>
-        <div style={{ height: '100%', width: `${displayPct}%`, background: 'linear-gradient(90deg,#EC4899,#8B5CF6)', transition: 'width 0.4s linear' }} />
+        <div style={{ height: '100%', width: `${displayPct}%`, background: 'var(--brand)', transition: 'width 0.4s linear' }} />
       </div>
     </div>
   )
@@ -356,21 +358,27 @@ function PropGeneratingSlot({ apiProgress, claudeStatus }) {
 function PSec({ children }) {
   return (
     <div
-      style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-subtle)', transition: 'box-shadow 0.2s' }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)' }}
+      style={{ ...glassPanel, borderRadius: 'var(--radius-lg)', padding: 20, transition: 'box-shadow 0.45s var(--ease-liquid)' }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = 'inset 0 1px 0 var(--glass-highlight), var(--shadow-md), var(--glow-brand)' }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = glassPanel.boxShadow }}
     >{children}</div>
   )
 }
 
+// Phase 10 remix: ledger-style header (tabular index chip + eyebrow rule) — matches
+// CSStepHeader in Influencers.jsx; replaces the ancestor repo's numbered lime circles.
 function PSHeader({ n, title, sub }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-      <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{n}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>
-        {sub && <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-tertiary)', fontStyle: 'italic', letterSpacing: '0.1px' }}>({sub})</div>}
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14, minWidth: 0 }}>
+      <span style={{
+        fontSize: 10, fontWeight: 800, fontVariantNumeric: 'tabular-nums', letterSpacing: '1px',
+        color: 'var(--brand)', background: 'rgba(199,242,78,0.10)',
+        border: '1px solid rgba(199,242,78,0.30)', borderRadius: '3px 8px 8px 8px',
+        padding: '2px 7px', flexShrink: 0, lineHeight: 1.5,
+      }}>{String(n).padStart(2, '0')}</span>
+      <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{title}</span>
+      {sub && <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>}
+      <span aria-hidden="true" style={{ flex: 1, height: 1, minWidth: 16, background: 'var(--glass-border)' }} />
     </div>
   )
 }
@@ -407,6 +415,13 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
   const [history, setHistory] = useState(() => {
     try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') } catch { return [] }
   })
+  // Re-read when the shared history changes elsewhere — notably when the server-sync daemon
+  // (store.jsx) hydrates this browser's history from D1 on sign-in.
+  useEffect(() => {
+    const onUpdate = () => { try { setHistory(JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')) } catch {} }
+    window.addEventListener('photo_studio_history_updated', onUpdate)
+    return () => window.removeEventListener('photo_studio_history_updated', onUpdate)
+  }, [])
 
   const [elapsedSecs, setElapsedSecs] = useState(0)
 
@@ -631,7 +646,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
   async function generatePropSheet(idx) {
     const slot = propSlots[idx]
     if (!slot?.image) return
-    if (!isHFConnected()) { alert('Connect Higgsfield in Settings first'); return }
+    if (!isVymotionSession()) { promptSignUp(); return }
 
     // Resolve target slot index upfront so the spinner shows there, not on the source
     const existingTarget = propSlots.findIndex((s, i) => i > idx && !s)
@@ -642,12 +657,11 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
     setPropProgress(p => ({ ...p, [targetIdx]: 0 }))
     try {
       let prompt = null
-      const claudeKey = localStorage.getItem('claude_api_key')
-      if (claudeKey) {
+      if (isVymotionSession()) {
         try {
           setPropProgress(p => ({ ...p, [targetIdx]: 5 }))
           setPropClaudeStatus(s => ({ ...s, [targetIdx]: 'analyzing' }))
-          prompt = await buildCharSheetPromptWithClaude(slot.image, propText || 'product', '', claudeKey)
+          prompt = await buildCharSheetPromptWithClaude(slot.image, propText || 'product', '')
           setPropClaudeStatus(s => ({ ...s, [targetIdx]: 'done' }))
           setTimeout(() => setPropClaudeStatus(s => ({ ...s, [targetIdx]: null })), 3000)
         } catch (e) {
@@ -814,9 +828,9 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
 
   const chipStyle = (active) => ({
     padding: '6px 13px', borderRadius: 980, fontSize: 12, fontWeight: active ? 600 : 500,
-    border: `1.5px solid ${active ? '#8B5CF6' : 'var(--border)'}`,
-    background: active ? 'rgba(139,92,246,0.10)' : 'var(--bg)',
-    color: active ? '#8B5CF6' : 'var(--text-secondary)',
+    border: `1.5px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+    background: active ? 'rgba(199,242,78,0.10)' : 'var(--bg)',
+    color: active ? 'var(--brand)' : 'var(--text-secondary)',
     cursor: 'pointer', transition: 'all 0.12s', fontFamily: 'inherit',
   })
 
@@ -848,7 +862,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               reader.onload = ev => setOverrideRef(ev.target.result)
               reader.readAsDataURL(file)
             }}
-            style={{ borderRadius: 12, overflow: 'hidden', position: 'relative', background: 'var(--bg-tertiary)', aspectRatio: '9/16', cursor: refImage ? 'zoom-in' : 'default', outline: dragOver ? '2.5px dashed #8B5CF6' : '2.5px solid transparent', outlineOffset: 2, transition: 'outline-color 0.15s' }}
+            style={{ borderRadius: 12, overflow: 'hidden', position: 'relative', background: 'var(--bg-tertiary)', aspectRatio: '9/16', cursor: refImage ? 'zoom-in' : 'default', outline: dragOver ? '2.5px dashed var(--brand)' : '2.5px solid transparent', outlineOffset: 2, transition: 'outline-color 0.15s' }}
           >
             {refImage ? (
               <>
@@ -859,7 +873,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               </>
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 20 }}>
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: 'var(--brand-ink)' }}>
                   {influencer?.name?.[0]?.toUpperCase()}
                 </div>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No photo yet</span>
@@ -867,8 +881,8 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             )}
             {/* Drag overlay */}
             {dragOver && (
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(139,92,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, pointerEvents: 'none' }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: 'rgba(139,92,246,0.8)', padding: '8px 14px', borderRadius: 9 }}>Drop to replace</span>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(199,242,78,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, pointerEvents: 'none' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: 'rgba(199,242,78,0.8)', padding: '8px 14px', borderRadius: 9 }}>Drop to replace</span>
               </div>
             )}
             {/* Download — top right */}
@@ -948,7 +962,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             <img src={expandedImg} alt="" onClick={() => setExpandedImg(null)} style={{ maxWidth: '92vw', maxHeight: '82vh', objectFit: 'contain', borderRadius: 14, boxShadow: '0 32px 80px rgba(0,0,0,0.6)', cursor: 'zoom-out', display: 'block' }} />
             <button
               onClick={() => downloadImage(expandedImg, 'photo.jpg')}
-              style={{ padding: '10px 28px', borderRadius: 980, fontSize: 13, fontWeight: 700, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 20px rgba(139,92,246,0.4)' }}
+              style={{ padding: '10px 28px', borderRadius: 980, fontSize: 13, fontWeight: 700, background: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 20px rgba(199,242,78,0.4)' }}
             >↓ Download</button>
           </div>
         </div>
@@ -971,8 +985,8 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
           onChange={e => setLocation(e.target.value || null)}
           style={{
             width: '100%', boxSizing: 'border-box',
-            padding: '9px 12px', borderRadius: 10, fontSize: 12,
-            border: `1.5px solid ${!LOCATIONS.some(l => l.id === location) && location ? '#8B5CF6' : 'var(--border)'}`,
+            padding: '9px 12px', borderRadius: 'var(--radius-sm)', fontSize: 12,
+            border: `1.5px solid ${!LOCATIONS.some(l => l.id === location) && location ? 'var(--brand)' : 'var(--border)'}`,
             background: 'var(--bg)', color: 'var(--text-primary)',
             outline: 'none', fontFamily: 'inherit',
             transition: 'border-color 0.15s',
@@ -995,9 +1009,9 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
       {/* ── Step 3: Pose ── */}
       <PSec>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Pose</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, fontVariantNumeric: 'tabular-nums', letterSpacing: '1px', color: 'var(--brand)', background: 'rgba(199,242,78,0.10)', border: '1px solid rgba(199,242,78,0.30)', borderRadius: '3px 8px 8px 8px', padding: '2px 7px', flexShrink: 0, lineHeight: 1.5 }}>03</span>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-primary)' }}>Pose</div>
           </div>
           {!hasStancePreviews && (
             <button
@@ -1017,16 +1031,15 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '4px 10px', borderRadius: 980, fontSize: 11, fontWeight: 600,
-                border: '1px solid rgba(139,92,246,0.35)', background: 'rgba(139,92,246,0.08)',
-                color: '#8B5CF6', cursor: poseGenerating ? 'default' : 'pointer',
+                border: '1px solid rgba(199,242,78,0.35)', background: 'rgba(199,242,78,0.08)',
+                color: 'var(--brand)', cursor: poseGenerating ? 'default' : 'pointer',
                 opacity: poseGenerating ? 0.6 : 1, fontFamily: 'inherit',
               }}
             >
               {poseGenerating ? (
                 <>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', border: '1.5px solid rgba(139,92,246,0.3)', borderTopColor: '#8B5CF6', animation: 'spin 0.7s linear infinite' }} />
+                  <div style={{ width: 8, height: 8, background: 'var(--brand)', boxShadow: '0 0 6px rgba(199,242,78,0.6)', animation: 'droplet-wobble 2.2s var(--ease-liquid) infinite, liquid-breath 1.5s ease-in-out infinite' }} />
                   Generating…
-                  <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
                 </>
               ) : 'Generate Previews'}
             </button>
@@ -1046,19 +1059,19 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
           onChange={e => setPose(e.target.value || 'front')}
           style={{
             width: '100%', boxSizing: 'border-box',
-            padding: '9px 12px', borderRadius: 10, fontSize: 12, marginBottom: 12,
-            border: `1.5px solid ${!currentPoses.some(p => p.id === pose) && pose && pose !== 'front' ? '#8B5CF6' : 'var(--border)'}`,
+            padding: '9px 12px', borderRadius: 'var(--radius-sm)', fontSize: 12, marginBottom: 12,
+            border: `1.5px solid ${!currentPoses.some(p => p.id === pose) && pose && pose !== 'front' ? 'var(--brand)' : 'var(--border)'}`,
             background: 'var(--bg)', color: 'var(--text-primary)',
             outline: 'none', fontFamily: 'inherit',
             transition: 'border-color 0.15s',
           }}
         />
-        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', width: 'fit-content' }}>
+        <div style={{ display: 'flex', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)', width: 'fit-content' }}>
           {['standing', 'sitting'].map(s => (
             <button key={s} onClick={() => setStance(s)} style={{
               padding: '5px 16px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              background: stance === s ? '#8B5CF6' : 'var(--bg)',
-              color: stance === s ? '#fff' : 'var(--text-secondary)',
+              background: stance === s ? 'var(--brand)' : 'var(--bg)',
+              color: stance === s ? 'var(--brand-ink)' : 'var(--text-secondary)',
               border: 'none', cursor: 'pointer', transition: 'all 0.12s',
               textTransform: 'capitalize',
             }}>{s}</button>
@@ -1070,7 +1083,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
       <PSec>
         <PSHeader n={4} title="Expression" />
         {pose === 'facing-away' ? (
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 10, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', lineHeight: 1.5 }}>
             Not applicable — face is not visible when posing away from the camera.
           </div>
         ) : (
@@ -1089,19 +1102,19 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               onChange={e => setExpression(e.target.value || 'natural')}
               style={{
                 width: '100%', boxSizing: 'border-box',
-                padding: '9px 12px', borderRadius: 10, fontSize: 12, marginBottom: 12,
-                border: `1.5px solid ${!EXPRESSIONS.some(ex => ex.id === expression) && expression && expression !== 'natural' ? '#8B5CF6' : 'var(--border)'}`,
+                padding: '9px 12px', borderRadius: 'var(--radius-sm)', fontSize: 12, marginBottom: 12,
+                border: `1.5px solid ${!EXPRESSIONS.some(ex => ex.id === expression) && expression && expression !== 'natural' ? 'var(--brand)' : 'var(--border)'}`,
                 background: 'var(--bg)', color: 'var(--text-primary)',
                 outline: 'none', fontFamily: 'inherit',
                 transition: 'border-color 0.15s',
               }}
             />
-            <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', width: 'fit-content' }}>
+            <div style={{ display: 'flex', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)', width: 'fit-content' }}>
               {[{ id: 'at-camera', label: 'Looking at Camera' }, { id: 'looking-away', label: 'Looking Away' }].map(g => (
                 <button key={g.id} onClick={() => setGaze(g.id)} style={{
                   padding: '5px 16px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  background: gaze === g.id ? '#8B5CF6' : 'var(--bg)',
-                  color: gaze === g.id ? '#fff' : 'var(--text-secondary)',
+                  background: gaze === g.id ? 'var(--brand)' : 'var(--bg)',
+                  color: gaze === g.id ? 'var(--brand-ink)' : 'var(--text-secondary)',
                   border: 'none', cursor: 'pointer', transition: 'all 0.12s',
                 }}>{g.label}</button>
               ))}
@@ -1123,8 +1136,8 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               style={{
                 display: 'flex', alignItems: 'center', gap: 4,
                 padding: '2px 8px', borderRadius: 980, fontSize: 10, fontWeight: 600,
-                border: '1px solid rgba(139,92,246,0.35)', background: 'rgba(139,92,246,0.08)',
-                color: '#8B5CF6', cursor: 'pointer', fontFamily: 'inherit',
+                border: '1px solid rgba(199,242,78,0.35)', background: 'rgba(199,242,78,0.08)',
+                color: 'var(--brand)', cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1190,7 +1203,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             rows={2}
             style={{
               width: '100%', padding: '10px 12px', borderRadius: 9,
-              border: `1.5px solid ${wardrobeText ? '#8B5CF6' : 'var(--border)'}`,
+              border: `1.5px solid ${wardrobeText ? 'var(--brand)' : 'var(--border)'}`,
               background: 'var(--bg)', fontSize: 13, color: 'var(--text-primary)',
               lineHeight: 1.5, resize: 'none', fontFamily: 'inherit',
               boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.15s',
@@ -1209,21 +1222,21 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '8px 12px', borderRadius: 9, width: '100%',
-              background: hairstyleLocked ? 'rgba(139,92,246,0.08)' : 'var(--bg-tertiary)',
-              border: `1.5px solid ${hairstyleLocked ? 'rgba(139,92,246,0.35)' : 'var(--border)'}`,
+              background: hairstyleLocked ? 'rgba(199,242,78,0.08)' : 'var(--bg-tertiary)',
+              border: `1.5px solid ${hairstyleLocked ? 'rgba(199,242,78,0.35)' : 'var(--border)'}`,
               cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={hairstyleLocked ? '#8B5CF6' : 'var(--text-tertiary)'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={hairstyleLocked ? 'var(--brand)' : 'var(--text-tertiary)'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               {hairstyleLocked
                 ? <><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>
                 : <><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></>
               }
             </svg>
-            <span style={{ fontSize: 12, fontWeight: 600, color: hairstyleLocked ? '#8B5CF6' : 'var(--text-tertiary)', flex: 1, textAlign: 'left' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: hairstyleLocked ? 'var(--brand)' : 'var(--text-tertiary)', flex: 1, textAlign: 'left' }}>
               {hairstyleLocked ? 'Hairstyle locked' : 'Lock hairstyle'}
             </span>
-            <span style={{ fontSize: 10, color: hairstyleLocked ? 'rgba(139,92,246,0.6)' : 'var(--text-tertiary)', fontStyle: 'italic' }}>
+            <span style={{ fontSize: 10, color: hairstyleLocked ? 'rgba(199,242,78,0.6)' : 'var(--text-tertiary)', fontStyle: 'italic' }}>
               {hairstyleLocked ? 'overrides all refs' : 'optional'}
             </span>
           </button>
@@ -1237,7 +1250,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               style={{
                 width: '100%', boxSizing: 'border-box', marginTop: 8,
                 padding: '9px 12px', borderRadius: 9, fontSize: 13,
-                border: '1.5px solid rgba(139,92,246,0.4)',
+                border: '1.5px solid rgba(199,242,78,0.4)',
                 background: 'var(--bg)', color: 'var(--text-primary)',
                 outline: 'none', fontFamily: 'inherit',
               }}
@@ -1248,17 +1261,17 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
 
       {/* ── Step 6: Props ── */}
       <PSec>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>6</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, fontVariantNumeric: 'tabular-nums', letterSpacing: '1px', color: 'var(--brand)', background: 'rgba(199,242,78,0.10)', border: '1px solid rgba(199,242,78,0.30)', borderRadius: '3px 8px 8px 8px', padding: '2px 7px', flexShrink: 0, lineHeight: 1.5 }}>06</span>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Props</div>
-            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-tertiary)', fontStyle: 'italic', letterSpacing: '0.1px' }}>(optional)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '1.2px', textTransform: 'uppercase', color: 'var(--text-primary)' }}>Props</div>
+            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-tertiary)' }}>optional</div>
           </div>
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
             onMouseEnter={() => setPropInfoTip(true)} onMouseLeave={() => setPropInfoTip(false)}>
             <div style={{ width: 15, height: 15, borderRadius: '50%', border: '1.5px solid var(--text-tertiary)', color: 'var(--text-tertiary)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default', userSelect: 'none' }}>i</div>
             {propInfoTip && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 200, width: 220, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, pointerEvents: 'none' }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 200, width: 220, background: 'var(--glass-bg-strong)', backdropFilter: 'blur(var(--blur-lg)) saturate(1.7)', WebkitBackdropFilter: 'blur(var(--blur-lg)) saturate(1.7)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-lg)', padding: '10px 12px', boxShadow: 'inset 0 1px 0 var(--glass-highlight), var(--shadow-lg)', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, pointerEvents: 'none' }}>
                 A product or item you want the influencer to hold or wear in the photo. Upload an image of the product and it will be worked into the shot.
               </div>
             )}
@@ -1289,10 +1302,10 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               {slot?.image ? (
                 /* Filled slot: image + mode strip inside box + generate button below */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ position: 'relative', borderRadius: 12, border: slot.pairId ? '1.5px solid rgba(139,92,246,0.6)' : '1.5px solid rgba(139,92,246,0.35)', overflow: 'hidden', background: 'var(--bg-tertiary)' }}>
+                  <div style={{ position: 'relative', borderRadius: 12, border: slot.pairId ? '1.5px solid rgba(199,242,78,0.6)' : '1.5px solid rgba(199,242,78,0.35)', overflow: 'hidden', background: 'var(--bg-tertiary)' }}>
                     {/* Paired indicator */}
                     {slot.pairId && (
-                      <div style={{ position: 'absolute', top: 5, left: 5, zIndex: 2, background: 'rgba(139,92,246,0.8)', borderRadius: 4, padding: '2px 5px', fontSize: 8, fontWeight: 700, color: '#fff', backdropFilter: 'blur(2px)', letterSpacing: '0.3px' }}>PAIRED</div>
+                      <div style={{ position: 'absolute', top: 5, left: 5, zIndex: 2, background: 'rgba(199,242,78,0.8)', borderRadius: 4, padding: '2px 5px', fontSize: 8, fontWeight: 700, color: '#fff', backdropFilter: 'blur(2px)', letterSpacing: '0.3px' }}>PAIRED</div>
                     )}
                     {/* ✕ — hidden on last remaining slot */}
                     {propSlots.length > 1 && (
@@ -1318,7 +1331,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                       />
                       {propGenerating[idx] && (
                         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', animation: 'spin 0.75s linear infinite' }} />
+                          <div className="blob-loader" style={{ width: 22, height: 22 }} />
                           <div style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>{Math.round(propProgress[idx] || 0)}%</div>
                         </div>
                       )}
@@ -1333,7 +1346,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                             if (i === idx || (slot.pairId && s.pairId === slot.pairId)) return { ...s, mode: m }
                             return s
                           }))}
-                          style={{ flex: 1, padding: '5px 0', fontSize: 10, fontWeight: 600, fontFamily: 'inherit', background: (slot.mode || 'holding') === m ? '#8B5CF6' : 'transparent', color: (slot.mode || 'holding') === m ? '#fff' : 'var(--text-tertiary)', border: 'none', cursor: 'pointer', transition: 'all 0.12s', textTransform: 'capitalize' }}
+                          style={{ flex: 1, padding: '5px 0', fontSize: 10, fontWeight: 600, fontFamily: 'inherit', background: (slot.mode || 'holding') === m ? 'var(--brand)' : 'transparent', color: (slot.mode || 'holding') === m ? 'var(--brand-ink)' : 'var(--text-tertiary)', border: 'none', cursor: 'pointer', transition: 'all 0.12s', textTransform: 'capitalize' }}
                         >{m}</button>
                       ))}
                     </div>
@@ -1342,7 +1355,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                   <button
                     onClick={() => generatePropSheet(idx)}
                     disabled={!!propGenerating[idx]}
-                    style={{ width: '100%', padding: '5px 0', borderRadius: 8, fontSize: 10, fontWeight: 600, fontFamily: 'inherit', border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: propGenerating[idx] ? 'var(--text-tertiary)' : '#8B5CF6', cursor: propGenerating[idx] ? 'default' : 'pointer', transition: 'all 0.12s' }}
+                    style={{ width: '100%', padding: '5px 0', borderRadius: 'var(--radius-sm)', fontSize: 10, fontWeight: 600, fontFamily: 'inherit', border: '1px solid var(--border)', background: 'var(--bg-tertiary)', color: propGenerating[idx] ? 'var(--text-tertiary)' : 'var(--brand)', cursor: propGenerating[idx] ? 'default' : 'pointer', transition: 'all 0.12s' }}
                   >{propGenerating[idx] ? `${Math.round(propProgress[idx] || 0)}%…` : 'Generate Product Sheet'}</button>
                 </div>
               ) : propGenerating[idx] ? (
@@ -1363,8 +1376,8 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                 <div
                   style={{
                     width: 100, height: 100, borderRadius: 12,
-                    border: `1.5px dashed ${propDragOver === idx ? '#8B5CF6' : 'var(--border)'}`,
-                    background: propDragOver === idx ? 'rgba(139,92,246,0.06)' : 'var(--bg-tertiary)',
+                    border: `1.5px dashed ${propDragOver === idx ? 'var(--brand)' : 'var(--border)'}`,
+                    background: propDragOver === idx ? 'rgba(199,242,78,0.06)' : 'var(--bg-tertiary)',
                     display: 'flex', flexDirection: 'column', overflow: 'hidden',
                     transition: 'border-color 0.15s, background 0.15s',
                   }}
@@ -1387,10 +1400,10 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                         onClick={() => setBrandPickerSlot(idx)}
                         style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
                         </svg>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: '#8B5CF6', letterSpacing: '0.2px' }}>Brand Deal</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--brand)', letterSpacing: '0.2px' }}>Brand Deal</span>
                       </div>
                     </>
                   )}
@@ -1423,8 +1436,8 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               : (PROP_SUGGESTIONS[location] || 'e.g. holding a coffee cup')
           }
           style={{
-            width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8,
-            border: `1.5px solid ${propText ? '#8B5CF6' : 'var(--border)'}`,
+            width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+            border: `1.5px solid ${propText ? 'var(--brand)' : 'var(--border)'}`,
             background: 'var(--bg)', fontSize: 12, color: 'var(--text-primary)',
             fontFamily: 'inherit', outline: 'none',
             transition: 'border-color 0.15s',
@@ -1435,12 +1448,13 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
       {/* ── Brand Deal Picker Modal ── */}
       {brandPickerSlot !== null && createPortal(
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ position: 'fixed', inset: 0, ...glassOverlay, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setBrandPickerSlot(null)}
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--surface)', borderRadius: 20, padding: 24, width: 340, maxHeight: '70vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}
+            className="reveal"
+            style={{ ...glassModal, padding: 24, width: 340, maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}
           >
             <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.3px', marginBottom: 16 }}>Pick a Brand Deal</div>
             <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1462,7 +1476,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                           setBrandPickerSlot(null)
                         }}
                         style={{ background: 'var(--bg-tertiary)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left', transition: 'border-color 0.12s' }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = '#8B5CF6'}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
                         onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
                       >
                         <img src={deal.characterSheet || deal.image} alt={deal.brand} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
@@ -1487,7 +1501,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
           {[{id:'9:16',w:10,h:16},{id:'16:9',w:16,h:10}].map(a => (
             <button key={a.id} onClick={() => setAspectRatio(a.id)} style={{ ...chipStyle(aspectRatio === a.id), display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ display: 'inline-block', width: a.w, height: a.h, border: `1.5px solid ${aspectRatio === a.id ? '#8B5CF6' : 'var(--text-secondary)'}`, borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ display: 'inline-block', width: a.w, height: a.h, border: `1.5px solid ${aspectRatio === a.id ? 'var(--brand)' : 'var(--text-secondary)'}`, borderRadius: 2, flexShrink: 0 }} />
               {a.id}
             </button>
           ))}
@@ -1504,7 +1518,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
         <input
           type="range" min={1} max={10} value={outputCount}
           onChange={e => setOutputCount(Number(e.target.value))}
-          style={{ width: '100%', accentColor: '#8B5CF6', cursor: 'pointer' }}
+          style={{ width: '100%', accentColor: 'var(--brand)', cursor: 'pointer' }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginTop: 2 }}>
           <span>1</span><span>10</span>
@@ -1529,23 +1543,26 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             }}
           >Cancel</button>
         ) : (
-          <button onClick={doRandomize} disabled={isActivelyGenerating} style={{
-            padding: '12px 18px', borderRadius: 11, fontSize: 13, fontWeight: 600,
-            border: '1.5px solid var(--border)', background: 'var(--bg)',
+          <button onClick={doRandomize} disabled={isActivelyGenerating} className="liquid-press" style={{
+            padding: '12px 18px', borderRadius: 999, fontSize: 13, fontWeight: 600,
+            border: '1px solid var(--glass-border)', background: 'var(--glass-bg)',
+            boxShadow: 'inset 0 1px 0 var(--glass-highlight)',
             color: 'var(--text-primary)', cursor: 'pointer',
-            transition: 'all 0.12s', fontFamily: 'inherit',
+            transition: 'background 0.45s var(--ease-liquid), transform 0.5s var(--ease-jelly)', fontFamily: 'inherit',
           }}>🎲 Random</button>
         )}
         <button
           onClick={generate}
           disabled={isActivelyGenerating || !influencer}
+          className="liquid-press"
           style={{
-            flex: 1, padding: '12px 18px', borderRadius: 11, fontSize: 14, fontWeight: 700,
-            background: (isActivelyGenerating || !influencer) ? 'rgba(139,92,246,0.12)' : 'linear-gradient(135deg,#EC4899,#8B5CF6)',
-            color: (isActivelyGenerating || !influencer) ? '#8B5CF6' : '#fff',
-            border: isActivelyGenerating ? '1.5px solid rgba(139,92,246,0.3)' : 'none',
+            flex: 1, padding: '12px 18px', borderRadius: 999, fontSize: 14, fontWeight: 800,
+            background: (isActivelyGenerating || !influencer) ? 'rgba(199,242,78,0.12)' : 'var(--brand)',
+            color: (isActivelyGenerating || !influencer) ? 'var(--brand)' : 'var(--brand-ink)',
+            border: (isActivelyGenerating || !influencer) ? '1px solid rgba(199,242,78,0.3)' : '1px solid rgba(255,255,255,0.35)',
+            boxShadow: (isActivelyGenerating || !influencer) ? 'inset 0 1px 0 var(--glass-highlight)' : 'inset 0 1px 0 rgba(255,255,255,0.55), var(--glow-brand)',
             cursor: (isActivelyGenerating || !influencer) ? 'default' : 'pointer',
-            opacity: !influencer ? 0.4 : 1, transition: 'all 0.12s', fontFamily: 'inherit',
+            opacity: !influencer ? 0.4 : 1, transition: 'background 0.5s var(--ease-liquid), box-shadow 0.5s var(--ease-liquid), transform 0.5s var(--ease-jelly)', fontFamily: 'inherit',
           }}
         >
           {isActivelyGenerating ? 'Generating…' : 'Generate Photo'}
@@ -1584,7 +1601,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                 aspectRatio: aspectRatio.replace(':', '/'),
                 position: 'relative',
                 background: isReady ? 'var(--bg-tertiary)' : 'linear-gradient(160deg,#0f0720 0%,#1a0d35 55%,#0d0820 100%)',
-                border: isReady ? 'none' : '1.5px solid rgba(139,92,246,0.22)',
+                border: isReady ? 'none' : '1.5px solid rgba(199,242,78,0.22)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: isReady ? 'zoom-in' : 'default',
               }}>
@@ -1593,7 +1610,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                     <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     <button onClick={async(e)=>{e.stopPropagation();try{const res=await fetch(url);const blob=await res.blob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`photo-studio-${i+1}.jpg`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000)}catch{const a=document.createElement('a');a.href=url;a.download=`photo-studio-${i+1}.jpg`;a.click()}}} style={{ position: 'absolute', bottom: 8, right: 8, padding: '5px 10px', borderRadius: 7, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>↓</button>
                     {onUseAsStartFrame && (
-                      <button onClick={()=>onUseAsStartFrame(url)} style={{ position: 'absolute', bottom: 8, left: 8, padding: '5px 10px', borderRadius: 7, background: 'linear-gradient(135deg,rgba(236,72,153,0.85),rgba(139,92,246,0.85))', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button onClick={()=>onUseAsStartFrame(url)} style={{ position: 'absolute', bottom: 8, left: 8, padding: '5px 10px', borderRadius: 7, background: 'linear-gradient(135deg,rgba(199,242,78,0.85),rgba(199,242,78,0.85))', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                         → Video
                       </button>
@@ -1601,16 +1618,16 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                   </>
                 ) : (
                   <>
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(105deg,transparent 30%,rgba(139,92,246,0.07) 50%,transparent 70%)', animation: 'ps-shimmer 2.6s ease-in-out infinite', pointerEvents: 'none' }} />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(105deg,transparent 30%,rgba(199,242,78,0.07) 50%,transparent 70%)', animation: 'ps-shimmer 2.6s ease-in-out infinite', pointerEvents: 'none' }} />
                     <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: 16 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#EC4899,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: 10 }}>Generating…</div>
                       <div style={{ width: 80, height: 2, background: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden', margin: '0 auto 8px' }}>
-                        <div style={{ height: '100%', width: `${smoothPct}%`, background: 'linear-gradient(90deg,#EC4899,#8B5CF6)', borderRadius: 2, transition: 'width 0.4s linear' }} />
+                        <div style={{ height: '100%', width: `${smoothPct}%`, background: 'var(--brand)', borderRadius: 2, transition: 'width 0.4s linear' }} />
                       </div>
-                      <div style={{ fontSize: 11, color: 'rgba(139,92,246,0.7)', fontVariantNumeric: 'tabular-nums' }}>
+                      <div style={{ fontSize: 11, color: 'rgba(199,242,78,0.7)', fontVariantNumeric: 'tabular-nums' }}>
                         {elapsedSecs < 60 ? `${elapsedSecs}s` : `${Math.floor(elapsedSecs/60)}m ${elapsedSecs%60}s`}
                       </div>
                     </div>
@@ -1647,9 +1664,9 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                   }}
                   style={{
                     padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600,
-                    background: selectedHistIds.size === infHistory.length ? 'rgba(139,92,246,0.1)' : 'var(--bg-tertiary)',
-                    color: selectedHistIds.size === infHistory.length ? '#8B5CF6' : 'var(--text-tertiary)',
-                    border: selectedHistIds.size === infHistory.length ? '1px solid rgba(139,92,246,0.3)' : '1px solid var(--border)',
+                    background: selectedHistIds.size === infHistory.length ? 'rgba(199,242,78,0.1)' : 'var(--bg-tertiary)',
+                    color: selectedHistIds.size === infHistory.length ? 'var(--brand)' : 'var(--text-tertiary)',
+                    border: selectedHistIds.size === infHistory.length ? '1px solid rgba(199,242,78,0.3)' : '1px solid var(--border)',
                     cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >{selectedHistIds.size === infHistory.length ? 'Deselect all' : 'Select all'}</button>
@@ -1682,6 +1699,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                         const next = history.filter(h => !ids.has(h.histId || h.url))
                         setHistory(next)
                         try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch {}
+                        window.dispatchEvent(new CustomEvent('photo_studio_history_updated'))
                         const deletedUrls = new Set(infHistory.filter(h => ids.has(h.histId || h.url)).map(h => h.url))
                         setCurrentImgs(prev => prev.filter(u => !deletedUrls.has(u)))
                         setSelectedHistIds(new Set())
@@ -1706,12 +1724,12 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             {/* Loading placeholders for images still generating */}
             {isActivelyGenerating && Array.from({ length: Math.max(0, lockedCount - currentImgs.length) }, (_, i) => (
               <div key={`gen-${i}`} style={{
-                width: aspectRatio === '9:16' ? 60 : 96, height: 96, borderRadius: 8,
+                width: aspectRatio === '9:16' ? 60 : 96, height: 96, borderRadius: 'var(--radius-sm)',
                 background: 'linear-gradient(160deg,#0f0720 0%,#1a0d35 55%,#0d0820 100%)',
-                border: '1.5px solid rgba(139,92,246,0.22)',
+                border: '1.5px solid rgba(199,242,78,0.22)',
                 position: 'relative', overflow: 'hidden',
               }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(105deg,transparent 30%,rgba(139,92,246,0.07) 50%,transparent 70%)', animation: 'ps-shimmer 2.6s ease-in-out infinite' }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(105deg,transparent 30%,rgba(199,242,78,0.07) 50%,transparent 70%)', animation: 'ps-shimmer 2.6s ease-in-out infinite' }} />
               </div>
             ))}
 
@@ -1753,15 +1771,15 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
       )}
 
       {confirmClear && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', ...glassOverlay }}
           onClick={() => setConfirmClear(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 16, padding: '28px 32px', maxWidth: 340, width: '90%', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', border: '1px solid var(--border)', textAlign: 'center' }}>
+          <div onClick={e => e.stopPropagation()} className="reveal" style={{ ...glassModal, padding: '28px 32px', maxWidth: 340, width: '90%', textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🗑️</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>{confirmClear.label}?</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>This cannot be undone.</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button onClick={() => setConfirmClear(null)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={confirmClear.onConfirm} style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, background: '#FF3B30', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
+              <button onClick={() => setConfirmClear(null)} style={{ flex: 1, padding: '10px 0', borderRadius: 'var(--radius-sm)', fontSize: 13, fontWeight: 600, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={confirmClear.onConfirm} style={{ flex: 1, padding: '10px 0', borderRadius: 'var(--radius-sm)', fontSize: 13, fontWeight: 700, background: '#FF3B30', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Delete</button>
             </div>
           </div>
         </div>

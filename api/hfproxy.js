@@ -30,16 +30,25 @@ export default async function handler(req) {
 
   const target = `https://mcp.higgsfield.ai${path}${search}`
 
-  // CORS preflight
-  const origin = req.headers.get('origin') || '*'
+  // CORS — allowlist only (never reflect arbitrary Origin with credentials)
+  const rawOrigin = req.headers.get('origin') || ''
+  const allowed =
+    rawOrigin === 'https://vymotion.org' ||
+    rawOrigin === 'https://www.vymotion.org' ||
+    /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(rawOrigin)
   const corsHeaders = {
-    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Origin': allowed ? rawOrigin : 'https://vymotion.org',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'authorization, content-type, accept, mcp-session-id',
     'Access-Control-Allow-Credentials': 'true',
+    'Vary': 'Origin',
   }
   if (req.method === 'OPTIONS') {
+    if (!allowed && rawOrigin) return new Response('Forbidden', { status: 403 })
     return new Response(null, { status: 204, headers: corsHeaders })
+  }
+  if (rawOrigin && !allowed) {
+    return new Response('Forbidden', { status: 403, headers: corsHeaders })
   }
 
   const rl = rateLimit(clientIp(req.headers))
@@ -50,10 +59,12 @@ export default async function handler(req) {
     })
   }
 
-  // Forward all request headers, drop 'host' so upstream doesn't reject it
+  // Forward request headers, minus 'host' (upstream would reject it) and 'cookie' —
+  // same-origin fetches attach the Clerk __session cookie, which must never reach a
+  // third party. Higgsfield auth travels in the Authorization header, not cookies.
   const forward = new Headers()
   for (const [k, v] of req.headers.entries()) {
-    if (k === 'host') continue
+    if (k === 'host' || k === 'cookie') continue
     forward.set(k, v)
   }
 
