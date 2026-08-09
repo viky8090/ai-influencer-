@@ -314,7 +314,14 @@ function PlanCard({ pl, annual, busy, onChoose }) {
 
       {/* Name + badges */}
       <HStack gap={2} align="center" style={{ flexWrap: 'wrap' }}>
-        <Text type="body" weight="bold" size="lg" style={{ letterSpacing: '0.4px', textTransform: 'uppercase' }}>{pl.name}</Text>
+        {/* Plain h3 wrapper rather than Astryx <Heading>: per CLAUDE.md the Heading
+            component renders at a different scale than Text and would visibly shrink this.
+            `font: inherit` keeps the rendered result byte-identical while giving the plan
+            name real structure — a screen-reader user browsing this page by heading was
+            getting the title and "Compare plans in detail" and nothing else. */}
+        <h2 style={{ font: 'inherit', margin: 0, display: 'contents' }}>
+          <Text type="body" weight="bold" size="lg" style={{ letterSpacing: '0.4px', textTransform: 'uppercase' }}>{pl.name}</Text>
+        </h2>
         {annual && pl.key !== 'starter' && <MiniChip text="17% OFF" color="pink" />}
       </HStack>
       <Text type="supporting" size="xsm" color="secondary" display="block" style={{ margin: '5px 0 12px', lineHeight: 1.4 }}>{pl.blurb}</Text>
@@ -831,7 +838,7 @@ export default function Pricing() {
 
       {/* Packs */}
       <div style={{ textAlign: 'center', margin: '42px 0 4px' }}>
-        <Text type="large" weight="bold" display="block" style={{ letterSpacing: '-0.4px' }}>Need more? Top up anytime</Text>
+        <h2 style={{ font: 'inherit', margin: 0 }}><Text type="large" weight="bold" display="block" style={{ letterSpacing: '-0.4px' }}>Need more? Top up anytime</Text></h2>
         <Text type="body" size="sm" color="secondary" display="block" style={{ marginTop: 7 }}>
           One-off credit packs — available on any plan. Top-up credits last 12 months.
         </Text>
@@ -857,7 +864,7 @@ export default function Pricing() {
 
       {/* FAQ */}
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '10px 24px 70px' }}>
-        <Text type="large" weight="bold" display="block" style={{ marginBottom: 14 }}>FAQ</Text>
+        <h2 style={{ font: 'inherit', margin: 0, marginBottom: 14 }}><Text type="large" weight="bold" display="block">FAQ</Text></h2>
         {[
           ['How do credit tiers work?', 'Creator, Pro and Studio come in multiple credit sizes — use the slider on each card to pick your monthly volume. Bigger tiers cost less per credit. You can change tier or plan any time from the billing portal.'],
           ['What is social publish?', 'Connect your social accounts once and schedule posts from Vymotion’s Publish calendar. Media comes from your generation library — no platform API keys for you to manage.'],

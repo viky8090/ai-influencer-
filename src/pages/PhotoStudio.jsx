@@ -873,7 +873,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
               </>
             ) : (
               <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 20 }}>
-                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: 'var(--brand-ink)' }}>
                   {influencer?.name?.[0]?.toUpperCase()}
                 </div>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No photo yet</span>
@@ -962,7 +962,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             <img src={expandedImg} alt="" onClick={() => setExpandedImg(null)} style={{ maxWidth: '92vw', maxHeight: '82vh', objectFit: 'contain', borderRadius: 14, boxShadow: '0 32px 80px rgba(0,0,0,0.6)', cursor: 'zoom-out', display: 'block' }} />
             <button
               onClick={() => downloadImage(expandedImg, 'photo.jpg')}
-              style={{ padding: '10px 28px', borderRadius: 980, fontSize: 13, fontWeight: 700, background: 'var(--brand)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 20px rgba(199,242,78,0.4)' }}
+              style={{ padding: '10px 28px', borderRadius: 980, fontSize: 13, fontWeight: 700, background: 'var(--brand)', color: 'var(--brand-ink)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 20px rgba(199,242,78,0.4)' }}
             >↓ Download</button>
           </div>
         </div>
@@ -1071,7 +1071,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
             <button key={s} onClick={() => setStance(s)} style={{
               padding: '5px 16px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               background: stance === s ? 'var(--brand)' : 'var(--bg)',
-              color: stance === s ? '#fff' : 'var(--text-secondary)',
+              color: stance === s ? 'var(--brand-ink)' : 'var(--text-secondary)',
               border: 'none', cursor: 'pointer', transition: 'all 0.12s',
               textTransform: 'capitalize',
             }}>{s}</button>
@@ -1114,7 +1114,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                 <button key={g.id} onClick={() => setGaze(g.id)} style={{
                   padding: '5px 16px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                   background: gaze === g.id ? 'var(--brand)' : 'var(--bg)',
-                  color: gaze === g.id ? '#fff' : 'var(--text-secondary)',
+                  color: gaze === g.id ? 'var(--brand-ink)' : 'var(--text-secondary)',
                   border: 'none', cursor: 'pointer', transition: 'all 0.12s',
                 }}>{g.label}</button>
               ))}
@@ -1346,7 +1346,7 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
                             if (i === idx || (slot.pairId && s.pairId === slot.pairId)) return { ...s, mode: m }
                             return s
                           }))}
-                          style={{ flex: 1, padding: '5px 0', fontSize: 10, fontWeight: 600, fontFamily: 'inherit', background: (slot.mode || 'holding') === m ? 'var(--brand)' : 'transparent', color: (slot.mode || 'holding') === m ? '#fff' : 'var(--text-tertiary)', border: 'none', cursor: 'pointer', transition: 'all 0.12s', textTransform: 'capitalize' }}
+                          style={{ flex: 1, padding: '5px 0', fontSize: 10, fontWeight: 600, fontFamily: 'inherit', background: (slot.mode || 'holding') === m ? 'var(--brand)' : 'transparent', color: (slot.mode || 'holding') === m ? 'var(--brand-ink)' : 'var(--text-tertiary)', border: 'none', cursor: 'pointer', transition: 'all 0.12s', textTransform: 'capitalize' }}
                         >{m}</button>
                       ))}
                     </div>

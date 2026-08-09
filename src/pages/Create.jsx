@@ -1452,6 +1452,17 @@ function Step5({ data, onFinish, onReset, isSignedIn }) {
             onMouseEnter={e => { e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.6), 0 10px 52px rgba(199,242,78,0.62)' }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.55), 0 6px 36px rgba(199,242,78,0.45)' }}
           >Generate 3 looks →</button>
+
+          {/* What happens next, said before the click rather than after it.
+              The visitor has walked five steps and made up to 62 choices with no mention of
+              credits or an account anywhere in the flow; discovering the boundary by hitting
+              it is the most expensive possible moment to learn it. Signed-in users get the
+              cost framing, signed-out users get the account ask — both up front. */}
+          <p style={{ margin: '14px 0 0', fontSize: 12.5, lineHeight: 1.5, color: L.textFaint, textAlign: 'center' }}>
+            {isSignedIn
+              ? <>Uses credits from your balance. You’re only charged for delivered images — failed generations are always refunded.</>
+              : <>You’ll sign in first — it’s free, no card required, and your answers are kept. Free credits on sign-up cover your first looks.</>}
+          </p>
         </div>
       )}
 
@@ -1588,20 +1599,60 @@ export default function Create() {
   const navigate = useNavigate()
   const location = useLocation()
   const [, setInfluencers] = useInfluencers()
-  const [step, setStep] = useState(1)
   const prefill = location.state || {}
-  const [data, setData] = useState({
+
+  const EMPTY_DRAFT = {
     name: prefill.prefillName || '', gender: prefill.prefillGender || '', age: '', niches: [], nicheCustom: '',
     backstory: '', personality: 50,
     ethnicity: '', skinTone: '', hairColor: '', hairLength: 'Long', hairTexture: 'Straight',
     eyeColor: '', build: '', uniqueFeatures: '',
     vibeWords: [], faceRef: null, styleRef: null,
     faceRefNote: '', styleRefNote: '',
-  })
+  }
+
+  // Draft persistence.
+  //
+  // This wizard held everything in memory only, so a refresh — or a phone backgrounding the
+  // tab — at step 3 dropped the user back to step 1 with every field blank. That is the
+  // worst place in the product to lose work: it is the activation flow, the user has spent
+  // real effort (step 4 alone offers 62 choices), and they have nothing invested yet to make
+  // them retype it. Everything else in this app is local-first; this screen was the exception.
+  //
+  // Reference images are deliberately NOT persisted: they are data URLs and would blow the
+  // ~5 MB localStorage budget. Restoring without them is still far better than restoring
+  // nothing, and the slots are optional by design.
+  const DRAFT_KEY = 'create_wizard_draft'
+  const restored = (() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (!raw) return null
+      const d = JSON.parse(raw)
+      // A prefill from another screen is an explicit fresh start; it wins over an old draft.
+      if (prefill.prefillName || prefill.prefillGender) return null
+      return d && typeof d === 'object' ? d : null
+    } catch { return null }
+  })()
+
+  const [step, setStep] = useState(() => Math.min(Math.max(restored?.step ?? 1, 1), 5))
+  const [data, setData] = useState(() => ({ ...EMPTY_DRAFT, ...(restored?.data || {}), faceRef: null, styleRef: null }))
+  const [draftRestored, setDraftRestored] = useState(!!restored)
 
   const { isSignedIn } = useAuth()
   const [shakeContinue, setShakeContinue] = useState(false)
   const [ageErrorPulse, setAgeErrorPulse] = useState(false)
+
+  // Persist on every change. Cheap: the draft is small once refs are stripped, and writing
+  // eagerly is what makes an interrupted session recoverable rather than nearly-recoverable.
+  useEffect(() => {
+    try {
+      const { faceRef, styleRef, ...persistable } = data
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, data: persistable, savedAt: Date.now() }))
+    } catch { /* quota or private mode — the wizard still works, it just won't resume */ }
+  }, [step, data])
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
+  }
 
   function set(k, v) { setData(prev => ({ ...prev, [k]: v })) }
 
@@ -1700,6 +1751,8 @@ export default function Create() {
         }
       })
 
+      // The draft has become a real influencer — drop it so the next visit starts clean.
+      clearDraft()
       navigate('/influencers', { state: { selectId: newInf.id } })
     } catch (e) {
       console.error('finish() failed:', e)
@@ -1734,6 +1787,28 @@ export default function Create() {
           <StepRail current={step} />
 
           <div style={{ minWidth: 0 }}>
+        {/* Silently reappearing on step 3 with fields already filled is disorienting — say
+            why, and give an explicit way out. Dismissing only hides the notice; the draft
+            stays, because "I don't need the banner" is not "throw my work away". */}
+        {draftRestored && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            padding: '10px 14px', marginBottom: 18, borderRadius: 'var(--radius-sm)',
+            background: 'rgba(199,242,78,0.07)', border: '1px solid rgba(199,242,78,0.28)',
+            fontSize: 13, color: 'var(--text-secondary)',
+          }}>
+            <span style={{ flex: 1, minWidth: 200 }}>Picked up where you left off.</span>
+            <button
+              onClick={() => { clearDraft(); setData(EMPTY_DRAFT); setStep(1); setDraftRestored(false) }}
+              style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
+            >Start over</button>
+            <button
+              onClick={() => setDraftRestored(false)}
+              aria-label="Dismiss"
+              style={{ fontSize: 13, color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '6px 8px' }}
+            >✕</button>
+          </div>
+        )}
         {step === 1 && <Step1 data={data} set={set} onGenderChange={handleGenderChange} ageErrorPulse={ageErrorPulse} />}
         {step === 2 && <Step2 data={data} set={set} />}
         {step === 3 && <Step3 data={data} set={set} />}

@@ -17,6 +17,7 @@ import WardrobeDrawer from '../components/WardrobeDrawer'
 import { glassCard, glassPanel, glassModal, glassOverlay, glassInput, glassBtnGhost, glassBtnPrimary } from '../ui/glass'
 import AIAssist from '../components/AIAssist'
 import { SmartImage, SmartVideo } from '../components/Media'
+import { useCredits } from '../api/creditsStore'
 import { useSEO } from '../ui/seo'
 
 // Video Studio model lineup — ids must match worker/src/providers/fal.js buildRequest cases
@@ -471,7 +472,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
               background:'rgba(0,0,0,0.45)',color:'#fff',fontSize:12,
               display:'flex',alignItems:'center',justifyContent:'center',
               backdropFilter:'blur(4px)',border:'1px solid rgba(255,255,255,0.12)',
-              opacity: hovered ? 1 : 0, transition:'opacity 0.15s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.15s, visibility 0.15s',
             }}
               onMouseEnter={e=>{e.currentTarget.style.background='rgba(220,50,50,0.85)'}}
               onMouseLeave={e=>{e.currentTarget.style.background='rgba(0,0,0,0.45)'}}>×</button>
@@ -482,7 +483,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
               padding:'28px 8px 8px',
               background:'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
               display:'flex',gap:5,
-              opacity: hovered ? 1 : 0, transition:'opacity 0.2s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.2s, visibility 0.2s',
             }}>
               <button onClick={regenerate} disabled={loading} style={{
                 flex:1.4,padding:'6px 0',borderRadius:7,fontSize:11,fontWeight:700,
@@ -518,7 +519,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
             <button onClick={e=>{e.stopPropagation();setOpen(o=>!o)}} style={{
               position:'absolute',bottom:10,left:10,right:10,
               padding:'7px 0',borderRadius:'var(--radius-sm)',fontSize:11,fontWeight:700,
-              background:'var(--brand)',color:'#fff',
+              background:'var(--brand)',color:'var(--brand-ink)',
               boxShadow:'0 2px 10px rgba(199,242,78,0.28)',transition:'opacity 0.15s',
             }}
               onMouseEnter={e=>{e.currentTarget.style.opacity='0.85'}}
@@ -565,7 +566,7 @@ function CharacterSheetSlot({ influencer, onSave, onLightbox }) {
           <button onClick={generate} disabled={loading} style={{
             padding:'9px 0',borderRadius:'var(--radius-sm)',fontSize:13,fontWeight:700,
             background:loading?'var(--bg-tertiary)':'var(--brand)',
-            color:loading?'var(--text-tertiary)':'#fff',
+            color:loading?'var(--text-tertiary)':'var(--brand-ink)',
             boxShadow:loading?'none':'0 2px 12px rgba(199,242,78,0.3)',
             transition:'all 0.15s',
           }}>
@@ -680,7 +681,7 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
               padding:'28px 8px 8px',
               background:'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
               display:'flex', gap:5,
-              opacity: hovered ? 1 : 0, transition:'opacity 0.2s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.2s, visibility 0.2s',
             }}>
               <button
                 onClick={regenerate} disabled={loading}
@@ -734,7 +735,7 @@ function CloseUpSlot({ influencer, imageKey, label, onSave, onLightbox, promptFn
                 position:'absolute', bottom:8, left:8, right:8,
                 padding:'6px 0', borderRadius:7, fontSize:11, fontWeight:700,
                 background: loading ? 'var(--bg-tertiary)' : 'var(--brand)',
-                color: loading ? 'var(--text-tertiary)' : '#fff',
+                color: loading ? 'var(--text-tertiary)' : 'var(--brand-ink)',
                 boxShadow: loading ? 'none' : '0 2px 10px rgba(199,242,78,0.28)',
                 transition:'opacity 0.15s',
               }}
@@ -847,7 +848,7 @@ function MainImageSlot({ influencer, onChange, onLightbox }) {
               background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 12,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.12)',
-              opacity: hovered ? 1 : 0, transition: 'opacity 0.15s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.15s, visibility 0.15s',
             }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,50,50,0.85)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.45)' }}>×</button>
@@ -857,7 +858,7 @@ function MainImageSlot({ influencer, onChange, onLightbox }) {
               padding: '28px 8px 8px',
               background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%)',
               display: 'flex', gap: 5,
-              opacity: hovered ? 1 : 0, transition: 'opacity 0.2s',
+              opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.2s, visibility 0.2s',
             }}>
               <button onClick={regenerate} disabled={loading} style={{
                 flex: 1.4, padding: '6px 0', borderRadius: 7, fontSize: 11, fontWeight: 700,
@@ -1131,7 +1132,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
         </div>
         <button onClick={add} style={{
           padding:'7px 16px',borderRadius:980,
-          background:'var(--brand)',color:'#fff',
+          background:'var(--brand)',color:'var(--brand-ink)',
           fontSize:12,fontWeight:700,display:'flex',alignItems:'center',gap:5,
           boxShadow:'0 2px 10px rgba(199,242,78,0.3)',
         }}>+ New Script</button>
@@ -1302,7 +1303,7 @@ function ScriptsSection({ scripts=[], influencerPrompt='', onChange, initialExpa
                         <div style={{position:'relative',cursor:'pointer'}} onClick={()=>setVidLightbox(url)}>
                           <video src={url} preload="metadata" muted playsInline style={{width:'100%',height:90,objectFit:'cover',display:'block',pointerEvents:'none'}}/>
                           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.18)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'#fff',boxShadow:'0 2px 8px rgba(199,242,78,0.45)'}}>▶</div>
+                            <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'var(--brand-ink)',boxShadow:'0 2px 8px rgba(199,242,78,0.45)'}}>▶</div>
                           </div>
                         </div>
                         <div style={{display:'flex',gap:1,background:'var(--bg-tertiary)',padding:'3px'}}>
@@ -1824,7 +1825,7 @@ function WardrobeGenerator({ influencer, onAdd }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={saveToWardrobe} style={{
             flex: 1, padding: '10px', borderRadius: 9, fontSize: 13, fontWeight: 700,
-            background: 'var(--brand)', color: '#fff',
+            background: 'var(--brand)', color: 'var(--brand-ink)',
             boxShadow: '0 2px 10px rgba(199,242,78,0.3)',
           }}>Save to Wardrobe</button>
           <button onClick={discardResult} style={{
@@ -1897,7 +1898,7 @@ function WardrobeGenerator({ influencer, onAdd }) {
         <button onClick={generate} disabled={!canGenerate} style={{
           width: '100%', marginTop: 16, padding: '12px', borderRadius: 'var(--radius-sm)', fontSize: 14, fontWeight: 700,
           background: canGenerate ? 'var(--brand)' : 'var(--bg-tertiary)',
-          color: canGenerate ? '#fff' : 'var(--text-tertiary)',
+          color: canGenerate ? 'var(--brand-ink)' : 'var(--text-tertiary)',
           cursor: canGenerate ? 'pointer' : 'not-allowed',
           boxShadow: canGenerate ? '0 2px 12px rgba(199,242,78,0.32)' : 'none',
           transition: 'all 0.15s',
@@ -1968,7 +1969,7 @@ function WorldDropCard({ drop, editing, editName, onEditName, onStartEdit, onCom
               style={{ flex:1, fontSize:13, fontWeight:600, border:'none', background:'transparent', color:'var(--text-primary)', outline:'none' }}/>
           : <span style={{ flex:1, fontSize:13, fontWeight:600, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{drop.name}</span>
         }
-        <div style={{ display:'flex', gap:3, flexShrink:0, opacity: hovered ? 1 : 0, transition:'opacity 0.15s' }}>
+        <div style={{ display:'flex', gap:3, flexShrink:0, opacity: hovered ? 1 : 0, visibility: hovered ? 'visible' : 'hidden', transition:'opacity 0.15s, visibility 0.15s' }}>
           {drop.image && (
             <button onClick={e=>{e.stopPropagation();downloadImage(drop.image,`${drop.name||'wardrobe'}.jpg`)}} title="Download" style={{
               width:26, height:26, borderRadius:7, border:'none', cursor:'pointer',
@@ -2264,7 +2265,7 @@ function BrandDealCard({ deal, editingBrand, editBrand, onEditBrand, onStartEdit
         {deal.image && !generating && (
           <button
             onClick={e=>{e.stopPropagation();onGenerate(deal)}}
-            style={{marginTop:8,width:'100%',padding:'5px 0',borderRadius:6,fontSize:11,fontWeight:600,background:hasSheet?'var(--bg-tertiary)':'var(--brand)',color:hasSheet?'var(--text-secondary)':'#fff',boxShadow:hasSheet?'none':'0 1px 6px rgba(199,242,78,0.3)',transition:'all 0.15s',cursor:'pointer'}}
+            style={{marginTop:8,width:'100%',padding:'5px 0',borderRadius:6,fontSize:11,fontWeight:600,background:hasSheet?'var(--bg-tertiary)':'var(--brand)',color:hasSheet?'var(--text-secondary)':'var(--brand-ink)',boxShadow:hasSheet?'none':'0 1px 6px rgba(199,242,78,0.3)',transition:'all 0.15s',cursor:'pointer'}}
           >{hasSheet ? '↺ Regenerate Sheet' : 'Generate Sheet'}</button>
         )}
       </div>
@@ -2393,7 +2394,7 @@ function ImportBrandDealsModal({ deals, existingBrands, onImport, onClose }) {
                       : <div style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28,fontWeight:800,color:'var(--text-tertiary)',opacity:0.25 }}>{deal.brand[0]}</div>
                     }
                     {isSelected && (
-                      <div style={{ position:'absolute',top:6,right:6,width:20,height:20,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'#fff',fontWeight:700 }}>✓</div>
+                      <div style={{ position:'absolute',top:6,right:6,width:20,height:20,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:'var(--brand-ink)',fontWeight:700 }}>✓</div>
                     )}
                     {already && (
                       <div style={{ position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.35)',fontSize:11,fontWeight:700,color:'#fff' }}>Already added</div>
@@ -3347,10 +3348,23 @@ function HistoryCard({ entry, onDelete, onDownload, isSelected, onSelect, showSe
 
   return (
     <>
+      {/* role+tabIndex rather than a bare div: Library is the view the studio opens on, and
+          this card was the only way into a generation — so the grid of everything the user
+          has made was unreachable by keyboard and announced as nothing. It stays a div
+          because it contains its own buttons (download/delete/select), and a <button> may
+          not nest interactive children. */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-label={`${isVideo ? 'Video' : 'Image'}${entry.label ? `: ${entry.label}` : ''} — open`}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
+        onFocus={handleEnter}
+        onBlur={handleLeave}
         onClick={() => openLightbox()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLightbox() }
+        }}
         style={{
           position:'relative', borderRadius:'var(--radius-sm)', overflow:'hidden', background:'var(--bg-tertiary)',
           outline: isSelected ? '2px solid var(--accent)' : 'none',
@@ -3374,7 +3388,7 @@ function HistoryCard({ entry, onDelete, onDownload, isSelected, onSelect, showSe
           }
           {isVideo && !hovered && (
             <div style={{position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.22)', pointerEvents:'none'}}>
-              <div style={{width:34, height:34, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, paddingLeft:3, color:'#fff', boxShadow:'0 2px 10px rgba(199,242,78,0.5)'}}>▶</div>
+              <div style={{width:34, height:34, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, paddingLeft:3, color:'var(--brand-ink)', boxShadow:'0 2px 10px rgba(199,242,78,0.5)'}}>▶</div>
             </div>
           )}
           {!isVideo && hovered && (
@@ -3721,7 +3735,7 @@ function VideoStripThumb({ entry, onReuse, onDelete, isSelected, onToggle }) {
         )}
         <video src={entry.url} preload="metadata" muted playsInline style={{width:'100%',height:90,objectFit:'cover',display:'block'}}/>
         <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background: isSelected ? 'rgba(199,242,78,0.18)' : 'rgba(0,0,0,0.18)'}}>
-          <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'#fff',boxShadow:'0 2px 8px rgba(199,242,78,0.45)'}}>▶</div>
+          <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brand)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,paddingLeft:2,color:'var(--brand-ink)',boxShadow:'0 2px 8px rgba(199,242,78,0.45)'}}>▶</div>
         </div>
         <div style={{padding:'4px 6px',fontSize:9,color:'var(--text-tertiary)',fontWeight:500,background:'var(--glass-bg-strong)',backdropFilter:'blur(var(--blur-sm))',WebkitBackdropFilter:'blur(var(--blur-sm))'}}>
           {new Date(entry.date).toLocaleDateString([],{month:'short',day:'numeric'})}
@@ -3754,7 +3768,7 @@ function VideoStripThumb({ entry, onReuse, onDelete, isSelected, onToggle }) {
           }</button>
           </div>
           <div style={{padding:'7px 8px', display:'flex', gap:5}}>
-            <button onClick={download} title="Download" style={{flex:1,padding:'6px 0',borderRadius:'var(--radius-sm)',fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'var(--brand)',color:'#fff'}}>↓</button>
+            <button onClick={download} title="Download" style={{flex:1,padding:'6px 0',borderRadius:'var(--radius-sm)',fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'var(--brand)',color:'var(--brand-ink)'}}>↓</button>
             {onReuse && (
               <button onClick={e=>{e.stopPropagation(); onReuse(entry); clearPopup(); if(_clearActiveStripPopup===clearPopup) _clearActiveStripPopup=null}} title="Reuse settings" style={{flex:1,padding:'6px 0',borderRadius:'var(--radius-sm)',fontSize:13,border:'none',cursor:'pointer',fontFamily:'inherit',background:'rgba(199,242,78,0.12)',color:'var(--brand)'}}>↺</button>
             )}
@@ -3780,7 +3794,7 @@ function VideoStripThumb({ entry, onReuse, onDelete, isSelected, onToggle }) {
   )
 }
 
-function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, restoreKey = 0, pendingStartFrame = null, onStartFrameConsumed }) {
+function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, restoreKey = 0, pendingStartFrame = null, onStartFrameConsumed, isActiveView = true }) {
   const allImages = [
     { key: 'mainImage',          label: 'Main',          url: influencer.mainImage },
     { key: 'characterSheetImage',label: 'Character Sheet',url: influencer.characterSheetImage },
@@ -4027,8 +4041,18 @@ function ContentStudio({ influencer, onUpdate, onSaveToScripts, onGenerated, res
     }
   }, [generating])
 
-  // Cmd+Enter to generate
+  // Cmd+Enter to generate — only while the Videos view is the one on screen.
+  //
+  // ContentStudio is never unmounted; the view switcher hides it with display:none so a
+  // running job survives navigation. That meant this window-level listener stayed armed in
+  // Library, Photos, Wardrobe, Deals, Scripts and Identity — and ⌘↵ in the *Photos* studio,
+  // where the muscle memory is to submit that form, silently started a paid video render.
+  // The missing dependency array also re-bound the listener on every render.
+  // No dependency array on purpose: `canAct` and `generate` are declared further down this
+  // component, so naming them here would evaluate them in the temporal dead zone. Rebinding
+  // each render keeps the closure fresh and costs one addEventListener on window.
   useEffect(() => {
+    if (!isActiveView) return undefined
     function onKey(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canAct && !generating) {
         e.preventDefault()
@@ -4535,6 +4559,27 @@ ${shotsWithBeats.join('\n\n')}`
 
   const canAct = startFrameUrl || dialogue.trim() || environment || vibe
 
+  // What this click costs, at the point of commitment.
+  //
+  // The per-clip figure was already on the model chip, but every multiplier lived in a
+  // different sub-block, so the user was doing the arithmetic — and "Generate 3 Videos"
+  // against a chip reading "~200 cr" is off by 3x before resolution is considered.
+  //
+  // worker/src/lib/priceBook.js stays authoritative. This mirrors only the two factors the
+  // client can know for certain: base x clip count, and Seedance 2's documented 1080p
+  // uplift (quote() line 99). Per-model extra-second rates are DB rows the client never
+  // sees, so this deliberately reads low and says "~" rather than inventing a number.
+  const activeVideoModel = VIDEO_MODELS.find(m => m.id === videoModel) || VIDEO_MODELS[0]
+  const costEstimate = Math.ceil(
+    activeVideoModel.cost * outputs *
+    (activeVideoModel.id === 'seedance_2_0' && String(resolution).includes('1080') ? 2.25 : 1)
+  )
+  // Warn on a shortfall, but never disable: `bal` can be stale or still loading, and a
+  // wrong local number must not be what stops a paying user from generating. The server
+  // rejects an genuinely underfunded job anyway.
+  const { bal: creditBalance } = useCredits()
+  const shortfall = typeof creditBalance === 'number' && creditBalance < costEstimate
+
   function doVideoRandomize() {
     const vibeOpts = CS_VIBES
     const envKeys  = Object.keys(CS_ENV_PRESETS)
@@ -4888,7 +4933,7 @@ ${shotsWithBeats.join('\n\n')}`
         {/* Wardrobe */}
         <Sec>
           <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:14}}>
-            <div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,background:'var(--brand)',color:'#fff',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',marginTop:1}}>4</div>
+            <div style={{width:22,height:22,borderRadius:'50%',flexShrink:0,background:'var(--brand)',color:'var(--brand-ink)',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',marginTop:1}}>4</div>
             <div style={{flex:1}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',lineHeight:1.2}}>Wardrobe</div>
@@ -5323,9 +5368,12 @@ ${shotsWithBeats.join('\n\n')}`
       {/* Generating + Results — unified N-card display */}
       {(generating || genResults.length > 0) && (
         <div ref={genCardRef}>
-          {/* Progress area — only while generating */}
+          {/* Progress area — only while generating.
+              role=status + aria-live: this is the one moment on the surface where feedback
+              matters most, and it was announcing nothing. Polite rather than assertive so
+              the stage updates don't interrupt whatever the user is reading. */}
           {generating && (
-            <div style={{marginBottom:10}}>
+            <div role="status" aria-live="polite" style={{marginBottom:10}}>
               {/* Main status card */}
               <div style={{
                 padding:'14px 16px',borderRadius:14,marginBottom:8,
@@ -5343,7 +5391,7 @@ ${shotsWithBeats.join('\n\n')}`
                     <span style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>
                       {genProgress < 10 ? 'Connecting...'
                         : genProgress < 28 ? 'Uploading references...'
-                        : genProgress < 35 ? 'Submitting to Seedance...'
+                        : genProgress < 35 ? `Submitting to ${activeVideoModel.name}...`
                         : genProgress >= 95 ? 'Almost there...'
                         : lockedOutputs > 1 && genResults.length > 0
                           ? `Rendering · ${genResults.length}/${lockedOutputs} ready`
@@ -5573,10 +5621,15 @@ ${shotsWithBeats.join('\n\n')}`
           <button
             onClick={generate}
             disabled={!canAct || generating}
+            title={
+              shortfall
+                ? `Estimated ~${costEstimate} credits — your balance is ${creditBalance}. Extra seconds may add to this; the final charge is set server-side.`
+                : `Estimated ~${costEstimate} credits (${activeVideoModel.name} x${outputs}). Extra seconds may add to this; the final charge is set server-side.`
+            }
             style={{
               flex:1, padding:'12px 18px', borderRadius:12, fontSize:14, fontWeight:700,
               background: generating ? 'rgba(199,242,78,0.12)' : (canAct ? 'var(--brand)' : 'var(--bg-tertiary)'),
-              color: generating ? 'var(--brand)' : (canAct ? '#fff' : 'var(--text-tertiary)'),
+              color: generating ? 'var(--brand)' : (canAct ? 'var(--brand-ink)' : 'var(--text-tertiary)'),
               border: generating ? '1.5px solid rgba(199,242,78,0.3)' : 'none',
               cursor: (generating || !canAct) ? 'default' : 'pointer',
               transition:'all 0.2s', letterSpacing:'-0.2px', fontFamily:'inherit',
@@ -5585,7 +5638,7 @@ ${shotsWithBeats.join('\n\n')}`
           >
             {generating
               ? (genResults.length > 0 ? `${genResults.length}/${lockedOutputs} ready · ${fmtElapsed(elapsed)}` : `Generating… ${fmtElapsed(elapsed)}`)
-              : `✦ Generate${outputs > 1 ? ` ${outputs} Videos` : ' Video'}`}
+              : `✦ Generate${outputs > 1 ? ` ${outputs} Videos` : ' Video'} · ~${costEstimate} cr`}
             {!generating && <span style={{fontSize:10,opacity:0.5,marginLeft:8,fontWeight:400}}>⌘↵</span>}
           </button>
           {/* Save — appears only after generation completes */}
@@ -6224,7 +6277,10 @@ export default function Influencers() {
               Replaces a pill group (Profile/Photos/Videos) stacked on top of a six-item
               underline tab row that only existed under Profile. One level, seven peers,
               library first: the work you made is the page, not a tab six deep. */}
-          <nav style={{display:'flex',alignItems:'center',gap:2,flexWrap:'wrap',borderBottom:`1px solid ${SD.border}`,marginBottom:4}}>
+          {/* tablist semantics: the active view was signalled by colour and a 2px underline
+              only, so a screen-reader user had no way to tell which of the eight views they
+              were in. */}
+          <nav role="tablist" aria-label="Influencer views" style={{display:'flex',alignItems:'center',gap:2,flexWrap:'wrap',borderBottom:`1px solid ${SD.border}`,marginBottom:4}}>
             {sidebarCollapsed && !isMobile && (
               <button onClick={()=>{setSidebarCollapsed(false);localStorage.setItem('inf_sidebar_collapsed','0')}} title="Show influencers" style={{
                 width:30,height:30,borderRadius:8,border:`1px solid ${SD.border}`,background:'transparent',
@@ -6236,7 +6292,7 @@ export default function Influencers() {
               const on = view===v.key
               const count = v.count ? v.count(influencer) : 0
               return (
-                <button key={v.key} onClick={()=>goView(v.key)} style={{
+                <button key={v.key} onClick={()=>goView(v.key)} role="tab" aria-selected={on} style={{
                   position:'relative',padding:'10px 14px 11px',background:'none',border:'none',cursor:'pointer',
                   fontSize:13.5,fontWeight:on?700:550,letterSpacing:'-0.1px',
                   color:on?'var(--text-primary)':'var(--text-tertiary)',
@@ -6263,6 +6319,7 @@ export default function Influencers() {
               on a view switch would silently discard a running generation. */}
           <div style={{ display: view==='videos' ? 'block' : 'none' }}>
             <ContentStudio key={influencer.id} influencer={influencer} onUpdate={v=>upd(influencer.id,v)} onSaveToScripts={handleSaveToScripts} restoreKey={videoRestoreKey}
+              isActiveView={view==='videos'}
               pendingStartFrame={pendingStartFrame} onStartFrameConsumed={()=>setPendingStartFrame(null)}
               onGenerated={(urls, settings)=>{
                 const now = Date.now()
@@ -6426,7 +6483,7 @@ export default function Influencers() {
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5.5" stroke="white" strokeWidth="2"/><path d="M4 28c0-6.6 5.4-12 12-12s12 5.4 12 12" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
             </div>
             <h2 style={{fontSize:26,fontWeight:800,letterSpacing:'-0.6px',color:'var(--text-primary)',marginBottom:24}}>Build your first influencer</h2>
-            <button onClick={()=>navigate('/create')} style={{padding:'13px 36px',borderRadius:980,background:'var(--brand)',color:'#fff',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',boxShadow:'0 0 28px rgba(199,242,78,0.35),0 4px 16px rgba(0,0,0,0.12)',transition:'transform 0.18s,box-shadow 0.18s'}}
+            <button onClick={()=>navigate('/create')} style={{padding:'13px 36px',borderRadius:980,background:'var(--brand)',color:'var(--brand-ink)',fontSize:15,fontWeight:700,letterSpacing:'-0.2px',boxShadow:'0 0 28px rgba(199,242,78,0.35),0 4px 16px rgba(0,0,0,0.12)',transition:'transform 0.18s,box-shadow 0.18s'}}
               onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04) translateY(-1px)';e.currentTarget.style.boxShadow='0 0 48px rgba(199,242,78,0.5),0 8px 24px rgba(0,0,0,0.14)'}}
               onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 0 28px rgba(199,242,78,0.35),0 4px 16px rgba(0,0,0,0.12)'}}>+ Create Influencer</button>
           </div>

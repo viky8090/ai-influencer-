@@ -87,12 +87,17 @@ export function TierBars({ data, accent = M.brandText }) {
             <span style={{ fontSize: 13, fontWeight: 800, color: accent }}>{d.value}</span>
           </div>
           <div style={{ height: 12, borderRadius: 999, background: 'var(--m-line-soft)', overflow: 'hidden' }}>
+            {/* The fill is laid out at its final width and revealed with scaleX, rather than
+                animating `width` from 0. Same motion, but it runs on the compositor instead
+                of forcing four layout passes per frame for the length of the stagger. */}
             <div style={{
               height: '100%', borderRadius: 999,
-              width: inView ? `${(d.bar / max) * 100}%` : '0%',
+              width: `${(d.bar / max) * 100}%`,
+              transformOrigin: 'left center',
+              transform: inView ? 'scaleX(1)' : 'scaleX(0)',
               background: `linear-gradient(90deg, ${accent}, ${M.teal})`,
               boxShadow: `0 0 18px ${accent}55`,
-              transition: `width 1.1s var(--ease-liquid) ${0.15 + i * 0.1}s`,
+              transition: `transform 1.1s var(--ease-liquid) ${0.15 + i * 0.1}s`,
             }} />
           </div>
           {d.note && <div style={{ fontSize: 11.5, color: M.faint, marginTop: 5 }}>{d.note}</div>}

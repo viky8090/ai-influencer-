@@ -143,7 +143,11 @@
   --m-bg-top: #0A0A0B;
   --m-ink: #F4F4F5;
   --m-sub: rgba(255, 255, 255, 0.58);
-  --m-faint: rgba(255, 255, 255, 0.40);
+  /* Mirrors the light-theme correction above. 0.40 measures 3.77-3.83:1 against the dark
+     surfaces this token is used on, which fails WCAG AA for body text — and this token
+     carries the reassurance copy ("No card required", "not a guarantee of income") plus
+     every chart axis label. 0.58 lands at ~5.9:1. */
+  --m-faint: rgba(255, 255, 255, 0.58);
   --m-line: rgba(255, 255, 255, 0.10);
   --m-line-soft: rgba(255, 255, 255, 0.06);
   --m-card: #151517;
@@ -208,8 +212,25 @@ button {
   font-family: inherit;
   cursor: pointer;
   border: none;
-  outline: none;
   background: none;
+}
+
+/* `button { outline: none }` used to live in the rule above, unlayered, which beat every
+   layered :focus-visible rule in the app including Astryx's. The result was that anchors
+   showed a focus ring and buttons showed nothing — and every CTA on the marketing pages is
+   a button, so keyboard users had no visible position anywhere. WCAG 2.4.7.
+   Unlayered on purpose: it has to win the same specificity fight the old reset was winning. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Anchored sections (#how, #earnings, #pricing, #faq …) are scrolled to by the hero's
+   "See how it works" button and by five footer links. Without this they land underneath the
+   fixed nav, clipping their own heading. */
+section[id] {
+  scroll-margin-top: calc(var(--nav-h) + 24px);
 }
 
 input, textarea, select {

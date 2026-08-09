@@ -1,4 +1,4 @@
-# Project context for Claude Code
+# Project context for Codex
 
 ## What this app is
 
@@ -15,7 +15,7 @@ account (OAuth, PKCE).
   Astryx `reset.css` globally (fights Vymotion base styles). React 19 is
   required for Astryx (`use()`, `<Context value>`).
 - **No build-time API keys** — Higgsfield is OAuthed per-user; the optional
-  Claude features call through a serverless proxy that expects an
+  Codex features call through a serverless proxy that expects an
   `x-api-key` header from the browser.
 - **PRODUCTION IS CLOUDFLARE, NOT VERCEL.** vymotion.org is served by the
   `vymotion-api` Worker (`worker/wrangler.toml`), which serves the built SPA

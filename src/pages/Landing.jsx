@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { glassBtnPrimary, pressHandlers } from '../ui/glass'
 import { useTheme } from '../context/theme'
@@ -28,17 +28,33 @@ function useWordMorph() {
   return { word: WORDS[wordIdx], out }
 }
 
+// Chrome pauses video-only media while a tab is hidden, so playback has to be re-kicked when
+// the page comes back. One document-level listener drives every card. The previous version
+// registered a fresh listener from inside each `loadeddata` handler and never removed it —
+// `loadeddata` can fire more than once per element, so listeners accumulated for the lifetime
+// of the page and each closure pinned its <video> against collection.
+const autoplayCards = new Set()
+
+function kickPlayback(el) {
+  const p = el.play()
+  if (p) p.catch(() => {})
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return
+  for (const el of autoplayCards) {
+    if (!el.isConnected) { autoplayCards.delete(el); continue }
+    if (el.paused) kickPlayback(el)
+  }
+})
+
 // React doesn't reflect the `muted` prop as a DOM attribute, which can make browsers
-// veto `autoPlay` on mount — force-mute and kick playback from a ref instead. Chrome also
-// pauses video-only media while a tab is hidden, so resume when the page becomes visible.
+// veto `autoPlay` on mount — force-mute and kick playback from a ref instead.
 const autoplayRef = (el) => {
   if (!el) return
   el.muted = true
-  const kick = () => { const p = el.play(); if (p) p.catch(() => {}) }
-  kick()
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && el.isConnected && el.paused) kick()
-  })
+  autoplayCards.add(el)
+  kickPlayback(el)
 }
 
 // ── Hero (the signature dark hero, preserved) ────────────────────────────────
@@ -121,34 +137,42 @@ function Hero() {
 // Two rows that scroll in opposite directions. Ship version is Camila-only: one
 // persona, the same face holding across dozens of shots (the hard part of AI
 // characters, and the thing worth showing off).
+//
+// Everything here points at /camila/cards/, which holds derivatives cut to 428x642 —
+// exactly 2x the 214x318 card box, pre-cropped to the same centred cover the CSS applies.
+// The full-resolution originals under /camila/photos, /wardrobe, /brand_deals and /videos
+// are the seed influencer's real studio content (store.jsx) and must stay untouched: they
+// are opened full-screen and downloaded from the studio. Serving those here cost 14.6 MB
+// to render a wall of thumbnails — the derivatives cost 2.7 MB.
+const CARDS = '/camila/cards'
 const ROW_A = [
-  { src: '/camila/main.jpg', name: 'Camila', tag: 'Signature look' },
-  { src: '/camila/videos/v1.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p1.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p3.webp', name: 'Camila', tag: 'Editorial' },
-  { src: '/camila/wardrobe/sporty_fit.webp', name: 'Camila', tag: 'Wardrobe' },
-  { src: '/camila/videos/v3.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p5.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/closeup1.webp', name: 'Camila', tag: 'Close-up' },
-  { src: '/camila/photos/p7.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/videos/v4.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p9.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p11.webp', name: 'Camila', tag: 'Editorial' },
-  { src: '/camila/brand_deals/swatch_original.webp', name: 'Camila', tag: 'Brand deal' },
+  { src: `${CARDS}/main.webp`, name: 'Camila', tag: 'Signature look' },
+  { src: `${CARDS}/v1.mp4`, video: true, name: 'Camila', tag: 'Video Studio' },
+  { src: `${CARDS}/p1.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/p3.webp`, name: 'Camila', tag: 'Editorial' },
+  { src: `${CARDS}/sporty_fit.webp`, name: 'Camila', tag: 'Wardrobe' },
+  { src: `${CARDS}/v3.mp4`, video: true, name: 'Camila', tag: 'Video Studio' },
+  { src: `${CARDS}/p5.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/closeup1.webp`, name: 'Camila', tag: 'Close-up' },
+  { src: `${CARDS}/p7.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/v4.mp4`, video: true, name: 'Camila', tag: 'Video Studio' },
+  { src: `${CARDS}/p9.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/p11.webp`, name: 'Camila', tag: 'Editorial' },
+  { src: `${CARDS}/swatch_original.webp`, name: 'Camila', tag: 'Brand deal' },
 ]
 const ROW_B = [
-  { src: '/camila/photos/p2.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/videos/v2.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p4.webp', name: 'Camila', tag: 'Editorial' },
-  { src: '/camila/wardrobe/yoga_fit.webp', name: 'Camila', tag: 'Wardrobe' },
-  { src: '/camila/photos/p6.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/videos/v1.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/closeup2.webp', name: 'Camila', tag: 'Close-up' },
-  { src: '/camila/photos/p8.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p10.webp', name: 'Camila', tag: 'Editorial' },
-  { src: '/camila/videos/v3.mp4', video: true, name: 'Camila', tag: 'Video Studio' },
-  { src: '/camila/photos/p12.webp', name: 'Camila', tag: 'Photo Studio' },
-  { src: '/camila/photos/p13.webp', name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/p2.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/v2.mp4`, video: true, name: 'Camila', tag: 'Video Studio' },
+  { src: `${CARDS}/p4.webp`, name: 'Camila', tag: 'Editorial' },
+  { src: `${CARDS}/yoga_fit.webp`, name: 'Camila', tag: 'Wardrobe' },
+  { src: `${CARDS}/p6.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/v1.mp4`, video: true, name: 'Camila', tag: 'Video Studio' },
+  { src: `${CARDS}/closeup2.webp`, name: 'Camila', tag: 'Close-up' },
+  { src: `${CARDS}/p8.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/p10.webp`, name: 'Camila', tag: 'Editorial' },
+  { src: `${CARDS}/v3.mp4`, video: true, name: 'Camila', tag: 'Video Studio' },
+  { src: `${CARDS}/p12.webp`, name: 'Camila', tag: 'Photo Studio' },
+  { src: `${CARDS}/p13.webp`, name: 'Camila', tag: 'Photo Studio' },
 ]
 
 // Videos only start downloading once the strip is near the viewport — the clips are
@@ -166,22 +190,32 @@ function LazyVideo({ src, style }) {
     io.observe(el)
     return () => io.disconnect()
   }, [])
+  // Poster sits alongside the clip as <name>-poster.webp (~14 KB). Without it the card is a
+  // flat #0D0D14 rectangle for the whole download — on a slow connection the visitor scrolls
+  // past the showcase, which is the page's only proof, while it is still a row of black holes.
   return (
     <video
-      ref={ref} src={on ? src : undefined} muted autoPlay loop playsInline preload="none"
+      ref={ref} src={on ? src : undefined} poster={src.replace(/\.mp4$/, '-poster.webp')}
+      muted autoPlay loop playsInline preload="none"
       onLoadedData={(e) => autoplayRef(e.currentTarget)}
       style={style}
     />
   )
 }
 
-function ShowcaseCard({ m }) {
+// `dup` marks the cloned half of the marquee track. The clone exists only so the loop has
+// something to scroll into; announcing it doubles every card for a screen reader, which
+// previously read the same sentence 38 times. Hiding the clone and labelling the original
+// by its tag turns that into 19 useful announcements ("Video Studio", "Wardrobe", …).
+function ShowcaseCard({ m, dup }) {
   const media = { width: '100%', aspectRatio: '2/3', objectFit: 'cover', display: 'block', background: '#0D0D14' }
   return (
-    <div style={{ position: 'relative', width: 214, flexShrink: 0, marginRight: 16, borderRadius: 18, overflow: 'hidden', border: `1px solid ${M.mediaBorder}`, boxShadow: M.mediaShadow }}>
+    <div aria-hidden={dup ? 'true' : undefined}
+      style={{ position: 'relative', width: 214, flexShrink: 0, marginRight: 16, borderRadius: 18, overflow: 'hidden', border: `1px solid ${M.mediaBorder}`, boxShadow: M.mediaShadow }}>
       {m.video
         ? <LazyVideo src={m.src} style={media} />
-        : <img src={m.src} alt={`${m.name} — AI influencer made with Vymotion`} loading="lazy" style={media} />}
+        : <img src={m.src} alt={dup ? '' : `${m.name}, ${m.tag} — made with Vymotion`}
+            loading="lazy" decoding="async" width="214" height="318" style={media} />}
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(7,7,14,0.72) 0%, transparent 42%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12 }}>
         <div style={{ fontSize: 14.5, fontWeight: 800, color: '#fff', letterSpacing: '-0.2px' }}>{m.name}</div>
@@ -204,13 +238,13 @@ function ShowcaseSection() {
       <Reveal delay={0.12} style={{ marginTop: 44, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="vy-marquee-mask">
           <div className="vy-marquee">
-            {[...ROW_A, ...ROW_A].map((m, i) => <ShowcaseCard key={i} m={m} />)}
+            {[...ROW_A, ...ROW_A].map((m, i) => <ShowcaseCard key={i} m={m} dup={i >= ROW_A.length} />)}
           </div>
         </div>
         {/* second row drifts the opposite way (left → right) for a livelier wall */}
         <div className="vy-marquee-mask">
           <div className="vy-marquee reverse">
-            {[...ROW_B, ...ROW_B].map((m, i) => <ShowcaseCard key={i} m={m} />)}
+            {[...ROW_B, ...ROW_B].map((m, i) => <ShowcaseCard key={i} m={m} dup={i >= ROW_B.length} />)}
           </div>
         </div>
       </Reveal>
@@ -247,16 +281,24 @@ function FeatureCard({ title, body, icon }) {
 }
 
 function FaqItem({ q, a, open, onToggle }) {
+  const panelId = useId()
   return (
     <div style={{ borderBottom: `1px solid ${M.lineSoft}` }}>
-      <button onClick={onToggle} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '20px 4px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+      <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '20px 4px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <span style={{ fontSize: 16.5, fontWeight: 700, color: M.ink }}>{q}</span>
         <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, border: `1px solid ${M.line}`, color: M.brandText, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: open ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s var(--ease-liquid)' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         </span>
       </button>
-      <div style={{ maxHeight: open ? 320 : 0, overflow: 'hidden', transition: 'max-height 0.4s var(--ease-liquid)' }}>
-        <p style={{ fontSize: 15, lineHeight: 1.7, color: M.sub, margin: '0 4px 22px' }}>{a}</p>
+      {/* 0fr → 1fr rather than max-height. The old 320px cap was a guess that happened to
+          clear the longest current answer by 119px; the next long answer would have been
+          silently clipped with no visible symptom. Grid rows animate to the content's own
+          height, so the panel cannot lie about what it contains. */}
+      <div id={panelId} style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', transition: 'grid-template-rows 0.4s var(--ease-liquid)' }}>
+        <div style={{ overflow: 'hidden' }}>
+          <p style={{ fontSize: 15, lineHeight: 1.7, color: M.sub, margin: '0 4px 22px' }}>{a}</p>
+        </div>
       </div>
     </div>
   )

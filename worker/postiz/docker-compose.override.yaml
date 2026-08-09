@@ -1,0 +1,79 @@
+# Vymotion overrides for the upstream postiz-docker-compose stack.
+# Copy next to the upstream docker-compose.yaml; Compose auto-loads *.override.yaml.
+#
+# WHY THIS FILE EXISTS (do not "simplify" it back to env_file):
+#   The upstream docker-compose.yaml declares an inline `environment:` block, and in
+#   Compose `environment:` ALWAYS beats `env_file:`. Adding `env_file: postiz.env`
+#   alone silently loses every key that already appears inline — MAIN_URL, JWT_SECRET,
+#   DATABASE_URL, STORAGE_PROVIDER, API_LIMIT, all of them — leaving the container on
+#   http://localhost:4007 with local disk storage and OAuth callbacks that never resolve.
+#   Values here are interpolated from `.env` in this directory, which DOES win, and
+#   keeps the upstream file untouched so `git pull` upgrades stay clean.
+#
+# The AGPL boundary is unaffected: this is configuration, not a patch to the image.
+
+services:
+  postiz:
+    env_file:
+      - ./.env
+    environment:
+      MAIN_URL: '${MAIN_URL}'
+      FRONTEND_URL: '${FRONTEND_URL}'
+      NEXT_PUBLIC_BACKEND_URL: '${NEXT_PUBLIC_BACKEND_URL}'
+      JWT_SECRET: '${JWT_SECRET}'
+      DATABASE_URL: '${DATABASE_URL}'
+      REDIS_URL: '${REDIS_URL}'
+      BACKEND_INTERNAL_URL: '${BACKEND_INTERNAL_URL:-http://localhost:3000}'
+      TEMPORAL_ADDRESS: '${TEMPORAL_ADDRESS:-temporal:7233}'
+      IS_GENERAL: '${IS_GENERAL:-true}'
+      RUN_CRON: '${RUN_CRON:-true}'
+      # Must be 'true' once the single Vymotion admin account exists (README §5).
+      DISABLE_REGISTRATION: '${DISABLE_REGISTRATION:-true}'
+      # Instance-wide, per hour. Raised so the Vymotion Worker never sees 429s.
+      API_LIMIT: '${API_LIMIT:-600}'
+
+      # Storage — R2. Overrides the upstream 'local' provider.
+      STORAGE_PROVIDER: '${STORAGE_PROVIDER:-cloudflare}'
+      CLOUDFLARE_ACCOUNT_ID: '${CLOUDFLARE_ACCOUNT_ID}'
+      CLOUDFLARE_ACCESS_KEY: '${CLOUDFLARE_ACCESS_KEY}'
+      CLOUDFLARE_SECRET_ACCESS_KEY: '${CLOUDFLARE_SECRET_ACCESS_KEY}'
+      CLOUDFLARE_BUCKETNAME: '${CLOUDFLARE_BUCKETNAME:-vymotion-postiz}'
+      CLOUDFLARE_BUCKET_URL: '${CLOUDFLARE_BUCKET_URL}'
+      CLOUDFLARE_REGION: '${CLOUDFLARE_REGION:-auto}'
+
+      # Social platform apps. Empty is fine — a platform simply doesn't appear in
+      # Vymotion's connect picker until its credentials land here.
+      X_API_KEY: '${X_API_KEY:-}'
+      X_API_SECRET: '${X_API_SECRET:-}'
+      LINKEDIN_CLIENT_ID: '${LINKEDIN_CLIENT_ID:-}'
+      LINKEDIN_CLIENT_SECRET: '${LINKEDIN_CLIENT_SECRET:-}'
+      PINTEREST_CLIENT_ID: '${PINTEREST_CLIENT_ID:-}'
+      PINTEREST_CLIENT_SECRET: '${PINTEREST_CLIENT_SECRET:-}'
+      MASTODON_URL: '${MASTODON_URL:-https://mastodon.social}'
+      # Phase D — populate after each platform's app review clears.
+      INSTAGRAM_APP_ID: '${INSTAGRAM_APP_ID:-}'
+      INSTAGRAM_APP_SECRET: '${INSTAGRAM_APP_SECRET:-}'
+      FACEBOOK_APP_ID: '${FACEBOOK_APP_ID:-}'
+      FACEBOOK_APP_SECRET: '${FACEBOOK_APP_SECRET:-}'
+      THREADS_APP_ID: '${THREADS_APP_ID:-}'
+      THREADS_APP_SECRET: '${THREADS_APP_SECRET:-}'
+      TIKTOK_CLIENT_ID: '${TIKTOK_CLIENT_ID:-}'
+      TIKTOK_CLIENT_SECRET: '${TIKTOK_CLIENT_SECRET:-}'
+      YOUTUBE_CLIENT_ID: '${YOUTUBE_CLIENT_ID:-}'
+      YOUTUBE_CLIENT_SECRET: '${YOUTUBE_CLIENT_SECRET:-}'
+
+    # Bind to loopback only. cloudflared runs on the host and reaches this over
+    # localhost, so the VM needs no public inbound port and no VCN ingress rule.
+    # `!override` is required: Compose APPENDS list fields, so without it the
+    # upstream 0.0.0.0:4007 binding survives alongside this one — leaving the
+    # instance publicly exposed and double-binding the same port.
+    ports: !override
+      - '127.0.0.1:4007:5000'
+
+  # DATABASE_URL above carries a generated password; the upstream file hardcodes
+  # 'postiz-password'. These must agree or Postiz cannot reach its own database.
+  postiz-postgres:
+    environment:
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
+      POSTGRES_USER: '${POSTGRES_USER:-postiz-user}'
+      POSTGRES_DB: '${POSTGRES_DB:-postiz-db-local}'
