@@ -31,6 +31,9 @@ const BIO_MAX = 280
 // and that budget is tight — uploads get downscaled hard before being saved.
 const AVATAR_MAX_PX = 400
 const AVATAR_QUALITY = 0.85
+// A 400px JPEG lands well under this; anything larger means the compression
+// step did not actually run.
+const AVATAR_MAX_BYTES = 400 * 1024
 
 const LINK_FIELDS = [
   { key: 'website',   label: 'Website',   placeholder: 'yourstudio.com',        base: null },
@@ -210,7 +213,7 @@ function RosterCard({ influencer, image, photoCount, videoCount }) {
 
 export default function Profile() {
   const [influencers] = useInfluencers()
-  const { profile, updateProfile } = useProfile()
+  const { profile, updateProfile, saveError } = useProfile()
   const toast = useToast()
   const navigate = useNavigate()
   const fileRef = useRef(null)
@@ -288,6 +291,16 @@ export default function Profile() {
     setDraft(d => ({ ...d, [key]: value }))
   }
 
+  // The profile write lands in an effect inside the store, so the outcome is
+  // only known on the render after save(). Report it then, once.
+  const pendingSave = useRef(false)
+  useEffect(() => {
+    if (!pendingSave.current) return
+    pendingSave.current = false
+    if (saveError) toast(saveError, 'danger')
+    else toast('Profile saved')
+  })
+
   function setLink(key, value) {
     setDraft(d => ({ ...d, links: { ...d.links, [key]: value } }))
   }
@@ -303,8 +316,23 @@ export default function Profile() {
     setUploading(true)
     const reader = new FileReader()
     reader.onload = ev => {
-      compressImage(ev.target.result, AVATAR_MAX_PX, AVATAR_QUALITY)
-        .then(small => setDraft(d => (d ? { ...d, avatar: small } : d)))
+      const original = ev.target.result
+      compressImage(original, AVATAR_MAX_PX, AVATAR_QUALITY)
+        .then(small => {
+          // compressImage resolves with the ORIGINAL data URL when the browser
+          // cannot decode the file (HEIC in Chrome and Firefox, for example),
+          // so a successful promise is not proof it did anything. Reject the
+          // result if it was not actually downscaled — storing a multi-megabyte
+          // blob would blow the localStorage budget for the whole app.
+          if (small === original || small.length > AVATAR_MAX_BYTES) {
+            toast(
+              'That image could not be resized — try a JPEG or PNG under a few megabytes.',
+              'danger'
+            )
+            return
+          }
+          setDraft(d => (d ? { ...d, avatar: small } : d))
+        })
         .catch(() => toast('Could not process that image', 'danger'))
         .finally(() => setUploading(false))
     }
@@ -330,7 +358,9 @@ export default function Profile() {
     returnFocus.current = true
     setDraft(null)
     setUploading(false)
-    toast('Profile saved')
+    // Don't claim success yet — the write happens in an effect and can fail on
+    // a full store. The effect below reports whichever way it goes.
+    pendingSave.current = true
   }
 
   return (

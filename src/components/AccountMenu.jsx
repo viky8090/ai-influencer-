@@ -12,6 +12,14 @@ import {
  * themselves, their settings, and everything account-shaped.
  */
 
+// Mirrors the links in the nav bar. Shown only below 560px, where the bar
+// cannot fit them — see the .menu-section-nav rule in index.css.
+const NAV_LINKS = [
+  { to: '/influencers', label: 'Influencers' },
+  { to: '/inspiration', label: 'Inspiration' },
+  { to: '/brand-deals', label: 'Brand Deals' },
+]
+
 const ITEMS = [
   { to: '/profile',   label: 'View profile',   Icon: IconUser,     description: 'Your roster and stats' },
   { to: '/settings',  label: 'Settings',       Icon: IconSettings, description: 'Appearance, connections, defaults' },
@@ -27,7 +35,7 @@ export default function AccountMenu({ dark }) {
   const { pathname } = useLocation()
   const rootRef = useRef(null)
   const triggerRef = useRef(null)
-  const itemRefs = useRef([])
+  const menuRef = useRef(null)
 
   const displayName = profile.displayName?.trim() || 'Your studio'
   const handle = profile.handle?.trim()
@@ -38,11 +46,15 @@ export default function AccountMenu({ dark }) {
     if (open) setHfConnected(isHFConnected())
   }, [open])
 
+  // Visible menu items, in DOM order. Items hidden by a media query have no
+  // offsetParent, so this never focuses something the user cannot see.
+  const visibleItems = useCallback(() => {
+    const nodes = menuRef.current?.querySelectorAll('[role="menuitem"]') || []
+    return [...nodes].filter(el => el.offsetParent !== null)
+  }, [])
+
   const close = useCallback((refocus = false) => {
     setOpen(false)
-    // Drop refs to the unmounted items so arrow-key nav never walks a
-    // detached node on the next open.
-    itemRefs.current = []
     if (refocus) triggerRef.current?.focus()
   }, [])
 
@@ -58,9 +70,11 @@ export default function AccountMenu({ dark }) {
     }
     function onKeyDown(e) {
       if (e.key === 'Escape') { e.stopPropagation(); close(true); return }
+      // Tab should leave the menu rather than walking the page behind it.
+      if (e.key === 'Tab') { setOpen(false); return }
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
       e.preventDefault()
-      const items = itemRefs.current.filter(Boolean)
+      const items = visibleItems()
       if (!items.length) return
       const current = items.indexOf(document.activeElement)
       let next
@@ -77,12 +91,12 @@ export default function AccountMenu({ dark }) {
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open, close])
+  }, [open, close, visibleItems])
 
   function openWithFirstItem() {
     setOpen(true)
     // Wait for the popover to mount before moving focus into it.
-    requestAnimationFrame(() => itemRefs.current[0]?.focus())
+    requestAnimationFrame(() => visibleItems()[0]?.focus())
   }
 
   return (
@@ -117,6 +131,7 @@ export default function AccountMenu({ dark }) {
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Account"
           style={{
@@ -133,10 +148,9 @@ export default function AccountMenu({ dark }) {
           <Link
             to="/profile"
             role="menuitem"
-            ref={el => { itemRefs.current[0] = el }}
             className="menu-item"
             style={{ padding: '10px 12px', marginBottom: 4, alignItems: 'center' }}
-            onClick={() => setOpen(false)}
+            onClick={() => close()}
           >
             <Avatar src={profile.avatar} name={displayName} size={38} />
             <span style={{ minWidth: 0, display: 'block' }}>
@@ -153,15 +167,45 @@ export default function AccountMenu({ dark }) {
 
           <div style={{ height: 1, background: 'var(--border-subtle)', margin: '4px 6px 6px' }} />
 
-          {ITEMS.map(({ to, label, Icon }, i) => (
+          {/* On a phone the nav bar has no room for the section links, so they
+              live here instead. Hidden by CSS on wider screens. */}
+          <div className="menu-section-nav">
+            <div style={{
+              padding: '4px 12px 6px', fontSize: 11, fontWeight: 700,
+              letterSpacing: '0.5px', textTransform: 'uppercase',
+              color: 'var(--text-tertiary)',
+            }}>
+              Go to
+            </div>
+            {NAV_LINKS.map(({ to, label }) => (
+              <Link
+                key={to}
+                to={to}
+                role="menuitem"
+                className="menu-item"
+                style={pathname === to ? { background: 'var(--surface-hover)', fontWeight: 650 } : undefined}
+                onClick={() => close()}
+              >
+                <span style={{ width: 17, display: 'inline-flex', justifyContent: 'center' }}>
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: pathname === to ? 'var(--brand-ink)' : 'var(--text-tertiary)',
+                  }} />
+                </span>
+                {label}
+              </Link>
+            ))}
+            <div style={{ height: 1, background: 'var(--border-subtle)', margin: '6px 6px' }} />
+          </div>
+
+          {ITEMS.map(({ to, label, Icon }) => (
             <Link
               key={to}
               to={to}
               role="menuitem"
-              ref={el => { itemRefs.current[i + 1] = el }}
               className="menu-item"
               style={pathname === to ? { background: 'var(--surface-hover)', fontWeight: 650 } : undefined}
-              onClick={() => setOpen(false)}
+              onClick={() => close()}
             >
               <Icon size={17} />
               {label}
@@ -175,9 +219,8 @@ export default function AccountMenu({ dark }) {
           <button
             type="button"
             role="menuitem"
-            ref={el => { itemRefs.current[ITEMS.length + 1] = el }}
             className="menu-item"
-            onClick={() => { setOpen(false); navigate('/settings#connections') }}
+            onClick={() => { close(); navigate('/settings#connections') }}
             style={{ fontSize: 13 }}
           >
             <IconPlug size={17} />

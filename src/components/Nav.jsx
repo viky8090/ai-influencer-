@@ -65,8 +65,8 @@ export default function Nav() {
         }}>Influencer Studio</span>
       </NavLink>
 
-      {/* Nav links */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      {/* Nav links — hidden below 560px, where they move into the account menu */}
+      <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         {links.map(l => (
           <NavLink key={l.to} to={l.to} className="nav-link" style={({ isActive }) => ({
             padding: '6px 14px',

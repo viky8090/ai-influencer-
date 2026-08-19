@@ -22,6 +22,10 @@ import { isHFConnected } from '../utils/higgsfieldAuth'
  * checklist at the bottom reads real local state rather than pretending.
  */
 
+// The project's home, per README.md — every link on this page derives from it,
+// so pointing this at a fork repoints the whole page in one edit. Worth doing
+// if you run your own copy: "Report a bug" should reach whoever maintains the
+// deployment people are actually using.
 const REPO = 'https://github.com/DaanKieft/ai-influencer'
 const ISSUES = `${REPO}/issues`
 const DISCUSSIONS = `${REPO}/discussions`
@@ -457,10 +461,10 @@ export default function Community() {
           </h2>
           <p style={{ marginTop: 8, fontSize: 13.5, lineHeight: 1.7, color: 'var(--text-secondary)' }}>
             This app is local-first and built by Dan Kieft. Your influencers, boards and deals live in
-            your browser and nowhere else, which is lovely for privacy and useless for telemetry — it
-            means nobody can see that a screen confused you unless you say so. If something breaks,
-            feels clumsy, or is simply missing, telling someone is genuinely the most useful thing you
-            can do here.
+            your browser and nowhere else. The only thing measured is an anonymous count of which
+            pages get opened — never what is on them — so nobody can see that a screen confused you
+            unless you say so. If something breaks, feels clumsy, or is simply missing, telling
+            someone is genuinely the most useful thing you can do here.
           </p>
           <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <Button

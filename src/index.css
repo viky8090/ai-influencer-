@@ -14,7 +14,7 @@
   --border-subtle: rgba(0, 0, 0, 0.05);
   --text-primary: #1D1D1F;
   --text-secondary: #6E6E73;
-  --text-tertiary: #AEAEB2;
+  --text-tertiary: #78787D;
   --accent: #0071E3;
   --accent-hover: #0077ED;
   --accent-light: rgba(0, 113, 227, 0.08);
@@ -26,6 +26,32 @@
   --radius-lg: 16px;
   --radius-xl: 20px;
   --nav-h: 56px;
+
+  /* Semantic colours for text and icons drawn on a surface. Split by theme
+     because the iOS-style brights (#34C759, #F59E0B) sit at ~2.2:1 on white
+     — unreadable in light mode. Each value below clears WCAG AA (4.5:1)
+     against its own theme's --surface. */
+  --danger:  #D70015;
+  --success: #16803C;
+  --warn:    #A55A00;
+  --brand-ink: #7C3AED;
+
+  /* Boundary for interactive controls (inputs, toggles, meter tracks).
+     --border is a hairline for card edges at ~1.2:1; controls need the 3:1
+     of WCAG 1.4.11 or an empty field is invisible. */
+  --border-control: rgba(0, 0, 0, 0.42);
+
+  /* Fills and edges for tinted status surfaces (badges, callouts, icon
+     chips). Kept as explicit tokens rather than an alpha suffix on the hex
+     so the tint tracks the theme's own semantic colour. */
+  --danger-tint:  rgba(215, 0, 21, 0.09);
+  --danger-edge:  rgba(215, 0, 21, 0.26);
+  --success-tint: rgba(22, 128, 60, 0.10);
+  --success-edge: rgba(22, 128, 60, 0.28);
+  --warn-tint:    rgba(165, 90, 0, 0.10);
+  --warn-edge:    rgba(165, 90, 0, 0.26);
+  --accent-tint:  rgba(124, 58, 237, 0.09);
+  --accent-edge:  rgba(124, 58, 237, 0.26);
 }
 
 [data-theme="dark"] {
@@ -38,13 +64,31 @@
   --border-subtle: rgba(255,255,255,0.07);
   --text-primary: rgba(255,255,255,0.93);
   --text-secondary: rgba(255,255,255,0.50);
-  --text-tertiary: rgba(255,255,255,0.28);
+  --text-tertiary: rgba(255,255,255,0.48);
   --accent: #A78BFA;
   --accent-hover: #C4B5FD;
   --accent-light: rgba(139,92,246,0.14);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.7), 0 4px 8px rgba(0,0,0,0.4);
+
+  --danger:  #FF6961;
+  --success: #30D158;
+  --warn:    #F5A524;
+  --brand-ink: #A78BFA;
+
+  --border-control: rgba(255, 255, 255, 0.40);
+
+  /* Dark surfaces swallow a 9% tint, so these run roughly twice as strong
+     as their light counterparts to stay visible on #111120. */
+  --danger-tint:  rgba(255, 105, 97, 0.17);
+  --danger-edge:  rgba(255, 105, 97, 0.38);
+  --success-tint: rgba(48, 209, 88, 0.16);
+  --success-edge: rgba(48, 209, 88, 0.36);
+  --warn-tint:    rgba(245, 165, 36, 0.16);
+  --warn-edge:    rgba(245, 165, 36, 0.36);
+  --accent-tint:  rgba(167, 139, 250, 0.16);
+  --accent-edge:  rgba(167, 139, 250, 0.36);
 }
 
 @keyframes cs-pulse {
@@ -185,10 +229,23 @@ a {
 }
 
 /* ── Nav mobile ── */
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .nav-root { padding: 0 12px !important; gap: 2px !important; }
   .nav-link  { padding: 5px 8px !important; font-size: 12px !important; }
   .nav-brand-label { display: none !important; }
+}
+
+/* Below 560px the bar cannot hold the section links as well as Create, the
+   theme toggle and the avatar. The links move into the account menu, which
+   renders them under a "Go to" group. */
+@media (max-width: 560px) {
+  .nav-links { display: none !important; }
+}
+
+/* The same links are redundant in the menu on wider screens, where they are
+   already visible in the bar. */
+@media (min-width: 561px) {
+  .menu-section-nav { display: none !important; }
 }
 
 /* ── Reduced motion ──
@@ -232,10 +289,13 @@ a {
   background: transparent;
   transition: background 0.12s;
 }
-.menu-item:hover,
+.menu-item:hover {
+  background: var(--surface-hover);
+}
 .menu-item:focus-visible {
   background: var(--surface-hover);
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .menu-item svg { flex-shrink: 0; opacity: 0.7; }
 
@@ -259,13 +319,18 @@ a {
   .account-sidebar {
     position: static;
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
     padding-bottom: 4px;
-    scrollbar-width: none;
   }
-  .account-sidebar::-webkit-scrollbar { display: none; }
-  .account-sidebar > * { flex-shrink: 0; }
+  /* Override the inline width:100% the buttons carry for the sidebar layout —
+     a percentage width in a flex row resolves against the container, which
+     made every tab full-width and pushed the rest out of sight. */
+  .account-sidebar > * {
+    width: auto !important;
+    flex: 0 0 auto;
+    margin-bottom: 0 !important;
+  }
 }
 
 .stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }

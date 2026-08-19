@@ -14,6 +14,16 @@ import {
 
 const CLAUDE_KEY = 'claude_api_key'
 
+// localStorage access itself throws when storage is blocked by policy or
+// private browsing — an unguarded read during render white-screens the page.
+function readClaudeKey() {
+  try { return localStorage.getItem(CLAUDE_KEY) || '' } catch { return '' }
+}
+
+function safeIsHFConnected() {
+  try { return isHFConnected() } catch { return false }
+}
+
 const SECTIONS = [
   { id: 'appearance',  label: 'Appearance',  Icon: IconPalette },
   { id: 'connections', label: 'Connections', Icon: IconPlug },
@@ -97,25 +107,33 @@ export default function Settings() {
   const navigate = useNavigate()
   const toast = useToast()
   const { theme, toggle } = useTheme()
-  const { preferences, updatePreferences } = usePreferences()
+  const { preferences, updatePreferences, saveError } = usePreferences()
 
-  const [hfConnected, setHfConnected] = useState(isHFConnected)
+  const [hfConnected, setHfConnected] = useState(safeIsHFConnected)
   const [hfLoading, setHfLoading] = useState(false)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
+  const [confirmRemoveKey, setConfirmRemoveKey] = useState(false)
 
-  const [claudeKey, setClaudeKey] = useState(() => localStorage.getItem(CLAUDE_KEY) || '')
+  const [claudeKey, setClaudeKey] = useState(readClaudeKey)
   const [claudeInput, setClaudeInput] = useState('')
   const [editingClaude, setEditingClaude] = useState(false)
+
+  // A preference write can fail on a full browser store; say so rather than
+  // leaving a control showing a value that will not survive a reload.
+  useEffect(() => { if (saveError) toast(saveError, 'danger') }, [saveError, toast])
 
   const [active, setActive] = useState(SECTIONS[0].id)
   const sectionRefs = useRef({})
 
-  // OAuth returns to /settings?connected=1 — reflect that immediately.
+  // OAuth's redirect path returns to /settings?connected=1. Re-read the real
+  // token rather than trusting the parameter, and strip it afterwards —
+  // otherwise a later disconnect followed by a refresh shows "Connected"
+  // while the rest of the app correctly shows the opposite.
   useEffect(() => {
-    if (new URLSearchParams(location.search).get('connected') === '1') {
-      setHfConnected(true)
-    }
-  }, [location.search])
+    if (new URLSearchParams(location.search).get('connected') !== '1') return
+    setHfConnected(safeIsHFConnected())
+    navigate(location.pathname + location.hash, { replace: true })
+  }, [location.search, location.pathname, location.hash, navigate])
 
   const jumpTo = useCallback(id => {
     const el = sectionRefs.current[id]
@@ -146,10 +164,24 @@ export default function Settings() {
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
         if (visible[0]?.target?.id) setActive(visible[0].target.id)
       },
-      { rootMargin: '-25% 0px -60% 0px', threshold: 0 }
+      { rootMargin: '-20% 0px -45% 0px', threshold: 0 }
     )
     for (const node of nodes) observer.observe(node)
-    return () => observer.disconnect()
+
+    // The last section is never tall enough to reach the observer band, so
+    // clicking "About" would scroll the page and then highlight the section
+    // above it. At the bottom of the document, the last one is the answer.
+    function onScroll() {
+      const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 8
+      if (atBottom) setActive(SECTIONS[SECTIONS.length - 1].id)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', onScroll)
+    }
   }, [])
 
   async function connectHiggsfield() {
@@ -188,10 +220,11 @@ export default function Settings() {
   }
 
   function removeClaudeKey() {
-    localStorage.removeItem(CLAUDE_KEY)
+    try { localStorage.removeItem(CLAUDE_KEY) } catch {}
     setClaudeKey('')
     setClaudeInput('')
     setEditingClaude(false)
+    setConfirmRemoveKey(false)
     toast('Claude API key removed', 'neutral')
   }
 
@@ -270,7 +303,7 @@ export default function Settings() {
                 connected={hfConnected}
               >
                 {hfConnected ? (
-                  <Button variant="danger" size="sm" onClick={() => setConfirmDisconnect(true)}>
+                  <Button variant="danger" onClick={() => setConfirmDisconnect(true)}>
                     Disconnect
                   </Button>
                 ) : (
@@ -290,7 +323,7 @@ export default function Settings() {
                 detail={claudeKey ? `···${claudeKey.slice(-4)}` : null}
               >
                 {claudeKey ? (
-                  <Button variant="danger" size="sm" onClick={removeClaudeKey}>Remove</Button>
+                  <Button variant="danger" onClick={() => setConfirmRemoveKey(true)}>Remove</Button>
                 ) : editingClaude ? (
                   <Button variant="ghost" size="sm" onClick={() => { setEditingClaude(false); setClaudeInput('') }}>
                     Cancel
@@ -448,6 +481,16 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmRemoveKey}
+        title="Remove the stored Claude API key?"
+        description="The optional Claude steps stop working until you paste a key again. Nothing you have already generated is affected, and the key is not shown again after this."
+        confirmLabel="Remove key"
+        tone="danger"
+        onConfirm={removeClaudeKey}
+        onCancel={() => setConfirmRemoveKey(false)}
+      />
 
       <ConfirmDialog
         open={confirmDisconnect}

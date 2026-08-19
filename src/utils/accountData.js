@@ -1,38 +1,52 @@
 // Account-level helpers: local storage accounting, backup export/import, wipe.
+//
 // Everything in this app lives in the user's own browser, so "your account"
-// really means "the localStorage on this device" — these helpers make that
+// really means "the localStorage on this device". These helpers make that
 // concrete and manageable instead of invisible.
 
-const INF_PREFIX = 'hf_influencer_'
+// ── What we own ───────────────────────────────────────────────────
+//
+// localStorage is per-origin, so with one exception every key here was
+// written by this app. Ownership is therefore a denylist, not an allowlist:
+// an allowlist silently drops keys from backups, and this app writes 40+
+// distinct key shapes (per-influencer Photo Studio settings, saved prompts,
+// start frames, wardrobe selections, roster order…). Missing any of them
+// would make "back up, move browser, restore" quietly lose work.
 
-// Keys we own. Anything matching one of these prefixes is app data and is
-// included in a backup; everything else in localStorage is left alone.
-const OWNED_PREFIXES = [
-  'hf_influencer_',
-  'hf_video_history_',
-  'photo_studio_history',
-  'influencer_ids',
-  'influencers',
-  'inspiration_boards',
-  'brand_deals',
-  'studio_profile',
-  'studio_preferences',
-  'theme',
-  'theme_default_v2',
-]
-
-// Keys that hold a credential — never written into an export file.
+// Credentials. Never written into an export file, and only erased when the
+// caller explicitly asks to disconnect. Names verified against
+// utils/higgsfieldAuth.js — do not guess them.
 const SECRET_KEYS = [
   'claude_api_key',
   'hf_access_token',
   'hf_refresh_token',
   'hf_token_expires_at',
-  'hf_pkce_verifier',
-  'hf_oauth_state',
+  'hf_client_id',
+  'hf_verifier',
+  'hf_state',
+  'hf_referral_fired',
 ]
 
+// Keys written by something other than this app's own features. Left alone
+// by both backup and wipe.
+const FOREIGN_PREFIXES = [
+  'va-',        // Vercel Web Analytics
+  '_vercel',
+  'debug',
+]
+
+export function isSecretKey(key) {
+  return SECRET_KEYS.includes(key)
+}
+
+export function isForeignKey(key) {
+  return FOREIGN_PREFIXES.some(p => key.startsWith(p))
+}
+
+// Content and settings this app is responsible for: everything that is
+// neither a credential nor somebody else's key.
 export function isOwnedKey(key) {
-  return OWNED_PREFIXES.some(p => key === p || key.startsWith(p))
+  return !isSecretKey(key) && !isForeignKey(key)
 }
 
 // Approximate bytes a string occupies in localStorage. Browsers store UTF-16,
@@ -42,12 +56,49 @@ function byteSize(str) {
 }
 
 const CATEGORIES = [
-  { id: 'influencers', label: 'Influencers',   color: '#EC4899', match: k => k.startsWith(INF_PREFIX) || k === 'influencer_ids' || k === 'influencers' },
-  { id: 'photos',      label: 'Photo history', color: '#8B5CF6', match: k => k === 'photo_studio_history' },
-  { id: 'videos',      label: 'Video history', color: '#6366F1', match: k => k.startsWith('hf_video_history_') },
-  { id: 'inspiration', label: 'Inspiration',   color: '#0EA5E9', match: k => k === 'inspiration_boards' },
-  { id: 'deals',       label: 'Brand deals',   color: '#F59E0B', match: k => k === 'brand_deals' },
-  { id: 'settings',    label: 'Settings',      color: '#10B981', match: k => k === 'studio_profile' || k === 'studio_preferences' || k === 'theme' || k === 'theme_default_v2' },
+  {
+    id: 'influencers', label: 'Influencers', color: '#EC4899',
+    match: k => k.startsWith('hf_influencer_') || k === 'influencer_ids' || k === 'influencers',
+  },
+  {
+    id: 'photos', label: 'Photo history', color: '#8B5CF6',
+    match: k => k === 'photo_studio_history',
+  },
+  {
+    id: 'videos', label: 'Video history', color: '#6366F1',
+    match: k => k.startsWith('hf_video_history_'),
+  },
+  {
+    id: 'inspiration', label: 'Inspiration', color: '#0EA5E9',
+    match: k => k === 'inspiration_boards',
+  },
+  {
+    id: 'deals', label: 'Brand deals', color: '#F59E0B',
+    match: k => k === 'brand_deals',
+  },
+  {
+    // Reference images and start frames are stored as base64 and are by far
+    // the heaviest thing here, so they get their own slice rather than
+    // disappearing into a catch-all.
+    id: 'references', label: 'Reference images', color: '#14B8A6',
+    match: k => k.startsWith('hf_start_frame_') || k.startsWith('hf_product_ref_') ||
+                k.startsWith('wd_result_') || k.startsWith('wd_gen_result_') ||
+                k.startsWith('hf_gen_results_'),
+  },
+  {
+    id: 'studio', label: 'Studio settings', color: '#10B981',
+    match: k => k.startsWith('ps_') || k.startsWith('cs_') || k.startsWith('inf_') ||
+                k.startsWith('hf_last_prompt_') || k.startsWith('hf_home_id_') ||
+                k.startsWith('hf_wardrobe_id_') || k.startsWith('hf_voice_') ||
+                k.startsWith('hf_env_') || k.startsWith('hf_shot_mode') ||
+                k === 'hf_aspect' || k === 'hf_resolution' || k === 'hf_outputs' ||
+                k === 'hf_camera' || k === 'hf_duration' || k === 'hf_vibe',
+  },
+  {
+    id: 'settings', label: 'App settings', color: '#64748B',
+    match: k => k === 'studio_profile' || k === 'studio_preferences' ||
+                k === 'theme' || k === 'theme_default_v2',
+  },
 ]
 
 // Most browsers cap localStorage per origin at ~5 MB. Used only to render a
@@ -67,26 +118,26 @@ export function readStorageUsage() {
         buckets[cat.id] += size
         owned += size
       } else {
+        // Credentials and anything unrecognised. Counted toward the total —
+        // it occupies the same budget — but not attributed to a category.
         other += size
       }
     }
   } catch {
-    // Storage can be unavailable (private mode, disabled cookies). Report zero
-    // rather than crashing the page that renders this.
+    // Storage can be unavailable (private mode, disabled cookies). Report
+    // zero rather than crashing the page that renders this.
   }
 
+  const total = owned + other
   return {
-    total: owned + other,
+    total,
     owned,
     other,
     budget: STORAGE_BUDGET_BYTES,
-    percent: Math.min(100, ((owned + other) / STORAGE_BUDGET_BYTES) * 100),
-    categories: CATEGORIES.map(c => ({
-      id: c.id,
-      label: c.label,
-      color: c.color,
-      bytes: buckets[c.id],
-    })).sort((a, b) => b.bytes - a.bytes),
+    percent: Math.min(100, (total / STORAGE_BUDGET_BYTES) * 100),
+    categories: CATEGORIES
+      .map(c => ({ id: c.id, label: c.label, color: c.color, bytes: buckets[c.id] }))
+      .sort((a, b) => b.bytes - a.bytes),
   }
 }
 
@@ -99,14 +150,18 @@ export function formatBytes(bytes) {
 
 export const BACKUP_VERSION = 1
 
-// Builds a plain JSON snapshot of every owned key. Credentials are excluded so
-// a backup file can be emailed or synced without leaking an API key.
+// A plain JSON snapshot of every owned key. Credentials are excluded so a
+// backup file can be emailed or synced without leaking an API key.
 export function buildBackup() {
   const data = {}
-  for (const key of Object.keys(localStorage)) {
-    if (SECRET_KEYS.includes(key)) continue
-    if (!isOwnedKey(key)) continue
-    data[key] = localStorage.getItem(key)
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!isOwnedKey(key)) continue
+      const value = localStorage.getItem(key)
+      if (typeof value === 'string') data[key] = value
+    }
+  } catch {
+    // Unreadable storage yields an empty backup rather than an exception.
   }
   return {
     format: 'influencer-studio-backup',
@@ -130,35 +185,71 @@ export function downloadBackup() {
   return backup
 }
 
-// Validates a parsed backup and writes it back. `mode` is 'merge' (only add
-// keys that are missing) or 'replace' (overwrite every owned key present in
-// the file). Returns { written, skipped }.
-export function restoreBackup(parsed, mode = 'replace') {
-  if (!parsed || parsed.format !== 'influencer-studio-backup') {
-    throw new Error('Not an Influencer Studio backup file.')
-  }
-  if (typeof parsed.data !== 'object' || parsed.data === null) {
-    throw new Error('Backup file is missing its data.')
-  }
-  if (Number(parsed.version) > BACKUP_VERSION) {
-    throw new Error('This backup was made by a newer version of the app.')
-  }
+export function isValidBackup(parsed) {
+  return !!parsed &&
+    typeof parsed === 'object' &&
+    parsed.format === 'influencer-studio-backup' &&
+    !!parsed.data &&
+    typeof parsed.data === 'object' &&
+    Number(parsed.version || 0) <= BACKUP_VERSION
+}
 
+function describeInvalidBackup(parsed) {
+  if (!parsed || typeof parsed !== 'object') return 'That file is not a backup.'
+  if (parsed.format !== 'influencer-studio-backup') return 'Not an Influencer Studio backup file.'
+  if (!parsed.data || typeof parsed.data !== 'object') return 'Backup file is missing its data.'
+  if (Number(parsed.version || 0) > BACKUP_VERSION) return 'This backup was made by a newer version of the app.'
+  return 'That backup file could not be read.'
+}
+
+/**
+ * Writes a validated backup back into localStorage.
+ *
+ * `mode` is 'merge' (only add keys that are missing) or 'replace' (overwrite
+ * every owned key present in the file).
+ *
+ * The write is transactional: if the browser runs out of quota part-way, every
+ * key touched so far is restored to its previous value before throwing. A
+ * half-applied restore is worse than no restore at all — `influencer_ids` can
+ * end up naming records that were never written, which reads as silent data
+ * loss.
+ *
+ * Returns { written, skipped }.
+ */
+export function restoreBackup(parsed, mode = 'replace') {
+  if (!isValidBackup(parsed)) throw new Error(describeInvalidBackup(parsed))
+
+  const undo = []
   let written = 0
   let skipped = 0
-  for (const [key, value] of Object.entries(parsed.data)) {
-    if (!isOwnedKey(key) || SECRET_KEYS.includes(key)) { skipped++; continue }
-    if (typeof value !== 'string') { skipped++; continue }
-    if (mode === 'merge' && localStorage.getItem(key) !== null) { skipped++; continue }
-    try {
+
+  try {
+    for (const [key, value] of Object.entries(parsed.data)) {
+      // A hand-edited backup must not be able to plant a credential or a key
+      // belonging to something else.
+      if (!isOwnedKey(key) || typeof value !== 'string') { skipped++; continue }
+      if (mode === 'merge' && localStorage.getItem(key) !== null) { skipped++; continue }
+
+      undo.push([key, localStorage.getItem(key)])
       localStorage.setItem(key, value)
       written++
-    } catch {
-      // Quota exhausted mid-restore. Stop here rather than writing a partial,
-      // inconsistent influencer list.
-      throw new Error(`Ran out of browser storage after restoring ${written} item${written === 1 ? '' : 's'}. Free up space and try again.`)
     }
+  } catch {
+    for (const [key, previous] of undo.reverse()) {
+      try {
+        if (previous === null) localStorage.removeItem(key)
+        else localStorage.setItem(key, previous)
+      } catch {
+        // Rolling back only frees space, so this should not fail — but if it
+        // does there is nothing further we can do here.
+      }
+    }
+    throw new Error(
+      'Ran out of browser storage part-way through the restore, so nothing was changed. ' +
+      'Delete some influencers or generated images to free space, then try again.'
+    )
   }
+
   return { written, skipped }
 }
 
@@ -181,12 +272,13 @@ export function readBackupFile(file) {
 // so "start over with my content" doesn't silently sign you out of Higgsfield.
 export function wipeAllData({ includeConnections = false } = {}) {
   let removed = 0
-  for (const key of Object.keys(localStorage)) {
-    const secret = SECRET_KEYS.includes(key)
-    if (secret ? includeConnections : isOwnedKey(key)) {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      const shouldRemove = isSecretKey(key) ? includeConnections : isOwnedKey(key)
+      if (!shouldRemove) continue
       try { localStorage.removeItem(key); removed++ } catch {}
     }
-  }
+  } catch {}
   return removed
 }
 

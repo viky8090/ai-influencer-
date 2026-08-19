@@ -10,12 +10,24 @@ import { createPortal } from 'react-dom'
  * in one place rather than to introduce a new styling system.
  */
 
+// Brand hues. These stay literal because they are used for gradients and
+// decorative tints where an alpha suffix is needed.
 export const ACCENT = '#8B5CF6'
 export const ACCENT_2 = '#EC4899'
 export const GRADIENT = `linear-gradient(135deg, ${ACCENT_2}, ${ACCENT})`
-export const DANGER = '#FF3B30'
-export const SUCCESS = '#34C759'
-export const WARN = '#F59E0B'
+
+// Semantic colours for text and icons. Tokens rather than literals because
+// the iOS-style brights sit near 2:1 on a white surface — the "Connected"
+// badge and every warning were unreadable in light mode. index.css defines a
+// value per theme; each clears WCAG AA against its own surface.
+export const DANGER = 'var(--danger)'
+export const SUCCESS = 'var(--success)'
+export const WARN = 'var(--warn)'
+export const BRAND_INK = 'var(--brand-ink)'
+
+// A solid destructive button paints its own background, so it needs one value
+// dark enough for white text in both themes rather than a theme-aware one.
+export const DANGER_SOLID = '#C9000F'
 
 // ── Small helpers ────────────────────────────────────────────────
 
@@ -84,7 +96,7 @@ export function Card({ children, padding = 24, style, ...rest }) {
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 16,
+        borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--shadow-sm)',
         padding,
         ...style,
@@ -105,7 +117,7 @@ export function SectionCard({ title, description, action, children, footer, id }
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border-subtle)',
-        borderRadius: 16,
+        borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--shadow-sm)',
         overflow: 'hidden',
         marginBottom: 20,
@@ -173,25 +185,48 @@ export function Divider({ spacing = 20 }) {
 
 // ── Buttons ──────────────────────────────────────────────────────
 
+// `sm` clears 36px tall so the destructive controls (Disconnect, Remove) are
+// not the smallest touch targets on the page.
 const BUTTON_SIZES = {
-  sm: { padding: '6px 12px', fontSize: 13, radius: 8, gap: 6 },
-  md: { padding: '9px 18px', fontSize: 14, radius: 10, gap: 8 },
-  lg: { padding: '12px 24px', fontSize: 15, radius: 12, gap: 9 },
+  sm: { padding: '9px 14px', fontSize: 13, radius: 'var(--radius-sm)', gap: 6 },
+  md: { padding: '10px 18px', fontSize: 14, radius: 'var(--radius-sm)', gap: 8 },
+  lg: { padding: '13px 24px', fontSize: 15, radius: 'var(--radius-md)', gap: 9 },
 }
 
+// `hover` is an explicit background rather than a brightness filter:
+// brightening var(--surface) is a no-op on white and imperceptible on
+// #111120, which left every secondary and ghost button dead to the pointer.
 function buttonVariant(variant) {
   switch (variant) {
     case 'primary':
-      return { background: GRADIENT, color: '#fff', border: '1px solid transparent', boxShadow: '0 2px 10px rgba(139,92,246,0.28)' }
+      return {
+        background: GRADIENT, color: '#fff', border: '1px solid transparent',
+        boxShadow: '0 2px 10px rgba(139,92,246,0.28)', hover: null, brighten: true,
+      }
     case 'danger':
-      return { background: 'rgba(255,59,48,0.08)', color: DANGER, border: '1px solid rgba(255,59,48,0.24)', boxShadow: 'none' }
+      return {
+        background: 'var(--danger-tint)', color: DANGER,
+        border: '1px solid var(--danger-edge)', boxShadow: 'none',
+        hover: 'var(--danger-edge)',
+      }
     case 'dangerSolid':
-      return { background: DANGER, color: '#fff', border: '1px solid transparent', boxShadow: '0 2px 10px rgba(255,59,48,0.28)' }
+      return {
+        background: DANGER_SOLID, color: '#fff', border: '1px solid transparent',
+        boxShadow: '0 2px 10px rgba(201,0,15,0.28)', hover: null, brighten: true,
+      }
     case 'ghost':
-      return { background: 'transparent', color: 'var(--text-secondary)', border: '1px solid transparent', boxShadow: 'none' }
+      return {
+        background: 'transparent', color: 'var(--text-secondary)',
+        border: '1px solid transparent', boxShadow: 'none',
+        hover: 'var(--surface-hover)',
+      }
     case 'secondary':
     default:
-      return { background: 'var(--surface)', color: 'var(--text-primary)', border: '1px solid var(--border)', boxShadow: 'none' }
+      return {
+        background: 'var(--surface)', color: 'var(--text-primary)',
+        border: '1px solid var(--border)', boxShadow: 'none',
+        hover: 'var(--surface-hover)',
+      }
   }
 }
 
@@ -200,9 +235,15 @@ export function Button({
   icon, children, style, as, href, target, rel, ...rest
 }) {
   const s = BUTTON_SIZES[size] || BUTTON_SIZES.md
-  const v = buttonVariant(variant)
+  const { hover, brighten, ...v } = buttonVariant(variant)
   const inert = disabled || loading
   const Tag = as || (href ? 'a' : 'button')
+
+  function applyHover(el, on) {
+    if (inert) return
+    if (hover) el.style.background = on ? hover : v.background
+    if (brighten) el.style.filter = on ? 'brightness(1.06)' : 'none'
+  }
 
   return (
     <Tag
@@ -220,12 +261,15 @@ export function Button({
         lineHeight: 1.2, whiteSpace: 'nowrap', textDecoration: 'none',
         cursor: inert ? 'not-allowed' : 'pointer',
         opacity: inert ? 0.55 : 1,
-        transition: 'filter 0.15s, background 0.15s, border-color 0.15s, transform 0.12s',
+        transition: 'filter 0.15s, background 0.15s, border-color 0.15s, transform 0.1s',
         ...v,
         ...style,
       }}
-      onMouseEnter={e => { if (!inert) e.currentTarget.style.filter = 'brightness(1.06)' }}
-      onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
+      onMouseEnter={e => applyHover(e.currentTarget, true)}
+      onMouseLeave={e => applyHover(e.currentTarget, false)}
+      onMouseDown={e => { if (!inert) e.currentTarget.style.transform = 'translateY(1px)' }}
+      onMouseUp={e => { e.currentTarget.style.transform = 'none' }}
+      onBlur={e => { e.currentTarget.style.transform = 'none'; applyHover(e.currentTarget, false) }}
       {...rest}
     >
       {loading ? <Spinner size={s.fontSize} /> : icon}
@@ -262,9 +306,9 @@ export function Toggle({ checked, onChange, label, disabled }) {
       className="focus-ring"
       onClick={() => !disabled && onChange(!checked)}
       style={{
-        width: 46, height: 27, borderRadius: 999, padding: 3,
+        width: 50, height: 30, borderRadius: 999, padding: 3,
         background: checked ? GRADIENT : 'var(--bg-tertiary)',
-        border: `1px solid ${checked ? 'transparent' : 'var(--border)'}`,
+        border: `1px solid ${checked ? 'transparent' : 'var(--border-control)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
@@ -273,42 +317,60 @@ export function Toggle({ checked, onChange, label, disabled }) {
     >
       {/* Translated rather than re-justified so the knob actually slides. */}
       <span style={{
-        width: 21, height: 21, borderRadius: '50%', background: '#fff',
+        width: 24, height: 24, borderRadius: '50%', background: '#fff',
         boxShadow: '0 1px 3px rgba(0,0,0,0.28)',
-        transform: `translateX(${checked ? 19 : 0}px)`,
+        transform: `translateX(${checked ? 20 : 0}px)`,
         transition: 'transform 0.2s cubic-bezier(0.34,1.4,0.64,1)',
       }} />
     </button>
   )
 }
 
+/*
+ * A labelled form control.
+ *
+ * The hint/error sits OUTSIDE the <label>: anything inside a label becomes
+ * part of the control's accessible name, so a bio field would announce as
+ * "Bio 0/280" and re-read the counter on every keystroke. Pass `htmlFor` and
+ * the matching input `id` to get `aria-describedby` wired up for free.
+ */
 export function Field({ label, hint, error, htmlFor, children, style }) {
+  const describedBy = htmlFor && (error || hint) ? `${htmlFor}-desc` : undefined
   return (
-    <label htmlFor={htmlFor} style={{ display: 'block', ...style }}>
+    <div style={{ display: 'block', ...style }}>
       {label && (
-        <span style={{
-          display: 'block', fontSize: 12, fontWeight: 650, marginBottom: 7,
-          color: 'var(--text-secondary)', letterSpacing: '0.2px',
-        }}>
+        <label
+          htmlFor={htmlFor}
+          style={{
+            display: 'block', fontSize: 12, fontWeight: 650, marginBottom: 7,
+            color: 'var(--text-secondary)', letterSpacing: '0.2px',
+          }}
+        >
           {label}
-        </span>
+        </label>
       )}
       {children}
       {(hint || error) && (
-        <span style={{
-          display: 'block', marginTop: 6, fontSize: 12, lineHeight: 1.5,
-          color: error ? DANGER : 'var(--text-tertiary)',
-        }}>
+        <span
+          id={describedBy}
+          role={error ? 'alert' : undefined}
+          style={{
+            display: 'block', marginTop: 6, fontSize: 12, lineHeight: 1.5,
+            color: error ? DANGER : 'var(--text-secondary)',
+          }}
+        >
           {error || hint}
         </span>
       )}
-    </label>
+    </div>
   )
 }
 
+// --border is a hairline for card edges (~1.2:1). A control needs the 3:1 of
+// WCAG 1.4.11 or an empty field is invisible until it is focused.
 const inputStyle = {
-  width: '100%', padding: '10px 13px', borderRadius: 10,
-  border: '1.5px solid var(--border)', background: 'var(--bg)',
+  width: '100%', padding: '10px 13px', borderRadius: 'var(--radius-sm)',
+  border: '1.5px solid var(--border-control)', background: 'var(--bg)',
   fontSize: 14, color: 'var(--text-primary)', fontFamily: 'inherit',
   lineHeight: 1.45,
 }
@@ -318,7 +380,7 @@ export function TextInput({ prefix, style, ...rest }) {
     return (
       <span style={{
         display: 'flex', alignItems: 'center',
-        border: '1.5px solid var(--border)', borderRadius: 10,
+        border: '1.5px solid var(--border-control)', borderRadius: 'var(--radius-sm)',
         background: 'var(--bg)', overflow: 'hidden',
       }}>
         <span style={{
@@ -336,33 +398,70 @@ export function TextArea({ style, rows = 4, ...rest }) {
   return <textarea rows={rows} {...rest} style={{ ...inputStyle, resize: 'vertical', ...style }} />
 }
 
-// Radio-style pill group. `options` is [{ value, label, icon }].
+/*
+ * Radio-style pill group. `options` is [{ value, label, icon }].
+ *
+ * A real radiogroup: one tab stop, arrow keys move and select. This is the
+ * control that picks merge-vs-replace on a restore, so it has to be operable
+ * from the keyboard and unmistakable at a glance — the previous selected
+ * state was var(--surface) on var(--bg-tertiary), which in dark mode is
+ * 1.1:1 and actually darker than the track.
+ */
 export function Segmented({ options, value, onChange, ariaLabel, size = 'md' }) {
-  const pad = size === 'sm' ? '6px 12px' : '9px 14px'
+  const pad = size === 'sm' ? '7px 12px' : '9px 14px'
+  const refs = useRef([])
+  const index = Math.max(0, options.findIndex(o => o.value === value))
+
+  function move(delta) {
+    const next = (index + delta + options.length) % options.length
+    onChange(options[next].value)
+    refs.current[next]?.focus()
+  }
+
+  function onKeyDown(e) {
+    switch (e.key) {
+      case 'ArrowRight': case 'ArrowDown': e.preventDefault(); move(1); break
+      case 'ArrowLeft':  case 'ArrowUp':   e.preventDefault(); move(-1); break
+      case 'Home':       e.preventDefault(); onChange(options[0].value); refs.current[0]?.focus(); break
+      case 'End': {
+        e.preventDefault()
+        const last = options.length - 1
+        onChange(options[last].value)
+        refs.current[last]?.focus()
+        break
+      }
+      default: break
+    }
+  }
+
   return (
-    <div role="radiogroup" aria-label={ariaLabel} style={{
+    <div role="radiogroup" aria-label={ariaLabel} onKeyDown={onKeyDown} style={{
       display: 'inline-flex', gap: 4, padding: 4,
-      background: 'var(--bg-tertiary)', borderRadius: 12,
+      background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
       border: '1px solid var(--border-subtle)', flexWrap: 'wrap',
     }}>
-      {options.map(opt => {
+      {options.map((opt, i) => {
         const on = opt.value === value
         return (
           <button
             key={opt.value}
+            ref={el => { refs.current[i] = el }}
             type="button"
             role="radio"
             aria-checked={on}
+            tabIndex={on ? 0 : -1}
             className="focus-ring"
             onClick={() => onChange(opt.value)}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
-              padding: pad, borderRadius: 9,
+              padding: pad, borderRadius: 'var(--radius-sm)',
               fontSize: 13.5, fontWeight: on ? 650 : 500, fontFamily: 'inherit',
-              background: on ? 'var(--surface)' : 'transparent',
-              color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
-              boxShadow: on ? 'var(--shadow-sm)' : 'none',
-              transition: 'background 0.15s, color 0.15s',
+              background: on ? 'var(--accent-tint)' : 'transparent',
+              color: on ? 'var(--brand-ink)' : 'var(--text-secondary)',
+              // Transparent border on the unselected pills so selecting one
+              // does not shift the layout.
+              border: `1px solid ${on ? 'var(--accent-edge)' : 'transparent'}`,
+              transition: 'background 0.15s, color 0.15s, border-color 0.15s',
             }}
           >
             {opt.icon}
@@ -377,14 +476,20 @@ export function Segmented({ options, value, onChange, ariaLabel, size = 'md' }) 
 // ── Display ──────────────────────────────────────────────────────
 
 export function Avatar({ src, name, size = 44, ring = false, style }) {
+  const [broken, setBroken] = useState(false)
+  // A new src deserves a fresh attempt.
+  useEffect(() => { setBroken(false) }, [src])
   const dim = { width: size, height: size, borderRadius: '50%', flexShrink: 0 }
   const ringStyle = ring ? { boxShadow: `0 0 0 3px var(--surface), 0 0 0 5px ${ACCENT}55` } : {}
-  if (src) {
+  // A stored avatar can be a dead CDN URL or an image the browser cannot
+  // decode; fall back to the initials rather than rendering a broken image.
+  if (src && !broken) {
     return (
       <img
         src={src}
         alt={name ? `${name}'s avatar` : ''}
-        style={{ ...dim, objectFit: 'cover', ...ringStyle, ...style }}
+        onError={() => setBroken(true)}
+        style={{ ...dim, objectFit: 'cover', background: avatarGradient(name), ...ringStyle, ...style }}
       />
     )
   }
@@ -406,13 +511,17 @@ export function Avatar({ src, name, size = 44, ring = false, style }) {
   )
 }
 
-const BADGE_TONES = {
-  neutral: { bg: 'var(--bg-tertiary)', fg: 'var(--text-secondary)', bd: 'var(--border-subtle)' },
-  success: { bg: 'rgba(52,199,89,0.10)', fg: SUCCESS, bd: 'rgba(52,199,89,0.25)' },
-  warn:    { bg: 'rgba(245,158,11,0.10)', fg: WARN, bd: 'rgba(245,158,11,0.25)' },
-  danger:  { bg: 'rgba(255,59,48,0.08)', fg: DANGER, bd: 'rgba(255,59,48,0.22)' },
-  accent:  { bg: 'rgba(139,92,246,0.10)', fg: ACCENT, bd: 'rgba(139,92,246,0.25)' },
+// Every tone resolves through theme-aware tokens, so a tint that reads on
+// white is not the same alpha that reads on #111120.
+export const TONES = {
+  neutral: { bg: 'var(--bg-tertiary)',  fg: 'var(--text-secondary)', bd: 'var(--border-subtle)' },
+  success: { bg: 'var(--success-tint)', fg: SUCCESS,   bd: 'var(--success-edge)' },
+  warn:    { bg: 'var(--warn-tint)',    fg: WARN,      bd: 'var(--warn-edge)' },
+  danger:  { bg: 'var(--danger-tint)',  fg: DANGER,    bd: 'var(--danger-edge)' },
+  accent:  { bg: 'var(--accent-tint)',  fg: BRAND_INK, bd: 'var(--accent-edge)' },
 }
+
+const BADGE_TONES = TONES
 
 export function Badge({ tone = 'neutral', dot = false, children }) {
   const t = BADGE_TONES[tone] || BADGE_TONES.neutral
@@ -434,7 +543,7 @@ export function StatTile({ label, value, hint, icon, tone = 'accent' }) {
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border-subtle)',
-      borderRadius: 14, padding: '16px 18px', boxShadow: 'var(--shadow-sm)',
+      borderRadius: 'var(--radius-lg)', padding: '16px 18px', boxShadow: 'var(--shadow-sm)',
       display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -481,26 +590,79 @@ export function EmptyState({ icon, title, description, action, compact = false }
 
 // ── Overlays ─────────────────────────────────────────────────────
 
-export function Modal({ open, onClose, title, description, children, width = 440, labelledBy }) {
+const FOCUSABLE = [
+  'a[href]', 'button:not([disabled])', 'input:not([disabled])',
+  'select:not([disabled])', 'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+let modalSeq = 0
+
+/*
+ * A modal dialog that actually behaves like one.
+ *
+ * Three things a bare role="dialog" does not give you, and all three matter
+ * when the dialog is "Erase everything?":
+ *   - Tab is trapped inside, so you cannot land on the button that opened it.
+ *   - The app behind is inert, so a screen reader in browse mode cannot read
+ *     or operate the page under the scrim.
+ *   - The focus effect depends only on `open`, so a parent re-render does not
+ *     yank focus back out to the trigger mid-interaction.
+ */
+export function Modal({ open, onClose, title, description, children, width = 440 }) {
   const panelRef = useRef(null)
+  const restoreRef = useRef(null)
+  const closeRef = useRef(onClose)
+  const idRef = useRef(null)
+  if (idRef.current === null) idRef.current = ++modalSeq
+
+  // Read onClose through a ref so its identity never re-runs the effect below.
+  closeRef.current = onClose
 
   useEffect(() => {
     if (!open) return
-    function onKey(e) { if (e.key === 'Escape') onClose?.() }
-    document.addEventListener('keydown', onKey)
-    const previouslyFocused = document.activeElement
-    // Focus the dialog so Escape works and screen readers announce it.
-    panelRef.current?.focus()
+
+    restoreRef.current = document.activeElement
+    const root = document.getElementById('root')
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
-      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus()
+    if (root) root.setAttribute('inert', '')
+
+    // Focus the first real control if there is one — the confirmation input,
+    // typically — otherwise the panel itself.
+    const panel = panelRef.current
+    const first = panel?.querySelector(FOCUSABLE)
+    ;(first || panel)?.focus()
+
+    function onKeyDown(e) {
+      if (e.key === 'Escape') { e.stopPropagation(); closeRef.current?.(); return }
+      if (e.key !== 'Tab') return
+      const items = [...(panelRef.current?.querySelectorAll(FOCUSABLE) || [])]
+      if (!items.length) { e.preventDefault(); return }
+      const firstItem = items[0]
+      const lastItem = items[items.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === firstItem || !panelRef.current.contains(active))) {
+        e.preventDefault(); lastItem.focus()
+      } else if (!e.shiftKey && active === lastItem) {
+        e.preventDefault(); firstItem.focus()
+      }
     }
-  }, [open, onClose])
+
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
+      document.body.style.overflow = overflow
+      if (root) root.removeAttribute('inert')
+      const previous = restoreRef.current
+      if (previous instanceof HTMLElement && document.contains(previous)) previous.focus()
+    }
+  }, [open])
 
   if (!open) return null
+
+  const titleId = `modal-${idRef.current}-title`
+  const descId = `modal-${idRef.current}-desc`
 
   return createPortal(
     <div
@@ -516,19 +678,23 @@ export function Modal({ open, onClose, title, description, children, width = 440
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label={labelledBy ? undefined : title}
-        aria-labelledby={labelledBy}
+        aria-labelledby={title ? titleId : undefined}
+        aria-describedby={description ? descId : undefined}
         style={{
           width: '100%', maxWidth: width, maxHeight: 'calc(100vh - 40px)', overflowY: 'auto',
-          background: 'var(--surface)', borderRadius: 18, padding: 26,
+          background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 26,
           border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-lg)',
           animation: 'menu-in 0.16s ease-out',
           outline: 'none',
         }}
       >
-        {title && <h2 style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.4px' }}>{title}</h2>}
+        {title && (
+          <h2 id={titleId} style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.4px' }}>
+            {title}
+          </h2>
+        )}
         {description && (
-          <p style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+          <p id={descId} style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, color: 'var(--text-secondary)' }}>
             {description}
           </p>
         )}
@@ -596,10 +762,14 @@ export function ToastProvider({ children }) {
     if (timer) { clearTimeout(timer); timers.current.delete(id) }
   }, [])
 
-  const toast = useCallback((message, tone = 'success', duration = 3200) => {
+  // Failures stay until dismissed. A toast is the only place the reason for a
+  // failed connect, save or restore is ever shown — losing it after 3 seconds
+  // leaves the user with no way to find out what went wrong.
+  const toast = useCallback((message, tone = 'success', duration) => {
     const id = Math.random().toString(36).slice(2)
-    setToasts(list => [...list, { id, message, tone }])
-    timers.current.set(id, setTimeout(() => dismiss(id), duration))
+    const ms = duration ?? (tone === 'danger' ? 0 : 3200)
+    setToasts(list => [...list, { id, message, tone, persistent: ms === 0 }])
+    if (ms > 0) timers.current.set(id, setTimeout(() => dismiss(id), ms))
     return id
   }, [dismiss])
 
@@ -629,20 +799,43 @@ export function ToastProvider({ children }) {
             return (
               <div
                 key={t.id}
-                role="status"
-                onClick={() => dismiss(t.id)}
+                role={t.tone === 'danger' ? 'alert' : 'status'}
+                onClick={t.persistent ? undefined : () => dismiss(t.id)}
                 style={{
-                  pointerEvents: 'auto', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 9,
-                  maxWidth: 340, padding: '11px 15px', borderRadius: 12,
+                  pointerEvents: 'auto', cursor: t.persistent ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'flex-start', gap: 9,
+                  maxWidth: 360, padding: '11px 12px 11px 15px',
+                  borderRadius: 'var(--radius-md)',
                   background: 'var(--surface)', color: 'var(--text-primary)',
                   border: `1px solid ${tone.bd}`, boxShadow: 'var(--shadow-lg)',
                   fontSize: 13.5, fontWeight: 550, lineHeight: 1.45,
                   animation: 'menu-in 0.18s ease-out',
                 }}
               >
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: tone.fg, flexShrink: 0 }} />
-                {t.message}
+                <span style={{
+                  width: 7, height: 7, borderRadius: '50%', background: tone.fg,
+                  flexShrink: 0, marginTop: 6,
+                }} />
+                <span style={{ flex: 1, minWidth: 0 }}>{t.message}</span>
+                {t.persistent && (
+                  <button
+                    type="button"
+                    className="focus-ring"
+                    aria-label="Dismiss"
+                    onClick={() => dismiss(t.id)}
+                    style={{
+                      flexShrink: 0, width: 24, height: 24, borderRadius: 6,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--text-secondary)', background: 'transparent',
+                      marginTop: -1,
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
               </div>
             )
           })}

@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react'
 
 // Generic small-value localStorage hook (inspiration boards, brand deals, etc.)
+//
+// Returns [value, setValue, error]. The third element matters: this app runs
+// close to the browser's storage ceiling, so writes genuinely fail. Swallowing
+// that would let a page report "Saved" for something that was never written
+// and is gone on reload.
 function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => {
     try {
@@ -10,16 +15,19 @@ function useLocalStorage(key, initial) {
       return initial
     }
   })
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     try {
       localStorage.setItem(key, JSON.stringify(value))
+      setError(prev => (prev ? null : prev))
     } catch (e) {
-      console.warn('localStorage quota exceeded — data not saved', e)
+      console.warn(`localStorage write failed for "${key}" — data not saved`, e)
+      setError('Browser storage is full, so that change was not saved. Free up space in Manage account and try again.')
     }
   }, [key, value])
 
-  return [value, setValue]
+  return [value, setValue, error]
 }
 
 // ── Per-influencer storage ────────────────────────────────────────
@@ -126,6 +134,8 @@ const PreferencesCtx = createContext(null)
 // profile is what the app calls you and shows in the nav; preferences are
 // the handful of app-wide choices that actually change behaviour.
 
+const SEED_RELOAD_KEY = 'seeds_reloaded'
+
 const PROFILE_KEY = 'studio_profile'
 const PREFS_KEY   = 'studio_preferences'
 
@@ -178,13 +188,6 @@ export function readGenerationDefaults() {
   }
 }
 
-export function readPreferences() {
-  try {
-    return withDefaults(JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'), DEFAULT_PREFERENCES)
-  } catch {
-    return { ...DEFAULT_PREFERENCES }
-  }
-}
 
 const KAYLA_SEED = {
   id: 'kayla-template',
@@ -493,17 +496,18 @@ try {
   }
 } catch (_) {}
 
-const TEMPLATE_IDS = new Set(['kayla-template', 'camila-template', 'marcus-template'])
-
 export function StoreProvider({ children }) {
   const influencerStore = useInfluencerStore([KAYLA_SEED, CAMILA_SEED, MARCUS_SEED])
   const inspirationState = useLocalStorage('inspiration_boards', [])
   const brandDealsState  = useLocalStorage('brand_deals', [])
 
-  const [storedProfile, setStoredProfile] = useLocalStorage(PROFILE_KEY, DEFAULT_PROFILE)
-  const [storedPrefs,   setStoredPrefs]   = useLocalStorage(PREFS_KEY, DEFAULT_PREFERENCES)
-  const profile     = withDefaults(storedProfile, DEFAULT_PROFILE)
-  const preferences = withDefaults(storedPrefs, DEFAULT_PREFERENCES)
+  const [storedProfile, setStoredProfile, profileError] = useLocalStorage(PROFILE_KEY, DEFAULT_PROFILE)
+  const [storedPrefs,   setStoredPrefs,   prefsError]   = useLocalStorage(PREFS_KEY, DEFAULT_PREFERENCES)
+
+  // Memoised so the context value is stable — withDefaults builds a fresh
+  // object each call, and every consumer re-renders when the value changes.
+  const profile     = useMemo(() => withDefaults(storedProfile, DEFAULT_PROFILE), [storedProfile])
+  const preferences = useMemo(() => withDefaults(storedPrefs, DEFAULT_PREFERENCES), [storedPrefs])
 
   // Patch-style updaters — callers pass only the fields they changed.
   const updateProfile = useCallback(patch => {
@@ -522,8 +526,12 @@ export function StoreProvider({ children }) {
     setStoredPrefs(prev => ({ ...withDefaults(prev, DEFAULT_PREFERENCES), ...patch }))
   }, [setStoredPrefs])
 
-  const profileValue = useMemo(() => ({ profile, updateProfile }), [profile, updateProfile])
-  const prefsValue   = useMemo(() => ({ preferences, updatePreferences }), [preferences, updatePreferences])
+  const profileValue = useMemo(
+    () => ({ profile, updateProfile, saveError: profileError }),
+    [profile, updateProfile, profileError])
+  const prefsValue   = useMemo(
+    () => ({ preferences, updatePreferences, saveError: prefsError }),
+    [preferences, updatePreferences, prefsError])
 
   // Honour the reduced-motion preference globally. index.css keys off this
   // attribute to collapse transitions and animations.
@@ -550,8 +558,11 @@ export function StoreProvider({ children }) {
             if (!allIds.includes(id)) allIds.push(id)
           }
           writeIds(allIds)
+          // Only claim a write happened if one actually did — writeInfluencer
+          // returns false when the browser is out of quota, and reloading on a
+          // write that never landed loops forever.
           for (const id of missingSeedIds) {
-            if (seeds.influencers[id]) writeInfluencer(seeds.influencers[id])
+            if (seeds.influencers[id] && writeInfluencer(seeds.influencers[id])) didWrite = true
           }
 
           // Merge photo history — add seed photos that aren't already there
@@ -563,7 +574,6 @@ export function StoreProvider({ children }) {
             try { localStorage.setItem('photo_studio_history', JSON.stringify(merged)) } catch {}
           }
 
-          didWrite = true
         }
 
         // Always patch existing influencers that are missing prompt or backstory from seeds
@@ -573,12 +583,12 @@ export function StoreProvider({ children }) {
           if (!existing) continue
           const needsPatch = (seedInf.prompt && !existing.prompt) || (seedInf.backstory && !existing.backstory)
           if (needsPatch) {
-            writeInfluencer({
+            const ok = writeInfluencer({
               ...existing,
               prompt: existing.prompt || seedInf.prompt || '',
               backstory: existing.backstory || seedInf.backstory || '',
             })
-            didWrite = true
+            if (ok) didWrite = true
           }
         }
 
@@ -610,8 +620,14 @@ export function StoreProvider({ children }) {
           setDealsData([...newDeals, ...patchedDeals])
         }
 
-        // Only reload when influencer data or photo history changed — boards/deals are handled above via state
-        if (didWrite) window.location.reload()
+        // Only reload when influencer data or photo history changed — boards/deals
+        // are handled above via state. Guarded by a per-tab sentinel: if a write
+        // silently fails to stick, the next pass would ask for another reload and
+        // the app would never finish booting.
+        if (didWrite && !sessionStorage.getItem(SEED_RELOAD_KEY)) {
+          try { sessionStorage.setItem(SEED_RELOAD_KEY, '1') } catch {}
+          window.location.reload()
+        }
       })
       .catch(e => console.warn('[seeds] failed to load:', e))
   }, []) // eslint-disable-line

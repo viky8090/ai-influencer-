@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   PageShell, SectionCard, Row, Divider, Button, Badge, Avatar,
-  Modal, ConfirmDialog, Segmented, useToast, formatDate,
+  Modal, ConfirmDialog, Segmented, Spinner, useToast, formatDate,
   ACCENT, DANGER, WARN,
 } from '../components/ui'
 import {
@@ -128,12 +128,15 @@ export default function Account() {
     try {
       const result = restoreBackup(pending.parsed, restoreMode)
       setRestoreResult(result)
-      refresh()
-      toast(`Restored ${plural(result.written, 'item')}`)
+      // Reload rather than offer to. The influencer store was hydrated at
+      // mount and its save effect rewrites the id list from that stale copy,
+      // deleting every record the restore just added. Leaving the app running
+      // on stale state turns a successful restore into silent data loss on the
+      // user's next edit.
+      window.location.reload()
     } catch (err) {
-      toast(err?.message || 'Restore failed.', 'danger')
-    } finally {
       setRestoreBusy(false)
+      toast(err?.message || 'Restore failed.', 'danger')
     }
   }
 
@@ -176,7 +179,7 @@ export default function Account() {
     ...(stats.dealCount ? [plural(stats.dealCount, 'brand deal')] : []),
   ].join(' · ')
 
-  const backupFooterNote = (
+  const backupFirstButton = (
     <Button size="sm" icon={<IconDownload size={15} />} onClick={handleDownload}>
       Download a backup first
     </Button>
@@ -200,7 +203,7 @@ export default function Account() {
       <SectionCard
         id="where"
         title="Where your account lives"
-        description="What &ldquo;your account&rdquo; actually means in this app."
+        description="What “your account” actually means in this app."
       >
         <Callout tone="info" icon={<IconInfo size={17} />}>
           No account server, no password, no sync. Everything you make is written to this
@@ -209,9 +212,11 @@ export default function Account() {
 
         <p style={{ ...paragraph, marginTop: 16 }}>
           Your influencers, photo and video history, inspiration boards, brand deals and
-          settings never leave this machine. Nothing is uploaded to us, and there is no copy
-          of your work anywhere else. Generation runs through your own Higgsfield account, so
-          images and credits stay yours too.
+          settings are never uploaded &mdash; they exist only in this browser, and there is no
+          copy of your work anywhere else. Generating is the exception: prompts and reference
+          images pass through this app&rsquo;s proxy on their way to Higgsfield (and to Anthropic,
+          if you added a Claude key). Nothing is stored there, and generation is billed to your
+          own Higgsfield account.
         </p>
         <p style={{ ...paragraph, marginTop: 12 }}>
           The flip side: clearing site data, browsing privately, or moving to another browser
@@ -238,7 +243,7 @@ export default function Account() {
       <SectionCard
         id="storage"
         title="Storage"
-        description="How much of this browser&rsquo;s local storage your studio is using."
+        description="How much of this browser’s local storage your studio is using."
         action={
           <Button size="sm" variant="secondary" icon={<IconRefresh size={15} />} onClick={refresh}>
             Recheck
@@ -330,7 +335,7 @@ export default function Account() {
       {/* ── 3. Backup & restore ───────────────────────────────── */}
       <SectionCard
         id="backup"
-        title="Backup &amp; restore"
+        title="Backup & restore"
         description="A single JSON file that holds everything, and the way to bring it back."
       >
         <p style={paragraph}>
@@ -369,20 +374,6 @@ export default function Account() {
           />
         </div>
 
-        {restoreResult && !pending && (
-          <div style={{ marginTop: 18 }}>
-            <Callout tone="warn" icon={<IconRefresh size={17} />}>
-              {plural(restoreResult.written, 'item')} restored,{' '}
-              {restoreResult.skipped} skipped. This page is still showing the data it loaded
-              when you opened it &mdash; reload to see the restored studio.
-              <span style={{ display: 'block', marginTop: 12 }}>
-                <Button size="sm" variant="primary" onClick={() => window.location.reload()}>
-                  Reload now
-                </Button>
-              </span>
-            </Callout>
-          </div>
-        )}
       </SectionCard>
 
       {/* ── 4. Connections ────────────────────────────────────── */}
@@ -482,8 +473,8 @@ export default function Account() {
 
           <Row
             icon={<IconLock size={18} />}
-            title="Sign out of everything and erase"
-            description="Everything above, plus your Higgsfield connection and the stored Claude API key. This browser is left exactly as it was before you first opened the app."
+            title="Erase everything, including connections"
+            description="Everything above, plus your Higgsfield connection and the stored Claude API key. Nothing this app has written to the browser survives."
             control={
               <Button variant="dangerSolid" icon={<IconAlert size={15} />} onClick={() => setConfirmKind('everything')}>
                 Erase everything
@@ -501,31 +492,26 @@ export default function Account() {
         title={restoreResult ? 'Backup restored' : 'Restore from backup'}
         description={
           restoreResult
-            ? 'The app is still showing the data it loaded when this page opened. Reload to see the restored studio.'
+            ? 'Reloading so the restored studio is what you see.'
             : 'Check that this is the file you meant, then choose how it should be applied.'
         }
       >
         {restoreResult ? (
-          <>
-            <div style={{
-              padding: '14px 16px', borderRadius: 12,
-              background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)',
-              fontSize: 14, lineHeight: 1.6, color: 'var(--text-primary)',
-            }}>
+          /* The reload is already running; this is what the user sees while it
+             happens. There is deliberately no way to dismiss it — continuing on
+             a stale in-memory store would delete the records just restored. */
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '14px 16px', borderRadius: 'var(--radius-md)',
+            background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)',
+            fontSize: 14, lineHeight: 1.6, color: 'var(--text-primary)',
+          }}>
+            <Spinner size={16} />
+            <span>
               <strong>{plural(restoreResult.written, 'item')} restored</strong>
-              {', '}{restoreResult.skipped} skipped.
-              <span style={{ display: 'block', marginTop: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
-                Items are skipped when they are not part of a studio backup, or &mdash; in Merge
-                mode &mdash; when this browser already has its own copy.
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <Button variant="secondary" onClick={closeRestore}>Not now</Button>
-              <Button variant="primary" icon={<IconRefresh size={15} />} onClick={() => window.location.reload()}>
-                Reload now
-              </Button>
-            </div>
-          </>
+              {', '}{restoreResult.skipped} skipped. Reloading&hellip;
+            </span>
+          </div>
         ) : (
           <>
             <div style={{
@@ -578,7 +564,8 @@ export default function Account() {
                   {restoreMode === 'merge'
                     ? 'Merge only adds what is missing. Anything already in this browser is left exactly as it is.'
                     : 'Replace overwrites this browser’s copy with the backup’s version of every item in the file.'}
-                  {' '}Neither mode deletes anything that is not in the file.
+                  {' '}Neither mode deletes anything that is not in the file, and the
+                  app reloads afterwards so the restored studio is what you see.
                 </p>
               </>
             )}
@@ -591,7 +578,9 @@ export default function Account() {
                 disabled={!parsedOk}
                 loading={restoreBusy}
               >
-                {restoreMode === 'merge' ? 'Merge backup' : 'Replace with backup'}
+                {restoreBusy
+                  ? 'Restoring…'
+                  : restoreMode === 'merge' ? 'Merge backup' : 'Replace with backup'}
               </Button>
             </div>
           </>
@@ -614,7 +603,7 @@ export default function Account() {
             <span style={{ display: 'block', marginTop: 8, color: 'var(--text-primary)', fontWeight: 600 }}>
               Going now: {atStake}
             </span>
-            <span style={{ display: 'block', marginTop: 14 }}>{backupFooterNote}</span>
+            <span style={{ display: 'block', marginTop: 14 }}>{backupFirstButton}</span>
           </>
         }
         onCancel={() => setConfirmKind(null)}
@@ -635,7 +624,7 @@ export default function Account() {
             <span style={{ display: 'block', marginTop: 8, color: 'var(--text-primary)', fontWeight: 600 }}>
               Going now: {atStake}
             </span>
-            <span style={{ display: 'block', marginTop: 14 }}>{backupFooterNote}</span>
+            <span style={{ display: 'block', marginTop: 14 }}>{backupFirstButton}</span>
           </>
         }
         onCancel={() => setConfirmKind(null)}
