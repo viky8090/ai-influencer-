@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { ThemeProvider, useTheme } from './context/theme'
 import { StoreProvider } from './store'
 import { silentRefreshHFToken } from './utils/higgsfieldAuth'
+import { ToastProvider } from './components/ui'
 import Nav from './components/Nav'
 import Landing from './pages/Landing'
 import Influencers from './pages/Influencers'
@@ -11,6 +12,9 @@ import Inspiration from './pages/Inspiration'
 import BrandDeals from './pages/BrandDeals'
 import Create from './pages/Create'
 import Settings from './pages/Settings'
+import Profile from './pages/Profile'
+import Account from './pages/Account'
+import Community from './pages/Community'
 import AuthCallback from './pages/AuthCallback'
 
 const FEEDBACK_FORM_URL = 'https://forms.gle/p5cBXw4sYaHPdcANA'
@@ -63,6 +67,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <StoreProvider>
+    <ToastProvider>
     <BrowserRouter>
       <Nav />
       <Routes>
@@ -72,12 +77,16 @@ export default function App() {
         <Route path="/brand-deals" element={<BrandDeals />} />
         <Route path="/create" element={<Create />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/account" element={<Account />} />
+        <Route path="/community" element={<Community />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <FeedbackButton />
       <Analytics />
     </BrowserRouter>
+    </ToastProvider>
     </StoreProvider>
     </ThemeProvider>
   )

@@ -41,7 +41,12 @@ export function ThemeProvider({ children }) {
   function toggle(x, y) {
     if (busy) return
     const next = theme === 'light' ? 'dark' : 'light'
-    if (!document.startViewTransition) { setTheme(next); return }
+    // Skip the ink-splash entirely when the user (or their OS) asked for less
+    // motion — a full-screen wipe is exactly the kind of animation they mean.
+    const quiet =
+      document.documentElement.hasAttribute('data-reduce-motion') ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (quiet || !document.startViewTransition) { setTheme(next); return }
 
     busy = true
 

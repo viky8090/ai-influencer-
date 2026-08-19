@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, useCallback, useMemo, createContext, useContext } from 'react'
 
 // Generic small-value localStorage hook (inspiration boards, brand deals, etc.)
 function useLocalStorage(key, initial) {
@@ -118,6 +118,73 @@ function useInfluencerStore(initial) {
 const InfluencersCtx = createContext(null)
 const InspirationCtx = createContext(null)
 const BrandDealsCtx  = createContext(null)
+const ProfileCtx     = createContext(null)
+const PreferencesCtx = createContext(null)
+
+// ── Account profile + preferences ─────────────────────────────────
+// There is no server and no login: "your account" is this browser. The
+// profile is what the app calls you and shows in the nav; preferences are
+// the handful of app-wide choices that actually change behaviour.
+
+const PROFILE_KEY = 'studio_profile'
+const PREFS_KEY   = 'studio_preferences'
+
+export const DEFAULT_PROFILE = {
+  displayName: '',
+  handle: '',
+  avatar: '',
+  bio: '',
+  location: '',
+  links: { website: '', instagram: '', tiktok: '', youtube: '', x: '' },
+  createdAt: null,
+}
+
+export const DEFAULT_PREFERENCES = {
+  reduceMotion: false,
+  defaultAspectRatio: '9:16',
+  defaultResolution: '4k',
+  defaultOutputCount: 1,
+}
+
+// Merges stored values over the defaults so a preference added in a later
+// release still has a value for someone whose localStorage predates it.
+function withDefaults(stored, defaults) {
+  if (!stored || typeof stored !== 'object') return { ...defaults }
+  const merged = { ...defaults, ...stored }
+  for (const [key, value] of Object.entries(defaults)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      merged[key] = { ...value, ...(stored[key] || {}) }
+    }
+  }
+  return merged
+}
+
+// Read outside React — PhotoStudio needs these at module scope, before any
+// provider has mounted.
+export function readGenerationDefaults() {
+  try {
+    const prefs = withDefaults(JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'), DEFAULT_PREFERENCES)
+    return {
+      aspectRatio: prefs.defaultAspectRatio,
+      resolution:  prefs.defaultResolution,
+      outputCount: prefs.defaultOutputCount,
+    }
+  } catch {
+    return {
+      aspectRatio: DEFAULT_PREFERENCES.defaultAspectRatio,
+      resolution:  DEFAULT_PREFERENCES.defaultResolution,
+      outputCount: DEFAULT_PREFERENCES.defaultOutputCount,
+    }
+  }
+}
+
+export function readPreferences() {
+  try {
+    return withDefaults(JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'), DEFAULT_PREFERENCES)
+  } catch {
+    return { ...DEFAULT_PREFERENCES }
+  }
+}
 
 const KAYLA_SEED = {
   id: 'kayla-template',
@@ -432,6 +499,37 @@ export function StoreProvider({ children }) {
   const influencerStore = useInfluencerStore([KAYLA_SEED, CAMILA_SEED, MARCUS_SEED])
   const inspirationState = useLocalStorage('inspiration_boards', [])
   const brandDealsState  = useLocalStorage('brand_deals', [])
+
+  const [storedProfile, setStoredProfile] = useLocalStorage(PROFILE_KEY, DEFAULT_PROFILE)
+  const [storedPrefs,   setStoredPrefs]   = useLocalStorage(PREFS_KEY, DEFAULT_PREFERENCES)
+  const profile     = withDefaults(storedProfile, DEFAULT_PROFILE)
+  const preferences = withDefaults(storedPrefs, DEFAULT_PREFERENCES)
+
+  // Patch-style updaters — callers pass only the fields they changed.
+  const updateProfile = useCallback(patch => {
+    setStoredProfile(prev => {
+      const base = withDefaults(prev, DEFAULT_PROFILE)
+      return {
+        ...base,
+        ...patch,
+        links: { ...base.links, ...(patch.links || {}) },
+        createdAt: base.createdAt || Date.now(),
+      }
+    })
+  }, [setStoredProfile])
+
+  const updatePreferences = useCallback(patch => {
+    setStoredPrefs(prev => ({ ...withDefaults(prev, DEFAULT_PREFERENCES), ...patch }))
+  }, [setStoredPrefs])
+
+  const profileValue = useMemo(() => ({ profile, updateProfile }), [profile, updateProfile])
+  const prefsValue   = useMemo(() => ({ preferences, updatePreferences }), [preferences, updatePreferences])
+
+  // Honour the reduced-motion preference globally. index.css keys off this
+  // attribute to collapse transitions and animations.
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-reduce-motion', !!preferences.reduceMotion)
+  }, [preferences.reduceMotion])
   const [, setInspirationBoards] = inspirationState
   const [, setDealsData]         = brandDealsState
 
@@ -522,7 +620,11 @@ export function StoreProvider({ children }) {
     <InfluencersCtx.Provider value={influencerStore}>
       <InspirationCtx.Provider value={inspirationState}>
         <BrandDealsCtx.Provider value={brandDealsState}>
-          {children}
+          <ProfileCtx.Provider value={profileValue}>
+            <PreferencesCtx.Provider value={prefsValue}>
+              {children}
+            </PreferencesCtx.Provider>
+          </ProfileCtx.Provider>
         </BrandDealsCtx.Provider>
       </InspirationCtx.Provider>
     </InfluencersCtx.Provider>
@@ -532,6 +634,8 @@ export function StoreProvider({ children }) {
 export function useInfluencers()       { return useContext(InfluencersCtx) }
 export function useInspirationBoards() { return useContext(InspirationCtx) }
 export function useBrandDeals()        { return useContext(BrandDealsCtx) }
+export function useProfile()           { return useContext(ProfileCtx) }
+export function usePreferences()       { return useContext(PreferencesCtx) }
 
 export function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)

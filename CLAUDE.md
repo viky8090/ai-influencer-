@@ -31,6 +31,14 @@ account (OAuth, PKCE).
 | `src/utils/systemPrompt.js` | Prompt templates — poses, wardrobe library, vibe palettes, Soul vs GPT Image 2 variants |
 | `src/pages/Create.jsx` | Multi-step influencer creation wizard |
 | `src/pages/Influencers.jsx` | Influencer profile + Content Studio + Video Studio (very large — known structural debt) |
+| `src/components/ui.jsx` | Shared UI kit for the account area — `PageShell`, `SectionCard`, `Row`, `Button`, `Toggle`, `Segmented`, `Modal`, `ConfirmDialog`, `ToastProvider`/`useToast` |
+| `src/components/icons.jsx` | One 24×24 stroke icon set (`IconUser`, `IconSettings`, …) |
+| `src/components/AccountMenu.jsx` | Nav avatar dropdown: View profile / Settings / Manage account / Join community |
+| `src/pages/Profile.jsx` | Creator profile — identity, stats, influencer roster |
+| `src/pages/Account.jsx` | Manage account — storage meter, backup/restore, danger zone |
+| `src/pages/Community.jsx` | Help, feedback, docs, and a live getting-started checklist |
+| `src/utils/accountData.js` | localStorage accounting, JSON backup export/import, wipe |
+| `src/utils/accountStats.js` | Derived counts (photos, videos, active influencers) — never stored |
 | `api/hf/[...path].js` | Edge function that proxies all Higgsfield MCP traffic and forwards SSE streams |
 | `api/claude.js` | Anthropic API proxy — caller supplies their own `x-api-key` |
 
@@ -40,6 +48,14 @@ account (OAuth, PKCE).
   Theme tokens are set on `<html data-theme="dark|light">` from
   `src/context/theme.jsx`.
 - IDs use `generateId()` from `store.jsx` (`Date.now() + random`).
+- Account-area pages (Profile, Settings, Account, Community) compose
+  `src/components/ui.jsx` rather than re-rolling buttons and cards. Add to
+  the kit instead of styling a one-off.
+- `useProfile()` and `usePreferences()` in `store.jsx` back the account
+  identity and the app-wide preferences. `preferences.reduceMotion` sets
+  `data-reduce-motion` on `<html>`; the generation defaults are read at
+  module scope by `PhotoStudio.jsx` via `readGenerationDefaults()`, and a
+  per-influencer saved setting always wins over them.
 - Higgsfield models supported: `soul_2`, `gpt_image_2`, `nano_banana_2`,
   `nano_banana_flash`, `seedance_2_0`. Soul has its own simplified
   pose set (`POSES_SOUL`) because it struggles with detailed spatial pose
@@ -55,6 +71,10 @@ account (OAuth, PKCE).
 - Don't refactor `Influencers.jsx` casually. It's 4,700+ lines and the
   state is tangled; any split needs its own dedicated session with
   in-browser verification of every flow.
+- Don't ship a settings control that isn't wired to real behaviour, a stat
+  that isn't derived from real data, or a link to a service this project
+  doesn't have. There is no Discord/Slack — `Community.jsx` deliberately
+  points at GitHub issues, the feedback form, and the repo docs instead.
 
 ## Dev workflow
 

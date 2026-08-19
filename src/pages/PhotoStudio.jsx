@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { generateNImages, generatePosePreviews, generateSingleImage, savePendingPhoto, clearPendingPhoto, getPendingPhoto, pollAllJobs, hasPhotoGenSession } from '../utils/higgsfieldGenerate'
 import { isHFConnected } from '../utils/higgsfieldAuth'
 import { buildCharSheetPrompt, buildCharSheetPromptWithClaude } from '../utils/charSheetPrompt'
-import { useInfluencers, useBrandDeals } from '../store'
+import { useInfluencers, useBrandDeals, readGenerationDefaults } from '../store'
 import WardrobeDrawer from '../components/WardrobeDrawer'
 import {
   LOCATIONS, TIMES, EXPRESSIONS, PROP_SUGGESTIONS,
@@ -379,26 +379,33 @@ function loadSettings(id) {
   try { return JSON.parse(localStorage.getItem(`ps_settings_${id || 'default'}`) || '{}') } catch { return {} }
 }
 
-const PS_DEFAULTS = { location: 'coffee-shop', timeOfDay: 'afternoon', pose: 'front', outfitPreset: 'current', stance: 'standing', aspectRatio: '9:16', resolution: '4k', outputCount: 1, expression: 'natural', gaze: 'at-camera', propText: '', wardrobeText: '', hairstyleText: '' }
+const PS_BASE_DEFAULTS = { location: 'coffee-shop', timeOfDay: 'afternoon', pose: 'front', outfitPreset: 'current', stance: 'standing', aspectRatio: '9:16', resolution: '4k', outputCount: 1, expression: 'natural', gaze: 'at-camera', propText: '', wardrobeText: '', hairstyleText: '' }
+
+// Settings → Generation lets the user pick where a fresh influencer starts.
+// Per-influencer saved settings still win over these.
+function psDefaults() {
+  return { ...PS_BASE_DEFAULTS, ...readGenerationDefaults() }
+}
 
 export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsStartFrame, restoreKey = 0 }) {
   const [, setInfluencers] = useInfluencers()
   const [brandDeals] = useBrandDeals()
   const _s = loadSettings(influencer?.id)
-  const [location,     setLocation]     = useState(_s.location     ?? PS_DEFAULTS.location)
-  const [timeOfDay,    setTimeOfDay]    = useState(_s.timeOfDay    ?? PS_DEFAULTS.timeOfDay)
-  const [pose,         setPose]         = useState(_s.pose         ?? PS_DEFAULTS.pose)
+  const _d = psDefaults()
+  const [location,     setLocation]     = useState(_s.location     ?? _d.location)
+  const [timeOfDay,    setTimeOfDay]    = useState(_s.timeOfDay    ?? _d.timeOfDay)
+  const [pose,         setPose]         = useState(_s.pose         ?? _d.pose)
   const vibe = 'candid'
-  const [outfitPreset, setOutfitPreset] = useState(_s.outfitPreset ?? PS_DEFAULTS.outfitPreset)
-  const [stance,       setStance]       = useState(_s.stance       ?? PS_DEFAULTS.stance)
-  const [aspectRatio,  setAspectRatio]  = useState(_s.aspectRatio  ?? PS_DEFAULTS.aspectRatio)
-  const [resolution,   setResolution]   = useState(_s.resolution   ?? PS_DEFAULTS.resolution)
-  const [outputCount,  setOutputCount]  = useState(_s.outputCount  ?? PS_DEFAULTS.outputCount)
-  const [expression,   setExpression]   = useState(_s.expression   ?? PS_DEFAULTS.expression)
-  const [gaze,         setGaze]         = useState(_s.gaze         ?? PS_DEFAULTS.gaze)
-  const [propText,     setPropText]     = useState(_s.propText      ?? PS_DEFAULTS.propText)
-  const [wardrobeText,   setWardrobeText]   = useState(_s.wardrobeText   ?? PS_DEFAULTS.wardrobeText)
-  const [hairstyleText,  setHairstyleText]  = useState(_s.hairstyleText  ?? PS_DEFAULTS.hairstyleText)
+  const [outfitPreset, setOutfitPreset] = useState(_s.outfitPreset ?? _d.outfitPreset)
+  const [stance,       setStance]       = useState(_s.stance       ?? _d.stance)
+  const [aspectRatio,  setAspectRatio]  = useState(_s.aspectRatio  ?? _d.aspectRatio)
+  const [resolution,   setResolution]   = useState(_s.resolution   ?? _d.resolution)
+  const [outputCount,  setOutputCount]  = useState(_s.outputCount  ?? _d.outputCount)
+  const [expression,   setExpression]   = useState(_s.expression   ?? _d.expression)
+  const [gaze,         setGaze]         = useState(_s.gaze         ?? _d.gaze)
+  const [propText,     setPropText]     = useState(_s.propText      ?? _d.propText)
+  const [wardrobeText,   setWardrobeText]   = useState(_s.wardrobeText   ?? _d.wardrobeText)
+  const [hairstyleText,  setHairstyleText]  = useState(_s.hairstyleText  ?? _d.hairstyleText)
   const [generating,    setGenerating]   = useState(false)
   const [lockedCount,   setLockedCount]  = useState(1)
   const [smoothPct,     setSmoothPct]    = useState(0)
@@ -512,19 +519,20 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
     const id = influencer?.id
     // Restore per-influencer settings
     const s = loadSettings(id)
-    setLocation(s.location       ?? PS_DEFAULTS.location)
-    setTimeOfDay(s.timeOfDay     ?? PS_DEFAULTS.timeOfDay)
-    setPose(s.pose               ?? PS_DEFAULTS.pose)
-    setOutfitPreset(s.outfitPreset ?? PS_DEFAULTS.outfitPreset)
-    setStance(s.stance           ?? PS_DEFAULTS.stance)
-    setAspectRatio(s.aspectRatio ?? PS_DEFAULTS.aspectRatio)
-    setResolution(s.resolution   ?? PS_DEFAULTS.resolution)
-    setOutputCount(s.outputCount ?? PS_DEFAULTS.outputCount)
-    setExpression(s.expression   ?? PS_DEFAULTS.expression)
-    setGaze(s.gaze               ?? PS_DEFAULTS.gaze)
-    setPropText(s.propText       ?? PS_DEFAULTS.propText)
-    setWardrobeText(s.wardrobeText    ?? PS_DEFAULTS.wardrobeText)
-    setHairstyleText(s.hairstyleText ?? PS_DEFAULTS.hairstyleText)
+    const d = psDefaults()
+    setLocation(s.location       ?? d.location)
+    setTimeOfDay(s.timeOfDay     ?? d.timeOfDay)
+    setPose(s.pose               ?? d.pose)
+    setOutfitPreset(s.outfitPreset ?? d.outfitPreset)
+    setStance(s.stance           ?? d.stance)
+    setAspectRatio(s.aspectRatio ?? d.aspectRatio)
+    setResolution(s.resolution   ?? d.resolution)
+    setOutputCount(s.outputCount ?? d.outputCount)
+    setExpression(s.expression   ?? d.expression)
+    setGaze(s.gaze               ?? d.gaze)
+    setPropText(s.propText       ?? d.propText)
+    setWardrobeText(s.wardrobeText    ?? d.wardrobeText)
+    setHairstyleText(s.hairstyleText ?? d.hairstyleText)
     setCurrentImgs([])
     setError(null)
     setWardrobeOpen(false)
@@ -777,8 +785,9 @@ export default function PhotoStudioPanel({ influencer, onGoToWardrobe, onUseAsSt
     setExpression('natural')
     setPropText('')
     setPropSlots([null, null, null])
-    setAspectRatio('9:16')
-    setResolution('4k')
+    const d = psDefaults()
+    setAspectRatio(d.aspectRatio)
+    setResolution(d.resolution)
     setRightMode('location')
     setCurrentImgs([])
     setError(null)
